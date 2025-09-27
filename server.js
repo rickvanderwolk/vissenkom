@@ -19,6 +19,9 @@ const server = http.createServer((req, res) => {
         filePath = path.join(__dirname, 'index.html');
     } else if (pathname === '/controller' || pathname === '/controller.html') {
         filePath = path.join(__dirname, 'controller.html');
+    } else if (pathname.startsWith('/node_modules/')) {
+        // Serve npm packages from node_modules
+        filePath = path.join(__dirname, pathname);
     } else {
         res.writeHead(404);
         res.end('File not found');
@@ -33,7 +36,12 @@ const server = http.createServer((req, res) => {
         }
 
         const ext = path.extname(filePath);
-        const contentType = ext === '.html' ? 'text/html' : 'text/plain';
+        let contentType = 'text/plain';
+        if (ext === '.html') {
+            contentType = 'text/html';
+        } else if (ext === '.js') {
+            contentType = 'application/javascript';
+        }
 
         res.writeHead(200, { 'Content-Type': contentType });
         res.end(data);
@@ -167,7 +175,32 @@ const mainApps = new Set();
 let currentAccessCode = '';
 let accessCodeExpiry = 0;
 
+function disconnectAllControllers() {
+    if (controllers.size > 0) {
+        console.log(`🚪 Disconnecting ${controllers.size} controller(s) due to expired access code`);
+        controllers.forEach(client => {
+            try {
+                // Send a message indicating the code has expired
+                if (client.readyState === 1) { // WebSocket.OPEN
+                    client.send(JSON.stringify({
+                        error: 'Access code expired',
+                        message: 'Your access code has expired. Please refresh and enter the new code.'
+                    }));
+                }
+                // Close the connection
+                client.close(1000, 'Access code expired');
+            } catch (error) {
+                console.error('Error disconnecting controller:', error);
+            }
+        });
+        controllers.clear();
+    }
+}
+
 function generateAccessCode() {
+    // Disconnect all existing controllers before generating new code
+    disconnectAllControllers();
+
     // Generate 6-digit code
     currentAccessCode = Math.floor(100000 + Math.random() * 900000).toString();
     accessCodeExpiry = Date.now() + (60 * 60 * 1000); // 1 hour from now
@@ -176,7 +209,7 @@ function generateAccessCode() {
     appState.currentAccessCode = currentAccessCode;
     appState.accessCodeExpiry = accessCodeExpiry;
 
-    console.log(`Nieuwe toegangscode gegenereerd: ${currentAccessCode} (geldig tot ${new Date(accessCodeExpiry).toLocaleTimeString()})`);
+    console.log(`🔑 Nieuwe toegangscode gegenereerd: ${currentAccessCode} (geldig tot ${new Date(accessCodeExpiry).toLocaleTimeString()})`);
 
     // Log the access code generation
     logEvent('access_code_generated', {
@@ -547,7 +580,7 @@ function broadcastNewAccessCode() {
         expiresAt: accessCodeExpiry
     };
 
-    console.log('Broadcasting nieuwe access code naar main apps:', currentAccessCode);
+    console.log('📡 Broadcasting nieuwe access code naar main apps:', currentAccessCode, `(${mainApps.size} clients)`);
     mainApps.forEach(client => {
         sendToClient(client, accessCodeMessage);
     });
@@ -565,14 +598,12 @@ setInterval(() => {
     }
 }, 5000);
 
-// Check and regenerate access code every hour
+// Auto-regenerate access code 10 minutes before expiry (50 minutes interval for 1 hour codes)
 setInterval(() => {
-    const now = Date.now();
-    if (now > accessCodeExpiry) {
-        console.log('Access code verlopen, genereer nieuwe...');
-        generateAccessCode();
-    }
-}, 60 * 60 * 1000); // Every hour
+    console.log('🔄 Auto-regenerating access code for QR update...');
+    generateAccessCode();
+    broadcastNewAccessCode();
+}, 50 * 60 * 1000); // Every 50 minutes (10 minute buffer before 1 hour expiry)
 
 // Create WebSocket server on the same HTTP server
 const wss = new WebSocket.Server({ server });

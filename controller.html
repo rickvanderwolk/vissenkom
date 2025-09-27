@@ -522,6 +522,12 @@
                             showAccessDenied(data.message);
                             return;
                         }
+                        // Handle access code expiry
+                        if (data.error === 'Access code expired') {
+                            console.log('Mobile Debug: Access code expired, redirecting to login');
+                            showAccessDenied(data.message || 'Your access code has expired. Please enter the new code.');
+                            return;
+                        }
 
                         handleMessage(data);
                     } catch (error) {

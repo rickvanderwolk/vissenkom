@@ -8,9 +8,14 @@
     "dev": "node server.js"
   },
   "dependencies": {
+    "qrious": "^4.0.2",
     "ws": "^8.14.2"
   },
-  "keywords": ["websocket", "vissenkom", "aquarium"],
+  "keywords": [
+    "websocket",
+    "vissenkom",
+    "aquarium"
+  ],
   "author": "",
   "license": "MIT"
 }

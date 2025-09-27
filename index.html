@@ -4,6 +4,7 @@
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>Vissenkom Demo</title>
+
 <style>
 html,body{height:100%;margin:0;overflow:hidden}
 body{font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;display:flex;flex-direction:column;transition:color .2s ease, background .2s ease}
@@ -1055,45 +1056,91 @@ function drawQR(){
 }
 
 function updateQRWithCode(accessCode) {
-  const el=document.getElementById('qr');
+  const el = document.getElementById('qr');
   const controllerUrl = `${window.location.protocol}//${window.location.host}/controller?code=${accessCode}`;
 
-  // Use a more reliable QR code service
-  const qrUrl = `https://chart.googleapis.com/chart?chs=200x200&cht=qr&chl=${encodeURIComponent(controllerUrl)}`;
+  console.log('📱 Generating local QR code for URL:', controllerUrl);
 
-  // Create img element instead of drawing on canvas
-  el.style.display = 'none';
-  let img = el.parentNode.querySelector('.qr-img');
+  // Show canvas and hide any existing img
+  el.style.display = 'block';
+  const existingImg = el.parentNode.querySelector('.qr-img');
+  if (existingImg) {
+    existingImg.style.display = 'none';
+  }
+
+  // Configure QR code options
+  const qrOptions = {
+    width: 200,
+    height: 200,
+    color: {
+      dark: '#000000',
+      light: '#FFFFFF'
+    },
+    margin: 2
+  };
+
+  // Add visual feedback during generation
+  el.style.opacity = '0.7';
+  el.style.filter = 'blur(1px)';
+
+  // Check if QRious library is available
+  if (typeof QRious === 'undefined' || !window.qriousLoaded) {
+    console.warn('⚠️ QRious library not loaded yet, retrying in 100ms...');
+
+    // Retry after a short delay for library to load
+    setTimeout(() => {
+      console.log('🔄 Retrying QR generation...');
+      updateQRWithCode(accessCode);
+    }, 100);
+    return;
+  }
+
+  try {
+    // Generate QR code locally using QRious library
+    const qr = new QRious({
+      element: el,
+      value: controllerUrl,
+      size: 200, // Back to 200px
+      level: 'M'
+    });
+
+    console.log('✅ Local QR code generated successfully with QRious');
+
+    // Restore visual clarity with smooth transition
+    el.style.transition = 'opacity 0.3s ease, filter 0.3s ease';
+    el.style.opacity = '1';
+    el.style.filter = 'none';
+
+    // Style the canvas - override CSS to match external QR size
+    el.style.borderRadius = '6px';
+    el.style.boxShadow = '0 4px 12px rgba(0,0,0,.25)';
+    el.style.background = '#fff';
+    el.style.width = '200px';  // Fixed width to match external QR
+    el.style.height = '200px'; // Fixed height to match external QR
+
+  } catch (error) {
+    console.error('❌ Local QR generation failed:', error);
+    // Fallback to old method if local generation fails
+    fallbackToExternalQR(el, controllerUrl, accessCode);
+  }
+}
+
+// Fallback function for external QR generation (backup)
+function fallbackToExternalQR(canvas, controllerUrl, accessCode) {
+  console.log('🔄 Falling back to external QR service...');
+
+  canvas.style.display = 'none';
+  let img = canvas.parentNode.querySelector('.qr-img');
   if (!img) {
     img = document.createElement('img');
     img.className = 'qr-img';
-    img.style.cssText = 'display: block; width: 100%; margin: 0 auto; aspect-ratio: 1/1; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,.25); background: #fff';
-    el.parentNode.insertBefore(img, el);
-
-    // Add error handling
-    img.onerror = function() {
-      console.log('QR code loading failed, trying fallback...');
-      // Fallback to qr-server API with cache busting
-      this.src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(controllerUrl)}&t=${Date.now()}`;
-    };
+    img.style.cssText = 'display: block; width: 200px; height: 200px; margin: 0 auto; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,.25); background: #fff';
+    canvas.parentNode.insertBefore(img, canvas);
   }
 
-  // Add visual feedback during update
-  img.style.opacity = '0.5';
-  img.style.filter = 'blur(2px)';
-
-  // Add cache busting to force reload
-  img.src = qrUrl + '&t=' + Date.now();
+  img.style.display = 'block';
+  img.src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(controllerUrl)}&t=${Date.now()}`;
   img.alt = 'QR Code naar Controller';
-
-  // Restore visual clarity when loaded
-  img.onload = function() {
-    this.style.opacity = '1';
-    this.style.filter = 'none';
-    this.style.transition = 'opacity 0.3s ease, filter 0.3s ease';
-  };
-
-  console.log('QR code updated with URL:', controllerUrl);
 }
 
 // WebSocket connection for receiving commands
@@ -1144,6 +1191,7 @@ function handleRemoteCommand(data) {
             loadGameState(data.data);
             break;
         case 'accessCode':
+            console.log('🔄 Received new access code from server:', data.code);
             updateQRWithCode(data.code);
             break;
         case 'version':
@@ -1392,5 +1440,8 @@ if(fadeState==='idle'&&now-lastDecorUpdate>DECOR_UPDATE_INTERVAL){
 
 requestAnimationFrame(loop)}loop();
 </script>
+
+<!-- QR Code generation library - qrious (browser-native) -->
+<script src="./node_modules/qrious/dist/qrious.min.js" onload="console.log('✅ QRious library loaded successfully'); window.qriousLoaded = true;" onerror="console.error('❌ Failed to load QRious library'); window.qriousLoaded = false;"></script>
 </body>
 </html>
