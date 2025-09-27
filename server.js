@@ -655,6 +655,21 @@ wss.on('connection', (ws, req) => {
         });
         sendFeedCooldownUpdate(ws);
     } else {
+        // Check if there's already an active main app connection
+        if (mainApps.size >= 1) {
+            console.log('🚫 Tweede vissenkom verbinding geweigerd - er is al een actieve verbinding');
+            // Send error message before closing
+            sendToClient(ws, {
+                error: 'vissenkom_already_active',
+                message: 'Vissenkom is al geopend in ander tabblad of device'
+            });
+            // Close connection after short delay to ensure message is sent
+            setTimeout(() => {
+                ws.close(1008, 'Vissenkom already active elsewhere');
+            }, 100);
+            return;
+        }
+
         mainApps.add(ws);
         console.log('Main app verbonden');
     }
