@@ -2,8 +2,14 @@
 <html lang="nl">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Vissenkom Controller</title>
+
+    <!-- iOS Safari adresbalk kleur -->
+    <meta name="theme-color" content="#0b1e2d">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="msapplication-navbutton-color" content="#0b1e2d">
     <style>
         html, body {
             height: 100%;
@@ -11,32 +17,66 @@
             font-family: system-ui, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
             background: linear-gradient(135deg, #0b1e2d 0%, #083042 100%);
             color: #e9f1f7;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
             box-sizing: border-box;
+            /* Mobile optimizations */
+            -webkit-text-size-adjust: 100%; /* Prevent iOS text scaling */
+            -webkit-font-smoothing: antialiased; /* Better font rendering */
+            -moz-osx-font-smoothing: grayscale;
+            overflow-x: hidden; /* Prevent horizontal scroll */
+            overflow-y: auto; /* Allow vertical scroll */
+            /* Fix for iOS safe areas */
+            padding-top: env(safe-area-inset-top, 0);
+            padding-bottom: env(safe-area-inset-bottom, 0);
+            padding-left: env(safe-area-inset-left, 0);
+            padding-right: env(safe-area-inset-right, 0);
+        }
+
+        body {
+            min-height: 100vh; /* Use viewport height instead of 100% */
+            min-height: -webkit-fill-available; /* iOS Safari fix */
+            padding: 20px;
+            display: block; /* Change from flex to block for scrolling */
         }
 
         .controller-container {
             background: rgba(0, 0, 0, 0.3);
             backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px); /* Safari support */
             border-radius: 20px;
             padding: 40px;
             box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
             max-width: 600px;
-            width: 100%;
+            width: calc(100% - 40px); /* Account for body padding */
+            margin: 0 auto; /* Center the container */
+            margin-bottom: 40px; /* Extra space at bottom for scroll */
+        }
+
+        /* Fallback for browsers without backdrop-filter support */
+        @supports not (backdrop-filter: blur(10px)) {
+            .controller-container {
+                background: rgba(0, 0, 0, 0.7);
+            }
         }
 
         h1 {
             text-align: center;
             margin-bottom: 30px;
             font-size: 2.5em;
+            color: #50e3c2; /* Fallback color for mobile browsers */
             background: linear-gradient(45deg, #50e3c2, #4ecdc4);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
+            /* Better mobile support */
+            -webkit-text-stroke: 0.5px rgba(80, 227, 194, 0.3);
+        }
+
+        /* Fallback for browsers that don't support background-clip: text */
+        @supports not (-webkit-background-clip: text) {
+            h1 {
+                color: #50e3c2;
+                text-shadow: 0 2px 10px rgba(80, 227, 194, 0.3);
+            }
         }
 
         .connection-status {
@@ -78,6 +118,10 @@
             transition: all 0.2s ease;
             position: relative;
             overflow: hidden;
+            /* Mobile touch optimization */
+            min-height: 44px; /* Minimum touch target size */
+            touch-action: manipulation; /* Disable double-tap zoom */
+            -webkit-tap-highlight-color: transparent; /* Remove iOS tap highlight */
         }
 
         .control-button:hover {
@@ -135,35 +179,196 @@
         .add-fish-container {
             margin-top: 20px;
             display: flex;
-            gap: 10px;
-            align-items: center;
+            gap: 6px; /* Reduced from 10px to 6px */
+            align-items: stretch; /* Changed from center to stretch */
+            flex-wrap: wrap; /* Allow wrapping on small screens */
         }
 
         #fishNameInput {
             flex: 1;
+            min-width: 200px; /* Ensure minimum width */
             padding: 12px;
             border: none;
             border-radius: 10px;
             background: rgba(255, 255, 255, 0.1);
             color: #e9f1f7;
             font-size: 16px;
+            box-sizing: border-box; /* Include padding in width calculation */
         }
 
         #fishNameInput::placeholder {
             color: rgba(233, 241, 247, 0.6);
         }
 
+        .add-fish-btn {
+            flex: none !important;
+            padding: 12px 20px !important;
+            white-space: nowrap; /* Prevent text wrapping */
+        }
+
         @media (max-width: 600px) {
+            body {
+                padding: 15px;
+                /* Extra space for small screens */
+                padding-top: max(15px, env(safe-area-inset-top, 0));
+                padding-bottom: max(30px, env(safe-area-inset-bottom, 0));
+            }
+
             .controller-container {
                 padding: 20px;
+                margin: 0 auto;
+                margin-bottom: 30px;
+                width: calc(100% - 30px); /* Account for reduced body padding */
             }
 
             .controls-grid {
                 grid-template-columns: 1fr;
+                gap: 15px;
+            }
+
+            .control-button {
+                padding: 18px;
+                font-size: 15px;
+                /* Ensure buttons are never too small */
+                min-height: 50px;
             }
 
             h1 {
-                font-size: 2em;
+                font-size: 1.8em; /* Slightly smaller for small screens */
+                margin-bottom: 15px;
+                margin-top: 0;
+            }
+
+            .connection-status {
+                margin-bottom: 20px;
+                font-size: 14px;
+                padding: 8px;
+            }
+
+            .status-display {
+                margin-bottom: 20px;
+            }
+
+            .add-fish-container {
+                margin-top: 15px;
+                margin-bottom: 0;
+                flex-direction: column; /* Stack vertically on mobile */
+                align-items: stretch;
+            }
+
+            #fishNameInput {
+                min-width: unset; /* Remove min-width on mobile */
+                margin-bottom: 6px; /* Reduced from 10px to 6px */
+            }
+
+            .add-fish-btn {
+                flex: none !important;
+                width: 100% !important; /* Full width on mobile */
+                padding: 15px !important;
+                margin-top: 6px; /* Reduced from 10px to 6px */
+            }
+        }
+
+        /* iOS Safari specific fixes */
+        @supports (-webkit-touch-callout: none) {
+            .controller-container {
+                -webkit-user-select: none;
+                user-select: none;
+            }
+
+            .control-button {
+                -webkit-appearance: none;
+                -webkit-touch-callout: none;
+            }
+
+            /* iOS viewport height fix */
+            html {
+                height: -webkit-fill-available;
+            }
+
+            body {
+                min-height: -webkit-fill-available;
+                /* iOS momentum scrolling */
+                -webkit-overflow-scrolling: touch;
+            }
+        }
+
+        /* Android Chrome specific fixes */
+        @media screen and (-webkit-min-device-pixel-ratio: 0) and (min-resolution: .001dpcm) {
+            .control-button {
+                /* Fix for Android button rendering */
+                transform: translateZ(0);
+                will-change: transform;
+            }
+        }
+
+        /* High DPI displays */
+        @media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+            .control-button {
+                /* Crisper borders on retina displays */
+                box-shadow: 0 6px 20px rgba(80, 227, 194, 0.3), inset 0 0 0 1px rgba(80, 227, 194, 0.1);
+            }
+        }
+
+        /* Very small screens (older phones) */
+        @media (max-width: 400px), (max-height: 600px) {
+            body {
+                padding: 10px;
+                padding-top: max(10px, env(safe-area-inset-top, 0));
+                padding-bottom: max(20px, env(safe-area-inset-bottom, 0));
+            }
+
+            .controller-container {
+                padding: 15px;
+                border-radius: 15px;
+                width: calc(100% - 20px);
+            }
+
+            h1 {
+                font-size: 1.5em;
+                margin-bottom: 10px;
+            }
+
+            .control-button {
+                padding: 15px;
+                font-size: 14px;
+                min-height: 48px;
+            }
+
+            .controls-grid {
+                gap: 12px;
+            }
+
+            .connection-status {
+                margin-bottom: 15px;
+                font-size: 13px;
+            }
+
+            .status-display {
+                padding: 15px;
+            }
+
+            .status-grid {
+                gap: 10px;
+            }
+
+            .status-item {
+                padding: 12px;
+                font-size: 13px;
+            }
+
+            .add-fish-container {
+                margin-top: 12px;
+            }
+
+            #fishNameInput {
+                padding: 10px;
+                font-size: 14px;
+            }
+
+            .add-fish-btn {
+                padding: 12px !important;
+                font-size: 14px !important;
             }
         }
     </style>
@@ -194,13 +399,13 @@
             </button>
 
             <button id="cleanBtn" class="control-button" disabled>
-                🧹 Opruimen
+                🧹 Schoonmaken
             </button>
         </div>
 
         <div class="add-fish-container">
             <input type="text" id="fishNameInput" placeholder="Naam van je visje..." disabled>
-            <button id="addFishBtn" class="control-button" style="flex: none; padding: 12px 20px;" disabled>
+            <button id="addFishBtn" class="control-button add-fish-btn" disabled>
                 🐟 Toevoegen
             </button>
         </div>
@@ -254,72 +459,139 @@
         const pumpStatus = document.getElementById('pumpStatus');
         const feedStatus = document.getElementById('feedStatus');
 
+        let reconnectAttempts = 0;
+        const maxReconnectAttempts = 10;
+
         function connectWebSocket() {
             // Get access code from URL
             const urlParams = new URLSearchParams(window.location.search);
             const accessCode = urlParams.get('code');
 
             if (!accessCode) {
+                console.error('Mobile Debug: No access code found in URL');
                 showAccessDenied('Ongeldige code. Scan de QR code opnieuw.');
                 return;
             }
+
+            console.log('Mobile Debug: Starting WebSocket connection with code:', accessCode);
 
             // Try to connect to websocket server with access code
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
             const port = window.location.port ? `:${window.location.port}` : '';
             const wsUrl = `${protocol}//${window.location.hostname}${port}/controller?code=${accessCode}`;
 
+            console.log('Mobile Debug: WebSocket URL:', wsUrl);
+            console.log('Mobile Debug: User agent:', navigator.userAgent);
+
             try {
+                // Close existing connection if any
+                if (ws && ws.readyState !== WebSocket.CLOSED) {
+                    ws.close();
+                }
+
                 ws = new WebSocket(wsUrl);
 
+                // Set longer timeout for mobile networks
+                const connectionTimeout = setTimeout(() => {
+                    console.error('Mobile Debug: Connection timeout');
+                    if (ws.readyState === WebSocket.CONNECTING) {
+                        ws.close();
+                        setConnectionStatus(false);
+                        scheduleReconnect();
+                    }
+                }, 10000); // 10 second timeout
+
                 ws.onopen = function() {
-                    console.log('WebSocket verbonden');
+                    clearTimeout(connectionTimeout);
+                    console.log('Mobile Debug: WebSocket connected successfully');
+                    reconnectAttempts = 0; // Reset counter on successful connection
                     setConnectionStatus(true);
                     requestStatus();
                     requestVersion();
                 };
 
                 ws.onmessage = function(event) {
-                    const data = JSON.parse(event.data);
+                    console.log('Mobile Debug: Received message:', event.data);
 
-                    // Handle access denied
-                    if (data.type === 'accessDenied') {
-                        showAccessDenied(data.message);
-                        return;
+                    try {
+                        const data = JSON.parse(event.data);
+
+                        // Handle access denied
+                        if (data.type === 'accessDenied') {
+                            console.error('Mobile Debug: Access denied:', data.message);
+                            showAccessDenied(data.message);
+                            return;
+                        }
+
+                        handleMessage(data);
+                    } catch (error) {
+                        console.error('Mobile Debug: Error parsing message:', error);
                     }
-
-                    handleMessage(data);
                 };
 
-                ws.onclose = function() {
-                    console.log('WebSocket verbinding gesloten');
+                ws.onclose = function(event) {
+                    clearTimeout(connectionTimeout);
+                    console.log('Mobile Debug: WebSocket closed. Code:', event.code, 'Reason:', event.reason);
                     setConnectionStatus(false);
-                    // Try to reconnect after 3 seconds
-                    setTimeout(connectWebSocket, 3000);
+
+                    // Don't reconnect if it was a normal close or access denied
+                    if (event.code !== 1000 && event.code !== 1008) {
+                        scheduleReconnect();
+                    }
                 };
 
                 ws.onerror = function(error) {
-                    console.error('WebSocket fout:', error);
+                    clearTimeout(connectionTimeout);
+                    console.error('Mobile Debug: WebSocket error:', error);
                     setConnectionStatus(false);
                 };
 
             } catch (error) {
-                console.error('Kan geen verbinding maken:', error);
+                console.error('Mobile Debug: Exception creating WebSocket:', error);
                 setConnectionStatus(false);
-                setTimeout(connectWebSocket, 3000);
+                scheduleReconnect();
             }
         }
 
+        function scheduleReconnect() {
+            if (reconnectAttempts >= maxReconnectAttempts) {
+                console.error('Mobile Debug: Max reconnection attempts reached');
+                showAccessDenied('Verbinding mislukt na meerdere pogingen. Refresh de pagina.');
+                return;
+            }
+
+            reconnectAttempts++;
+            const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 30000); // Exponential backoff, max 30s
+            console.log(`Mobile Debug: Scheduling reconnect attempt ${reconnectAttempts} in ${delay}ms`);
+
+            setTimeout(connectWebSocket, delay);
+        }
+
         function setConnectionStatus(connected) {
+            console.log('Mobile Debug: Setting connection status:', connected);
+
             isConnected = connected;
-            connectionStatus.className = `connection-status ${connected ? 'connected' : 'disconnected'}`;
-            connectionStatus.textContent = `Verbinding: ${connected ? 'Verbonden' : 'Niet verbonden'}`;
+
+            // Update UI elements
+            if (connectionStatus) {
+                connectionStatus.className = `connection-status ${connected ? 'connected' : 'disconnected'}`;
+                connectionStatus.textContent = `Verbinding: ${connected ? 'Verbonden' : 'Niet verbonden'}`;
+                console.log('Mobile Debug: Updated connection status display');
+            } else {
+                console.error('Mobile Debug: Connection status element not found!');
+            }
 
             // Enable/disable controls based on connection
             const controls = [feedBtn, lightBtn, discoBtn, pumpBtn, cleanBtn, addFishBtn, fishNameInput];
             controls.forEach(control => {
-                control.disabled = !connected;
+                if (control) {
+                    control.disabled = !connected;
+                } else {
+                    console.warn('Mobile Debug: Control button not found');
+                }
             });
+
+            console.log('Mobile Debug: Controls', connected ? 'enabled' : 'disabled');
         }
 
         function sendCommand(command, data = {}) {
@@ -361,6 +633,15 @@
             lightBtn.textContent = status.lightsOn ? '🌙 Licht uit' : '☀️ Licht aan';
             discoBtn.textContent = status.discoOn ? '💡🎉 Disco uit' : '💡🎉 Disco aan';
             pumpBtn.textContent = status.pumpOn ? '💨 Pomp uit' : '💨 Pomp aan';
+
+            // Update clean button availability based on poop count
+            const hasPoopToClear = status.poopCount && status.poopCount > 0;
+            if (isConnected) {
+                cleanBtn.disabled = !hasPoopToClear;
+                cleanBtn.style.opacity = hasPoopToClear ? '1' : '0.5';
+
+                console.log('Mobile Debug: Clean button', hasPoopToClear ? 'enabled' : 'disabled', 'poop count:', status.poopCount);
+            }
         }
 
         function ageLabelMS(ms) {
@@ -433,8 +714,39 @@
             }
         });
 
-        // Start connection
-        connectWebSocket();
+        // Mobile debugging - check DOM elements on startup
+        function checkDOMElements() {
+            console.log('Mobile Debug: Checking DOM elements...');
+            console.log('Mobile Debug: connectionStatus element:', !!connectionStatus);
+            console.log('Mobile Debug: h1 element:', !!document.querySelector('h1'));
+            console.log('Mobile Debug: controller-container:', !!document.querySelector('.controller-container'));
+            console.log('Mobile Debug: feedBtn:', !!feedBtn);
+            console.log('Mobile Debug: lightBtn:', !!lightBtn);
+            console.log('Mobile Debug: Window size:', window.innerWidth, 'x', window.innerHeight);
+            console.log('Mobile Debug: Device pixel ratio:', window.devicePixelRatio);
+            console.log('Mobile Debug: Network:', navigator.onLine ? 'online' : 'offline');
+
+            // Check if CSS is loaded
+            const testElement = document.querySelector('.controller-container');
+            if (testElement) {
+                const computedStyle = window.getComputedStyle(testElement);
+                console.log('Mobile Debug: CSS loaded (background):', computedStyle.background !== '');
+                console.log('Mobile Debug: CSS loaded (padding):', computedStyle.padding);
+            }
+        }
+
+        // Wait for DOM to be fully loaded
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', () => {
+                console.log('Mobile Debug: DOM loaded');
+                checkDOMElements();
+                connectWebSocket();
+            });
+        } else {
+            console.log('Mobile Debug: DOM already loaded');
+            checkDOMElements();
+            connectWebSocket();
+        }
 
         // Request status updates every 5 seconds for better performance
         setInterval(() => {
@@ -442,6 +754,15 @@
                 requestStatus();
             }
         }, 5000);
+
+        // Add visibility change listener for mobile app switching
+        document.addEventListener('visibilitychange', () => {
+            console.log('Mobile Debug: Visibility changed to:', document.visibilityState);
+            if (document.visibilityState === 'visible' && !isConnected) {
+                console.log('Mobile Debug: App became visible, attempting reconnect');
+                connectWebSocket();
+            }
+        });
     </script>
 </body>
 </html>

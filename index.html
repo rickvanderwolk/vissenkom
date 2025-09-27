@@ -1013,6 +1013,11 @@ function updateFish(f,dt,now){
       size: rand(3, 6)
     });
     f.lastPoop = now;
+
+    // Report poop count to server for controller updates
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ command: 'reportPoop', poopCount: poops.length }));
+    }
   }
 
   if(Date.now()-f.lastEat>=f.hungerWindow) f.dead=true;
@@ -1202,6 +1207,11 @@ function loadGameState(state) {
     drawLists();
 
     console.log(`Geladen: ${fishes.length} vissen, ${deadLog.length} overleden vissen`);
+
+    // Report current poop count to server
+    if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ command: 'reportPoop', poopCount: poops.length }));
+    }
 }
 
 function makeFishFromData(serverFish) {
@@ -1283,7 +1293,15 @@ function addFish(nameOrData, newCounter){
 function toggleLight(){lightsOn=!lightsOn;document.getElementById('tank').style.background=lightsOn?BG:BG_NIGHT;document.getElementById('lightStatus').textContent='Licht: '+(lightsOn?'aan':'uit');document.body.classList.toggle('light',lightsOn);document.body.classList.toggle('dark',!lightsOn)}
 function toggleDisco(){discoOn=!discoOn;document.getElementById('discoStatus').textContent='Disco: '+(discoOn?'aan':'uit')}
 function togglePump(){pumpOn=!pumpOn;document.getElementById('pumpStatus').textContent='Pomp: '+(pumpOn?'aan':'uit');if(pumpOn){pumpPos.x=W-70;pumpJustOnUntil=Date.now()+3000}}
-function cleanTank(){poops.length=0;console.log('Tank opgeruimd! Alle poep weggehaald.')}
+function cleanTank(){
+  poops.length=0;
+  console.log('Tank opgeruimd! Alle poep weggehaald.');
+
+  // Report poop count to server for controller updates
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({ command: 'reportPoop', poopCount: 0 }));
+  }
+}
 function updateCooldown(){
     const cd=document.getElementById('cooldown');
     const left=Math.max(0,FEED_CD-(Date.now()-lastFed));

@@ -57,7 +57,8 @@ let appState = {
     deadLog: [],
     fishCounter: 1,
     currentAccessCode: '',
-    accessCodeExpiry: 0
+    accessCodeExpiry: 0,
+    poopCount: 0 // Track amount of poop in tank
 };
 
 // Load existing state from file
@@ -241,6 +242,9 @@ function handleCommand(data, fromClient) {
         case 'cleanTank':
             handleCleanTank();
             break;
+        case 'reportPoop':
+            handleReportPoop(data.poopCount);
+            break;
         case 'addFish':
             handleAddFish(data.name);
             break;
@@ -336,12 +340,30 @@ function handleTogglePump() {
 function handleCleanTank() {
     console.log('Tank wordt opgeruimd - alle poep weggehaald');
 
+    // Reset poop count
+    appState.poopCount = 0;
+
     // Log event
     logEvent('tank_cleaned', {
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        poopCleaned: appState.poopCount
     });
 
     broadcastToMainApp({ command: 'cleanTank' });
+    broadcastStatusUpdate(); // Update controllers with new poop status
+    saveState(); // Save state immediately
+}
+
+function handleReportPoop(poopCount) {
+    if (typeof poopCount === 'number' && poopCount >= 0) {
+        appState.poopCount = Math.max(0, poopCount);
+        console.log('Poep count gerapporteerd:', appState.poopCount);
+
+        // Broadcast status update to controllers
+        broadcastStatusUpdate();
+
+        // Auto-save will handle persistence (every 30s)
+    }
 }
 
 function handleAddFish(name) {
@@ -412,7 +434,8 @@ function broadcastStatusUpdate() {
         data: {
             lightsOn: appState.lightsOn,
             discoOn: appState.discoOn,
-            pumpOn: appState.pumpOn
+            pumpOn: appState.pumpOn,
+            poopCount: appState.poopCount
         }
     };
 
@@ -427,7 +450,8 @@ function sendStatusUpdate(client) {
         data: {
             lightsOn: appState.lightsOn,
             discoOn: appState.discoOn,
-            pumpOn: appState.pumpOn
+            pumpOn: appState.pumpOn,
+            poopCount: appState.poopCount
         }
     };
 
@@ -467,7 +491,8 @@ function sendGameState(client) {
             lastFed: appState.lastFed,
             lightsOn: appState.lightsOn,
             discoOn: appState.discoOn,
-            pumpOn: appState.pumpOn
+            pumpOn: appState.pumpOn,
+            poopCount: appState.poopCount
         }
     };
 
