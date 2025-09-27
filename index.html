@@ -159,21 +159,22 @@ let discoCache={};let lastDiscoTime=0;
 function discoEffects(time){
   if(!discoOn)return;
 
-  if(time-lastDiscoTime<0.08)return;
+  // Reduce frame rate for disco effects to improve performance
+  if(time-lastDiscoTime<0.15)return;
   lastDiscoTime=time;
 
   const pulse=Math.sin(time*2)*0.5+0.5;
   ctx.globalCompositeOperation='lighter';
-  const spots=6;
+  const spots=4; // Reduced from 6 to 4 for better performance
   for(let i=0;i<spots;i++){
     const spotTime=time*0.7+i*0.8;
-    const x=(W/spots)*i+W/(spots*2)+Math.sin(spotTime*1.2)*60;
-    const y=H*0.3+Math.sin(spotTime*0.8+i)*H*0.4;
-    const hue=(time*30+i*45)%360;
-    const spotOn=Math.sin(spotTime*0.5+i)>0.3;
+    const x=(W/spots)*i+W/(spots*2)+Math.sin(spotTime*1.2)*40; // Reduced movement range
+    const y=H*0.3+Math.sin(spotTime*0.8+i)*H*0.3; // Reduced movement range
+    const hue=(time*20+i*45)%360; // Slower color change
+    const spotOn=Math.sin(spotTime*0.5+i)>0.4; // Less frequent flashing
     if(spotOn){
-      const alpha=0.12*(0.7+pulse*0.3);
-      const size=35+Math.sin(spotTime*2+i)*15;
+      const alpha=0.08*(0.7+pulse*0.3); // Reduced intensity
+      const size=30+Math.sin(spotTime*1.5+i)*10; // Smaller size variation
       const grad=ctx.createRadialGradient(x,y,0,x,y,size);
       grad.addColorStop(0,`hsla(${hue},100%,75%,${alpha})`);
       grad.addColorStop(0.6,`hsla(${(hue+60)%360},90%,65%,${alpha*0.5})`);
@@ -187,7 +188,7 @@ function discoEffects(time){
   ctx.globalCompositeOperation='source-over';
 }
 
-function makeFish(x=rand(50,W-50),y=rand(50,H-50),name){const base=rand(18,30);const hue=Math.floor(rand(0,360));const initialVx=rand(-1.2,1.2);const initialVy=rand(-.2,.2);const f={x,y,vx:initialVx,vy:initialVy,speed:rand(0.7,1.2),baseSize:base,hue,dir:Math.random()*Math.PI*2,turnTimer:Math.floor(rand(30,120)),blink:0,name:name||`Vis ${fishCounter++}`,lastEat:Date.now(),bornAt:Date.now(),eats:0,sickTop:Math.random()<0.5,hungerWindow:DAY*rand(0.9,1.1),behaviorState:'normal',behaviorTimer:0,wallFollowTarget:null,lastPoop:Date.now(),targetVx:initialVx,targetVy:initialVy};fishes.push(f)}
+function makeFish(x=rand(50,W-50),y=rand(50,H-50),name){const base=rand(18,30);let hue=Math.floor(rand(0,360));if(isNaN(hue))hue=0;const initialVx=rand(-1.2,1.2);const initialVy=rand(-.2,.2);const f={x,y,vx:initialVx,vy:initialVy,speed:rand(0.7,1.2),baseSize:base,hue,dir:Math.random()*Math.PI*2,turnTimer:Math.floor(rand(30,120)),blink:0,name:name||`Vis ${fishCounter++}`,lastEat:Date.now(),bornAt:Date.now(),eats:0,sickTop:Math.random()<0.5,hungerWindow:DAY*rand(0.9,1.1),behaviorState:'normal',behaviorTimer:0,wallFollowTarget:null,lastPoop:Date.now(),targetVx:initialVx,targetVy:initialVy};fishes.push(f)}
 for(let i=0;i<8;i++)makeFish();
 
 function makeFood(){const n=Math.max(8,fishes.length);for(let i=0;i<n;i++){foods.push({x:rand(40,W-40),y:50+rand(0,30),vy:rand(0.7,1.5),r:7,ttl:2000})}}
@@ -195,29 +196,112 @@ function makeBubble(){const x=pumpPos.x+rand(-6,6);const r=rand(2,6);bubbles.pus
 
 function healthPct(f,now){return clamp(100*(1-((now-f.lastEat)/f.hungerWindow)),0,100)}
 function fishSize(f,now){const ageDays=clamp((now-f.bornAt)/DAY,0,365);const growth=1+Math.min(0.5,ageDays*0.06+f.eats*0.03);return f.baseSize*growth}
-function steerTowards(f,tx,ty,str){const dx=tx-f.x,dy=ty-f.y;const d=Math.hypot(dx,dy)||1;f.vx+=dx/d*str;f.vy+=dy/d*str}
-function limitSpeed(f){const sp=Math.hypot(f.vx,f.vy);const max=f.speed*1.8;const min=0.2;if(sp>max){f.vx=f.vx/sp*max;f.vy=f.vy/sp*max}if(sp<min){const a=Math.atan2(f.vy,f.vx);f.vx=Math.cos(a)*min;f.vy=Math.sin(a)*min}}
+function steerTowards(f,tx,ty,str){
+  // Validate inputs to prevent jumping
+  if(isNaN(tx) || isNaN(ty) || isNaN(str)) return;
+  if(isNaN(f.x) || isNaN(f.y)) return;
+
+  const dx=tx-f.x;
+  const dy=ty-f.y;
+  const d=Math.hypot(dx,dy);
+
+  // Prevent division by zero and limit maximum steering force
+  if(d < 0.1 || d > 1000) return;
+
+  const maxSteer = f.speed * 0.1; // Limit steering force
+  const steerX = Math.max(-maxSteer, Math.min(maxSteer, dx/d*str));
+  const steerY = Math.max(-maxSteer, Math.min(maxSteer, dy/d*str));
+
+  f.vx += steerX;
+  f.vy += steerY;
+}
+function limitSpeed(f){
+  // Validate fish speed property
+  if(isNaN(f.speed) || f.speed <= 0) f.speed = 1.0;
+
+  // Validate velocities
+  if(isNaN(f.vx)) f.vx = 0.1;
+  if(isNaN(f.vy)) f.vy = 0.05;
+
+  const sp=Math.hypot(f.vx,f.vy);
+  const max=f.speed*1.8;
+  const min=0.2;
+
+  if(sp > max && sp > 0){
+    f.vx = f.vx/sp*max;
+    f.vy = f.vy/sp*max;
+  }
+  if(sp < min){
+    const a = Math.atan2(f.vy, f.vx);
+    if(!isNaN(a)) {
+      f.vx = Math.cos(a) * min;
+      f.vy = Math.sin(a) * min;
+    } else {
+      f.vx = min;
+      f.vy = 0;
+    }
+  }
+}
 function bounceOffWalls(f){
   const margin = 20;
+
   // Bounce off left wall
   if(f.x < margin) {
-    f.x = margin;
-    f.vx = Math.abs(f.vx);
+    f.x = margin + 1; // Add small buffer to prevent sticking
+    f.vx = Math.abs(f.vx) + 0.1; // Add small velocity to prevent zero velocity
+    // Reset behavior to normal if stuck in corner
+    if(f.behaviorState !== 'normal') {
+      f.behaviorState = 'normal';
+      f.behaviorTimer = 0;
+      f.wallFollowTarget = null;
+    }
   }
   // Bounce off right wall
   if(f.x > W - margin) {
-    f.x = W - margin;
-    f.vx = -Math.abs(f.vx);
+    f.x = W - margin - 1;
+    f.vx = -Math.abs(f.vx) - 0.1;
+    if(f.behaviorState !== 'normal') {
+      f.behaviorState = 'normal';
+      f.behaviorTimer = 0;
+      f.wallFollowTarget = null;
+    }
   }
   // Bounce off top wall
   if(f.y < margin) {
-    f.y = margin;
-    f.vy = Math.abs(f.vy);
+    f.y = margin + 1;
+    f.vy = Math.abs(f.vy) + 0.1;
+    if(f.behaviorState !== 'normal') {
+      f.behaviorState = 'normal';
+      f.behaviorTimer = 0;
+      f.wallFollowTarget = null;
+    }
   }
   // Bounce off bottom wall
   if(f.y > H - margin) {
-    f.y = H - margin;
-    f.vy = -Math.abs(f.vy);
+    f.y = H - margin - 1;
+    f.vy = -Math.abs(f.vy) - 0.1;
+    if(f.behaviorState !== 'normal') {
+      f.behaviorState = 'normal';
+      f.behaviorTimer = 0;
+      f.wallFollowTarget = null;
+    }
+  }
+
+  // Gentle recovery for fish that get stuck - no sudden jumps
+  if(f.x < 15 || f.x > W - 15 || f.y < 15 || f.y > H - 15) {
+    // Gently push fish towards center instead of teleporting
+    const centerX = W / 2;
+    const centerY = H / 2;
+    const pushStrength = 0.02;
+
+    steerTowards(f, centerX, centerY, pushStrength);
+
+    // Only reset behavior state, don't change position/velocity
+    if(f.behaviorState !== 'normal') {
+      f.behaviorState = 'normal';
+      f.behaviorTimer = Math.floor(rand(60, 180));
+      f.wallFollowTarget = null;
+    }
   }
 }
 
@@ -225,40 +309,40 @@ function drawLamps(time){
   if(!lightsOn)return;
 
   const stro=strobeAlpha(time);
-  const discoMultiplier=discoOn?1.8:1;
+  const discoMultiplier=discoOn?1.5:1; // Reduced from 1.8 to 1.5
   for(const L of lamps){
     const hue=lampHueFor(L,time);
-    const intensity=L.intensity*(discoOn?1.4:1);
+    const intensity=L.intensity*(discoOn?1.2:1); // Reduced from 1.4 to 1.2
     const topGlow=ctx.createRadialGradient(L.x,0,2,L.x,0,Math.max(40,L.width*0.6*discoMultiplier));
-    topGlow.addColorStop(0,`hsla(${hue},95%,90%,${0.5*intensity*stro})`);
+    topGlow.addColorStop(0,`hsla(${hue},95%,90%,${0.4*intensity*stro})`); // Reduced intensity
     topGlow.addColorStop(1,'rgba(0,0,0,0)');
     ctx.globalCompositeOperation='lighter';
     ctx.fillStyle=topGlow;ctx.beginPath();ctx.arc(L.x,0,Math.max(40,L.width*0.6*discoMultiplier),0,Math.PI*2);ctx.fill();
     ctx.globalCompositeOperation='source-over';
     const hue2=(hue+140)%360;const hue3=(hue+220)%360;
     const beamGrad=ctx.createLinearGradient(L.x,0,L.x,H*0.9);
-    beamGrad.addColorStop(0,`hsla(${hue},95%,78%,${0.24*intensity*stro})`);
-    beamGrad.addColorStop(0.35,`hsla(${hue2},95%,72%,${0.16*intensity*stro})`);
-    if(discoOn)beamGrad.addColorStop(0.7,`hsla(${hue3},95%,65%,${0.12*intensity*stro})`);
+    beamGrad.addColorStop(0,`hsla(${hue},95%,78%,${0.2*intensity*stro})`); // Reduced intensity
+    beamGrad.addColorStop(0.35,`hsla(${hue2},95%,72%,${0.14*intensity*stro})`); // Reduced intensity
+    if(discoOn)beamGrad.addColorStop(0.7,`hsla(${hue3},95%,65%,${0.1*intensity*stro})`); // Reduced intensity
     beamGrad.addColorStop(1,'rgba(0,0,0,0)');
     const wTop=L.width*0.55*discoMultiplier;const wBottom=L.width*1.1*discoMultiplier;const yBottom=H*0.9;
     ctx.fillStyle=beamGrad;ctx.beginPath();ctx.moveTo(L.x-wTop,0);ctx.lineTo(L.x+wTop,0);ctx.lineTo(L.x+wBottom,yBottom);ctx.lineTo(L.x-wBottom,yBottom);ctx.closePath();ctx.fill();
-    const stripes=discoOn?6:3;
+    const stripes=discoOn?4:3; // Reduced from 6 to 4
     for(let i=0;i<stripes;i++){
       const p=i/stripes;const localPhase=L.stripePhase+i*0.9;const stripeX=L.x+(p-0.5)*L.width*0.8*discoMultiplier;
-      const stripeW=L.width*(0.05+0.03*Math.sin(time*(discoOn?2.4:1.2)+localPhase))*discoMultiplier;
+      const stripeW=L.width*(0.04+0.02*Math.sin(time*(discoOn?2:1.2)+localPhase))*discoMultiplier; // Reduced stripe width
       const stripeGrad=ctx.createLinearGradient(stripeX,0,stripeX,H*0.7);
-      const sh=(hue+(Math.sin(time*(discoOn?3:1.5)+localPhase)*(discoOn?240:160)+160))%360;
-      stripeGrad.addColorStop(0,`hsla(${sh},95%,86%,${0.18*intensity*stro})`);
+      const sh=(hue+(Math.sin(time*(discoOn?2.5:1.5)+localPhase)*(discoOn?200:160)+160))%360; // Slower color change
+      stripeGrad.addColorStop(0,`hsla(${sh},95%,86%,${0.15*intensity*stro})`); // Reduced intensity
       stripeGrad.addColorStop(1,'rgba(0,0,0,0)');
       ctx.fillStyle=stripeGrad;ctx.fillRect(stripeX-stripeW*0.5,0,stripeW,H*0.7);
     }
     if(discoOn){
-      const extraGlow=ctx.createRadialGradient(L.x,H*0.2,0,L.x,H*0.2,120);
-      extraGlow.addColorStop(0,`hsla(${(hue+180)%360},100%,75%,${0.15*stro})`);
+      const extraGlow=ctx.createRadialGradient(L.x,H*0.2,0,L.x,H*0.2,100); // Reduced size
+      extraGlow.addColorStop(0,`hsla(${(hue+180)%360},100%,75%,${0.12*stro})`); // Reduced intensity
       extraGlow.addColorStop(1,'rgba(0,0,0,0)');
       ctx.globalCompositeOperation='lighter';
-      ctx.fillStyle=extraGlow;ctx.beginPath();ctx.arc(L.x,H*0.2,120,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle=extraGlow;ctx.beginPath();ctx.arc(L.x,H*0.2,100,0,Math.PI*2);ctx.fill();
       ctx.globalCompositeOperation='source-over';
     }
   }
@@ -608,22 +692,32 @@ function drawFish(f,t,now){
   const s=fishSize(f,now);const a=Math.atan2(f.vy,f.vx);
   ctx.save();ctx.translate(f.x,f.y);ctx.rotate(a);
   const dimBase=1-(1-healthPct(f,now)/100)*0.4;const lightMul=lightsOn?1:0.6;let dim=dimBase*lightMul;
-  let fishHue=f.hue;
+
+  // Ensure f.hue is a valid number, fallback to 0 if NaN
+  let fishHue = isNaN(f.hue) ? 0 : f.hue;
+
   if(discoOn){
-    const colorShift=(Math.sin(t*0.08+f.x*0.01)*60);
-    fishHue=(f.hue+colorShift)%360;
+    // Ensure all inputs are valid numbers before calculating
+    const timeInput = isNaN(t) ? 0 : t;
+    const xInput = isNaN(f.x) ? 0 : f.x;
+    const colorShift = Math.sin(timeInput * 0.08 + xInput * 0.01) * 60;
+    fishHue = (fishHue + colorShift) % 360;
+
+    // Ensure fishHue is still a valid number after calculation
+    if(isNaN(fishHue)) fishHue = 0;
+
     dim*=1.2;
     const glow=ctx.createRadialGradient(0,0,0,0,0,s*1.5);
-    glow.addColorStop(0,`hsla(${fishHue},100%,70%,0.3)`);
+    glow.addColorStop(0,`hsla(${Math.round(fishHue)},100%,70%,0.3)`);
     glow.addColorStop(1,'rgba(0,0,0,0)');
     ctx.fillStyle=glow;ctx.beginPath();ctx.arc(0,0,s*1.5,0,Math.PI*2);ctx.fill();
   }
   const bodyGrad=ctx.createLinearGradient(-s*0.6,0,s*0.6,0);
-  bodyGrad.addColorStop(0,`hsla(${fishHue},90%,${60*dim}%,1)`);bodyGrad.addColorStop(1,`hsla(${(fishHue+50)%360},80%,${50*dim}%,1)`);
+  bodyGrad.addColorStop(0,`hsla(${Math.round(fishHue)},90%,${60*dim}%,1)`);bodyGrad.addColorStop(1,`hsla(${Math.round((fishHue+50)%360)},80%,${50*dim}%,1)`);
   ctx.fillStyle=bodyGrad;ctx.beginPath();ctx.ellipse(0,0,s*0.9,s*0.55,0,0,Math.PI*2);ctx.fill();
-  ctx.fillStyle=`hsla(${(fishHue+20)%360},80%,${55*dim}%,1)`;ctx.beginPath();ctx.moveTo(-s*0.9,0);ctx.lineTo(-s*1.4,-s*0.35);ctx.lineTo(-s*1.2,0);ctx.lineTo(-s*1.4,s*0.35);ctx.closePath();ctx.fill();
+  ctx.fillStyle=`hsla(${Math.round((fishHue+20)%360)},80%,${55*dim}%,1)`;ctx.beginPath();ctx.moveTo(-s*0.9,0);ctx.lineTo(-s*1.4,-s*0.35);ctx.lineTo(-s*1.2,0);ctx.lineTo(-s*1.4,s*0.35);ctx.closePath();ctx.fill();
   const finW=s*0.45;const finH=s*0.25;const finWave=Math.sin(t*(discoOn?0.04:0.02)+f.x*0.03)*0.5+0.5;
-  ctx.save();ctx.translate(-s*0.35,0);ctx.rotate((finWave-0.5)*(discoOn?1.2:0.6));ctx.fillStyle=`hsla(${(fishHue+70)%360},85%,${65*dim}%,1)`;ctx.beginPath();ctx.ellipse(0,0,finW,finH,0,0,Math.PI*2);ctx.fill();ctx.restore();
+  ctx.save();ctx.translate(-s*0.35,0);ctx.rotate((finWave-0.5)*(discoOn?1.2:0.6));ctx.fillStyle=`hsla(${Math.round((fishHue+70)%360)},85%,${65*dim}%,1)`;ctx.beginPath();ctx.ellipse(0,0,finW,finH,0,0,Math.PI*2);ctx.fill();ctx.restore();
   ctx.fillStyle=lightsOn?'#fff':'#d8e1e8';ctx.beginPath();ctx.arc(s*0.35,-s*0.08,s*0.11,0,Math.PI*2);ctx.fill();ctx.fillStyle=lightsOn?'#000':'#24323c';ctx.beginPath();ctx.arc(s*0.37,-s*0.08,s*0.05,0,Math.PI*2);ctx.fill();
   ctx.restore();
   const hp=healthPct(f,now);const label1=f.name;const label2=ageLabel(f,now);
@@ -865,16 +959,43 @@ function updateFish(f,dt,now){
     }
   }
 
-  if(discoOn&&Math.random()<0.003){
+  if(discoOn&&Math.random()<0.001){ // Reduced frequency from 0.003 to 0.001
     // Disco mode still prefers horizontal movement but allows more vertical
     const angle=Math.random()*Math.PI*2;
-    const force=0.3;
+    const force=0.15; // Reduced force from 0.3 to 0.15
     const horizontalBias=Math.abs(Math.cos(angle))*0.8+0.2; // Favor horizontal angles
     // Update target velocities instead of direct velocity change
     f.targetVx += Math.cos(angle)*force*horizontalBias;
     f.targetVy += Math.sin(angle)*force*(1-horizontalBias*0.6); // Reduce vertical component
+
+    // Ensure fish doesn't get stuck by limiting extreme velocities
+    f.targetVx = clamp(f.targetVx, -f.speed * 1.5, f.speed * 1.5);
+    f.targetVy = clamp(f.targetVy, -f.speed * 0.8, f.speed * 0.8);
   }
-  const slow=clamp(0.4+hp/120,0.4,discoOn?1.4:1.1);f.vx*=0.99;f.vy*=0.99;f.vx*=slow;f.vy*=slow;limitSpeed(f);f.x+=f.vx;f.y+=f.vy;bounceOffWalls(f);
+  const slow=clamp(0.4+hp/120,0.4,discoOn?1.4:1.1);
+
+  // Apply friction and speed adjustments
+  f.vx*=0.99;f.vy*=0.99;f.vx*=slow;f.vy*=slow;
+
+  // Validate velocities before applying
+  if(isNaN(f.vx)) f.vx = 0.1;
+  if(isNaN(f.vy)) f.vy = 0.05;
+
+  limitSpeed(f);
+
+  // Validate position before updating
+  if(isNaN(f.x)) f.x = W / 2;
+  if(isNaN(f.y)) f.y = H / 2;
+
+  // Update position
+  f.x += f.vx;
+  f.y += f.vy;
+
+  // Validate position after updating
+  if(isNaN(f.x)) f.x = W / 2;
+  if(isNaN(f.y)) f.y = H / 2;
+
+  bounceOffWalls(f);
   for(let i=foods.length-1;i>=0;i--){const p=foods[i];if(Math.hypot(p.x-f.x,p.y-f.y)<fishSize(f,now)*0.7+p.r){foods.splice(i,1);f.blink=8;f.lastEat=Date.now();f.eats++;if(ws && ws.readyState === WebSocket.OPEN){ws.send(JSON.stringify({command:'updateFishStats',fishName:f.name,stats:{eats:f.eats,lastEat:f.lastEat}}))}}}
 
   // Pooping logic - fish poop 15-60 minutes after eating
@@ -1084,15 +1205,27 @@ function loadGameState(state) {
 }
 
 function makeFishFromData(serverFish) {
+    // Ensure hue is always a valid number
+    let hue = serverFish.hue !== undefined ? serverFish.hue : Math.floor(rand(0, 360));
+    if(isNaN(hue) || hue < 0 || hue > 360) hue = Math.floor(rand(0, 360));
+
+    // Use saved position if available, otherwise spawn in safe area
+    let startX = rand(W * 0.2, W * 0.8); // Spawn away from edges
+    let startY = rand(H * 0.2, H * 0.8);
+
+    // Validate starting position
+    if(isNaN(startX) || startX < 50 || startX > W - 50) startX = W / 2;
+    if(isNaN(startY) || startY < 50 || startY > H - 50) startY = H / 2;
+
     const f = {
-        x: rand(50, W-50),
-        y: rand(50, H-50),
+        x: startX,
+        y: startY,
         vx: rand(-1, 1),
         vy: rand(-0.5, 0.5),
         // Use saved visual properties or fallback to random (for backwards compatibility)
         speed: serverFish.speed !== undefined ? serverFish.speed : rand(0.7, 1.2),
         baseSize: serverFish.baseSize !== undefined ? serverFish.baseSize : rand(18, 30),
-        hue: serverFish.hue !== undefined ? serverFish.hue : Math.floor(rand(0, 360)),
+        hue: hue,
         sickTop: serverFish.sickTop !== undefined ? serverFish.sickTop : (Math.random() < 0.5),
         hungerWindow: serverFish.hungerWindow !== undefined ? serverFish.hungerWindow : (DAY * rand(0.9, 1.1)),
         // Movement properties (still random each time)
