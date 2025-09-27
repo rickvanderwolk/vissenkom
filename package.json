@@ -1,0 +1,16 @@
+{
+  "name": "vissenkom",
+  "version": "0.0.0",
+  "description": "Vissenkom applicatie met WebSocket controller",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "ws": "^8.14.2"
+  },
+  "keywords": ["websocket", "vissenkom", "aquarium"],
+  "author": "",
+  "license": "MIT"
+}

@@ -1,0 +1,1245 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Vissenkom Demo</title>
+<style>
+html,body{height:100%;margin:0;overflow:hidden}
+body{font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;display:flex;flex-direction:column;transition:color .2s ease, background .2s ease}
+body.dark{background:#0b1e2d;color:#e9f1f7}
+body.light{background:#e9f1f7;color:#0b1e2d}
+button{appearance:none;border:none;border-radius:10px;padding:8px 12px;font-weight:600;background:#50e3c2;color:#0b1e2d;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,.25);transition:transform .05s ease, opacity .2s ease, filter .2s ease;font-size:13px}
+button:active{transform:translateY(1px)}
+button[disabled]{opacity:.45;filter:saturate(.2) brightness(.9);cursor:not-allowed}
+#tank{flex:1;position:relative}
+canvas#c{position:absolute;inset:0;width:100%;height:100%;display:block;z-index:1}
+.side{position:absolute;left:8px;top:8px;z-index:4;display:flex;flex-direction:column;gap:8px;max-width:220px}
+.panel{backdrop-filter:blur(6px);padding:8px 10px;border-radius:10px;line-height:1.25;box-shadow:0 4px 12px rgba(0,0,0,.25)}
+body.dark .panel{background:rgba(0,0,0,.35)}
+body.light .panel{background:rgba(255,255,255,.7)}
+.panel h4{margin:0 0 6px 0;font-size:12px;letter-spacing:.2px;opacity:.95}
+.item{font-size:12px;display:flex;gap:6px;align-items:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.label{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:999px;background:#ffe066;color:#0b1e2d;font-weight:900;font-size:11px;flex:0 0 auto}
+.statusbar{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);display:flex;gap:6px;z-index:4;flex-wrap:wrap;align-items:center;justify-content:center;font-size:12px}
+.pill{background:rgba(0,0,0,.35);backdrop-filter:blur(6px);padding:4px 8px;border-radius:999px;font-weight:600}
+body.light .pill{background:rgba(255,255,255,.7);color:#0b1e2d}
+#cooldown.ready{background:rgba(255,215,0,.85);color:#0b1e2d;box-shadow:0 0 12px rgba(255,215,0,.4)}
+body.light #cooldown.ready{background:rgba(255,215,0,.9);color:#0b1e2d;box-shadow:0 0 8px rgba(255,215,0,.3)}
+.qrbox canvas{display:block;width:50%;margin:0 auto;aspect-ratio:1/1;border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,.25);background:#fff}
+.qrbox .caption{margin-top:4px;text-align:center;font-size:11px;opacity:.85}
+</style>
+</head>
+<body class="dark">
+
+<div id="tank">
+<canvas id="c"></canvas>
+
+<div class="side">
+  <div class="panel">
+    <div class="qrbox">
+      <canvas id="qr"></canvas>
+    </div>
+  </div>
+
+  <div id="newestPanel" class="panel">
+    <h4>🌱 Nieuwe Bewoners</h4>
+    <div id="newestList"></div>
+  </div>
+
+  <div id="livingPanel" class="panel">
+    <h4>⭐ Sterren van de Kom</h4>
+    <div id="livingList"></div>
+  </div>
+
+  <div id="oldestPanel" class="panel">
+    <h4>🎖️ Legenden van de Kom</h4>
+    <div id="oldestList"></div>
+  </div>
+
+  <div id="deadPanel" class="panel" style="display: none;">
+    <h4>💙 In Onze Harten</h4>
+    <div id="deadList"></div>
+  </div>
+
+  <div class="panel">
+    <h4>🤓 Versie</h4>
+    <div class="item">
+      <span class="label">v</span><span id="versionNumber">...</span>
+    </div>
+  </div>
+</div>
+
+<div class="statusbar">
+  <div id="lightStatus" class="pill">Licht: aan</div>
+  <div id="discoStatus" class="pill">Disco: uit</div>
+  <div id="pumpStatus" class="pill">Pomp: uit</div>
+  <div id="cooldown" class="pill">Klaar om te voeren</div>
+</div>
+</div>
+
+<script>
+const cv=document.getElementById('c');const ctx=cv.getContext('2d');
+const rand=(a,b)=>Math.random()*(b-a)+a;const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+let lamps=[];let W=0,H=0;
+function resize(){W=cv.width=cv.clientWidth;H=cv.height=cv.clientHeight;setupLamps();setupPlants();setupDecorations();drawQR()}window.addEventListener('resize',resize);
+const DAY_MIN=2*24*60;const DAY=DAY_MIN*60*1000;const FEED_CD=60*60*1000;
+const BG='#083042';const BG_NIGHT='#04121a';
+const fishes=[];const foods=[];const deadLog=[];const bubbles=[];const poops=[];
+const plants=[];const decorations=[];
+let lastFed=0;let fishCounter=1;let lastT=Date.now();let TOP_N=5;
+let lightsOn=true;let discoOn=false;let pumpOn=false;const pumpPos={x:0,y:0};let pumpJustOnUntil=0;
+
+function setupLamps(){const n=4;const baseWidth=180;const spread=0.12;const hue=48;const margin=W*0.08;const step=(W-2*margin)/Math.max(1,n-1);lamps=[];for(let i=0;i<n;i++){const x=margin+i*step+rand(-step*spread,step*spread);const intensity=rand(0.55,0.8);const width=baseWidth*rand(0.9,1.1);const phase=rand(0,Math.PI*2);const stripePhase=rand(0,Math.PI*2);lamps.push({x,width,intensity,hueBase:hue,phase,stripePhase})}}
+
+function setupPlants(){
+  plants.length=0;
+  const numPlants=Math.floor(rand(4,7));
+  for(let i=0;i<numPlants;i++){
+    const plantTypes=['seaweed','kelp','fern','grass','anubias','vallisneria'];
+    const type=plantTypes[Math.floor(Math.random()*plantTypes.length)];
+    const x=rand(50,W-50);
+
+    let height,width,segments,zIndex;
+    if(type==='seaweed'){
+      height=rand(200,500); // Bigger seaweed
+      width=rand(20,45);
+      segments=Math.floor(rand(12,25));
+      zIndex=Math.random()<0.7?'back':'front';
+    } else if(type==='kelp'){
+      height=rand(300,600); // Very large kelp forests
+      width=rand(30,60);
+      segments=Math.floor(rand(15,30));
+      zIndex='back';
+    } else if(type==='fern'){
+      height=rand(150,300);
+      width=rand(40,80);
+      segments=Math.floor(rand(10,18));
+      zIndex=Math.random()<0.6?'back':'front';
+    } else if(type==='grass'){
+      height=rand(120,220);
+      width=rand(8,18);
+      segments=Math.floor(rand(25,40));
+      zIndex=Math.random()<0.8?'back':'front';
+    } else if(type==='anubias'){
+      height=rand(80,160);
+      width=rand(50,100);
+      segments=Math.floor(rand(5,10));
+      zIndex='front';
+    } else if(type==='vallisneria'){
+      height=rand(250,450);
+      width=rand(10,20);
+      segments=Math.floor(rand(20,35));
+      zIndex='back';
+    }
+
+    const hue=type==='anubias'?rand(100,140):rand(80,160);
+    const swayPhase=rand(0,Math.PI*2);
+    const movePhase=rand(0,Math.PI*2);
+    const branchiness=rand(0.5,0.9);
+    plants.push({type,x,y:H-15,height,width,segments,hue,swayPhase,movePhase,branchiness,zIndex});
+  }
+}
+
+function setupDecorations(){
+  decorations.length=0;
+
+  // Af en toe een kasteeltje
+  if(Math.random()<0.3){
+    const x=rand(80,W-80);
+    const size=rand(80,140);
+    const bobPhase=rand(0,Math.PI*2);
+    const zIndex=Math.random()<0.7?'back':'front';
+    decorations.push({type:'castle',x,y:H-size/2,size,hue:rand(200,220),bobPhase,zIndex});
+  }
+}
+function lampHueFor(L,time){if(!discoOn)return L.hueBase;const speed=2.5;const range=340;const wave=(Math.sin(time*speed+L.phase)+1)/2;return (L.hueBase+wave*range)%360}
+function strobeAlpha(time){if(!discoOn)return 1;const hz=1.5;const duty=0.8;const cycle=(time*hz)%1;return cycle<duty?1:0.75}
+let discoCache={};let lastDiscoTime=0;
+function discoEffects(time){
+  if(!discoOn)return;
+
+  if(time-lastDiscoTime<0.08)return;
+  lastDiscoTime=time;
+
+  const pulse=Math.sin(time*2)*0.5+0.5;
+  ctx.globalCompositeOperation='lighter';
+  const spots=6;
+  for(let i=0;i<spots;i++){
+    const spotTime=time*0.7+i*0.8;
+    const x=(W/spots)*i+W/(spots*2)+Math.sin(spotTime*1.2)*60;
+    const y=H*0.3+Math.sin(spotTime*0.8+i)*H*0.4;
+    const hue=(time*30+i*45)%360;
+    const spotOn=Math.sin(spotTime*0.5+i)>0.3;
+    if(spotOn){
+      const alpha=0.12*(0.7+pulse*0.3);
+      const size=35+Math.sin(spotTime*2+i)*15;
+      const grad=ctx.createRadialGradient(x,y,0,x,y,size);
+      grad.addColorStop(0,`hsla(${hue},100%,75%,${alpha})`);
+      grad.addColorStop(0.6,`hsla(${(hue+60)%360},90%,65%,${alpha*0.5})`);
+      grad.addColorStop(1,'rgba(0,0,0,0)');
+      ctx.fillStyle=grad;
+      ctx.beginPath();
+      ctx.arc(x,y,size,0,Math.PI*2);
+      ctx.fill();
+    }
+  }
+  ctx.globalCompositeOperation='source-over';
+}
+
+function makeFish(x=rand(50,W-50),y=rand(50,H-50),name){const base=rand(18,30);const hue=Math.floor(rand(0,360));const initialVx=rand(-1.2,1.2);const initialVy=rand(-.2,.2);const f={x,y,vx:initialVx,vy:initialVy,speed:rand(0.7,1.2),baseSize:base,hue,dir:Math.random()*Math.PI*2,turnTimer:Math.floor(rand(30,120)),blink:0,name:name||`Vis ${fishCounter++}`,lastEat:Date.now(),bornAt:Date.now(),eats:0,sickTop:Math.random()<0.5,hungerWindow:DAY*rand(0.9,1.1),behaviorState:'normal',behaviorTimer:0,wallFollowTarget:null,lastPoop:Date.now(),targetVx:initialVx,targetVy:initialVy};fishes.push(f)}
+for(let i=0;i<8;i++)makeFish();
+
+function makeFood(){const n=Math.max(8,fishes.length);for(let i=0;i<n;i++){foods.push({x:rand(40,W-40),y:50+rand(0,30),vy:rand(0.7,1.5),r:7,ttl:2000})}}
+function makeBubble(){const x=pumpPos.x+rand(-6,6);const r=rand(2,6);bubbles.push({x,y:H-30,vy:rand(0.8,1.8),vx:rand(-0.2,0.2),r,ttl:rand(200,380)})}
+
+function healthPct(f,now){return clamp(100*(1-((now-f.lastEat)/f.hungerWindow)),0,100)}
+function fishSize(f,now){const ageDays=clamp((now-f.bornAt)/DAY,0,365);const growth=1+Math.min(0.5,ageDays*0.06+f.eats*0.03);return f.baseSize*growth}
+function steerTowards(f,tx,ty,str){const dx=tx-f.x,dy=ty-f.y;const d=Math.hypot(dx,dy)||1;f.vx+=dx/d*str;f.vy+=dy/d*str}
+function limitSpeed(f){const sp=Math.hypot(f.vx,f.vy);const max=f.speed*1.8;const min=0.2;if(sp>max){f.vx=f.vx/sp*max;f.vy=f.vy/sp*max}if(sp<min){const a=Math.atan2(f.vy,f.vx);f.vx=Math.cos(a)*min;f.vy=Math.sin(a)*min}}
+function bounceOffWalls(f){
+  const margin = 20;
+  // Bounce off left wall
+  if(f.x < margin) {
+    f.x = margin;
+    f.vx = Math.abs(f.vx);
+  }
+  // Bounce off right wall
+  if(f.x > W - margin) {
+    f.x = W - margin;
+    f.vx = -Math.abs(f.vx);
+  }
+  // Bounce off top wall
+  if(f.y < margin) {
+    f.y = margin;
+    f.vy = Math.abs(f.vy);
+  }
+  // Bounce off bottom wall
+  if(f.y > H - margin) {
+    f.y = H - margin;
+    f.vy = -Math.abs(f.vy);
+  }
+}
+
+function drawLamps(time){
+  if(!lightsOn)return;
+
+  const stro=strobeAlpha(time);
+  const discoMultiplier=discoOn?1.8:1;
+  for(const L of lamps){
+    const hue=lampHueFor(L,time);
+    const intensity=L.intensity*(discoOn?1.4:1);
+    const topGlow=ctx.createRadialGradient(L.x,0,2,L.x,0,Math.max(40,L.width*0.6*discoMultiplier));
+    topGlow.addColorStop(0,`hsla(${hue},95%,90%,${0.5*intensity*stro})`);
+    topGlow.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.globalCompositeOperation='lighter';
+    ctx.fillStyle=topGlow;ctx.beginPath();ctx.arc(L.x,0,Math.max(40,L.width*0.6*discoMultiplier),0,Math.PI*2);ctx.fill();
+    ctx.globalCompositeOperation='source-over';
+    const hue2=(hue+140)%360;const hue3=(hue+220)%360;
+    const beamGrad=ctx.createLinearGradient(L.x,0,L.x,H*0.9);
+    beamGrad.addColorStop(0,`hsla(${hue},95%,78%,${0.24*intensity*stro})`);
+    beamGrad.addColorStop(0.35,`hsla(${hue2},95%,72%,${0.16*intensity*stro})`);
+    if(discoOn)beamGrad.addColorStop(0.7,`hsla(${hue3},95%,65%,${0.12*intensity*stro})`);
+    beamGrad.addColorStop(1,'rgba(0,0,0,0)');
+    const wTop=L.width*0.55*discoMultiplier;const wBottom=L.width*1.1*discoMultiplier;const yBottom=H*0.9;
+    ctx.fillStyle=beamGrad;ctx.beginPath();ctx.moveTo(L.x-wTop,0);ctx.lineTo(L.x+wTop,0);ctx.lineTo(L.x+wBottom,yBottom);ctx.lineTo(L.x-wBottom,yBottom);ctx.closePath();ctx.fill();
+    const stripes=discoOn?6:3;
+    for(let i=0;i<stripes;i++){
+      const p=i/stripes;const localPhase=L.stripePhase+i*0.9;const stripeX=L.x+(p-0.5)*L.width*0.8*discoMultiplier;
+      const stripeW=L.width*(0.05+0.03*Math.sin(time*(discoOn?2.4:1.2)+localPhase))*discoMultiplier;
+      const stripeGrad=ctx.createLinearGradient(stripeX,0,stripeX,H*0.7);
+      const sh=(hue+(Math.sin(time*(discoOn?3:1.5)+localPhase)*(discoOn?240:160)+160))%360;
+      stripeGrad.addColorStop(0,`hsla(${sh},95%,86%,${0.18*intensity*stro})`);
+      stripeGrad.addColorStop(1,'rgba(0,0,0,0)');
+      ctx.fillStyle=stripeGrad;ctx.fillRect(stripeX-stripeW*0.5,0,stripeW,H*0.7);
+    }
+    if(discoOn){
+      const extraGlow=ctx.createRadialGradient(L.x,H*0.2,0,L.x,H*0.2,120);
+      extraGlow.addColorStop(0,`hsla(${(hue+180)%360},100%,75%,${0.15*stro})`);
+      extraGlow.addColorStop(1,'rgba(0,0,0,0)');
+      ctx.globalCompositeOperation='lighter';
+      ctx.fillStyle=extraGlow;ctx.beginPath();ctx.arc(L.x,H*0.2,120,0,Math.PI*2);ctx.fill();
+      ctx.globalCompositeOperation='source-over';
+    }
+  }
+}
+
+function clearFrame(time){ctx.fillStyle=lightsOn?BG:BG_NIGHT;ctx.fillRect(0,0,W,H);drawLamps(time);discoEffects(time)}
+function drawFood(){for(let i=foods.length-1;i>=0;i--){const p=foods[i];p.y+=p.vy;p.ttl--;ctx.fillStyle='#ffb37a';ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fill();if(p.y>H-16||p.ttl<=0){foods.splice(i,1)}}}
+function drawBubbles(){for(let i=bubbles.length-1;i>=0;i--){const b=bubbles[i];b.y-=b.vy;b.x+=b.vx;b.ttl--;ctx.globalAlpha=lightsOn?0.7:0.5;ctx.fillStyle='#bfeaf5';ctx.beginPath();ctx.arc(b.x,b.y,b.r,0,Math.PI*2);ctx.fill();ctx.globalAlpha=1;if(b.y<-10||b.ttl<=0){bubbles.splice(i,1)}}}
+
+function drawPoops(){
+  for(const p of poops) {
+    // Draw small brown poop on tank floor
+    ctx.fillStyle = lightsOn ? '#8B4513' : '#654321';
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Add a slightly darker center for detail
+    ctx.fillStyle = lightsOn ? '#654321' : '#4A2C17';
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.size * 0.6, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+function drawPlant(plant,time){
+  const lightMul=lightsOn?1:0.6;
+  const swayAmount=0; // Static plants for performance
+  const moveAmount=0; // Static plants for performance
+
+  if(plant.type==='seaweed' || plant.type==='kelp'){
+    const segmentHeight=plant.height/plant.segments;
+    const swayMultiplier=plant.type==='kelp'?1.5:1;
+
+    for(let i=0;i<plant.segments;i++){
+      const y=plant.y-i*segmentHeight;
+      const x=plant.x;
+      const width=plant.width*(1-i*0.02/plant.segments);
+      const alpha=(lightsOn?0.9:0.6)*fadeAlpha;
+
+      ctx.fillStyle=`hsla(${plant.hue},70%,${45*lightMul}%,${alpha})`;
+      ctx.beginPath();
+      ctx.ellipse(x,y,width/2,segmentHeight/2,0,0,Math.PI*2);
+      ctx.fill();
+
+      if(plant.type==='kelp' && i>plant.segments*0.6){
+        // Add kelp fronds at the top - static for performance
+        const frondX=x+(i%2===0?-width/2:width/2);
+        const frondY=y;
+        ctx.fillStyle=`hsla(${plant.hue+15},65%,${50*lightMul}%,${alpha*0.7})`;
+        ctx.beginPath();
+        ctx.ellipse(frondX,frondY,width/4,segmentHeight/3,0,0,Math.PI*2);
+        ctx.fill();
+      }
+    }
+  }
+  else if(plant.type==='fern'){
+    const segmentHeight=plant.height/plant.segments;
+
+    for(let i=0;i<plant.segments;i++){
+      const y=plant.y-i*segmentHeight;
+      const x=plant.x;
+      const width=plant.width*(1-i*0.04/plant.segments);
+      const alpha=(lightsOn?0.8:0.5)*fadeAlpha;
+
+      // Main stem - static
+      ctx.strokeStyle=`hsla(${plant.hue-20},80%,${30*lightMul}%,${alpha})`;
+      ctx.lineWidth=3;
+      ctx.beginPath();
+      ctx.moveTo(plant.x,plant.y);
+      ctx.lineTo(x,y);
+      ctx.stroke();
+
+      // Fern fronds on both sides - static
+      const frondLength=width*plant.branchiness;
+      for(let side of [-1,1]){
+        const frondX=x+side*frondLength;
+        const frondY=y;
+
+        ctx.fillStyle=`hsla(${plant.hue},70%,${45*lightMul}%,${alpha})`;
+        ctx.beginPath();
+        ctx.ellipse(frondX,frondY,frondLength/3,segmentHeight/4,0,0,Math.PI*2);
+        ctx.fill();
+      }
+    }
+  }
+  else if(plant.type==='grass'){
+    const bladeSpacing=plant.width/plant.segments;
+
+    for(let i=0;i<plant.segments;i++){
+      const offsetX=(i-plant.segments/2)*bladeSpacing;
+      const x=plant.x+offsetX;
+      const bladeHeight=plant.height*(0.8+0.2*(i%3)/2); // Static variation
+      const topX=x;
+      const alpha=(lightsOn?0.8:0.5)*fadeAlpha;
+
+      ctx.strokeStyle=`hsla(${plant.hue},80%,${40*lightMul}%,${alpha})`;
+      ctx.lineWidth=2;
+      ctx.lineCap='round';
+      ctx.beginPath();
+      ctx.moveTo(x,plant.y);
+      ctx.lineTo(topX,plant.y-bladeHeight); // Straight lines for performance
+      ctx.stroke();
+    }
+  }
+  else if(plant.type==='anubias'){
+    // Large broad leaves
+    const leafSpacing=plant.height/plant.segments;
+    for(let i=0;i<plant.segments;i++){
+      const y=plant.y-i*leafSpacing;
+      const x=plant.x;
+      const leafWidth=plant.width*plant.branchiness*(1-i*0.1/plant.segments);
+      const leafHeight=leafSpacing*0.8;
+      const alpha=(lightsOn?0.9:0.6)*fadeAlpha;
+
+      ctx.fillStyle=`hsla(${plant.hue},60%,${35*lightMul}%,${alpha})`;
+      ctx.beginPath();
+      ctx.ellipse(x,y,leafWidth/2,leafHeight/2,0,0,Math.PI*2);
+      ctx.fill();
+
+      // Leaf veins - static
+      ctx.strokeStyle=`hsla(${plant.hue-10},50%,${25*lightMul}%,${alpha*0.7})`;
+      ctx.lineWidth=2;
+      ctx.beginPath();
+      ctx.moveTo(x,y+leafHeight/2);
+      ctx.lineTo(x,y-leafHeight/2);
+      ctx.stroke();
+    }
+  }
+  else if(plant.type==='vallisneria'){
+    // Long ribbon-like leaves
+    const segmentHeight=plant.height/plant.segments;
+    for(let i=0;i<plant.segments;i++){
+      const y=plant.y-i*segmentHeight;
+      const x=plant.x;
+      const width=plant.width*(1-i*0.01/plant.segments);
+      const alpha=(lightsOn?0.8:0.5)*fadeAlpha;
+
+      ctx.strokeStyle=`hsla(${plant.hue},70%,${40*lightMul}%,${alpha})`;
+      ctx.lineWidth=width;
+      ctx.lineCap='round';
+      ctx.beginPath();
+      ctx.moveTo(plant.x,plant.y);
+      ctx.lineTo(x,y); // Straight lines for performance
+      ctx.stroke();
+    }
+  }
+  else if(plant.type==='coral'){
+    const baseY=plant.y;
+    const branches=4;
+
+    for(let i=0;i<branches;i++){
+      const angle=(i/branches)*Math.PI; // Static angle
+      const branchLength=plant.height*0.8;
+      const endX=plant.x+Math.cos(angle)*branchLength*0.6;
+      const endY=baseY-Math.abs(Math.sin(angle))*branchLength;
+
+      ctx.strokeStyle=`hsla(${plant.hue},60%,${45*lightMul}%,${(lightsOn?0.8:0.5)*fadeAlpha})`;
+      ctx.lineWidth=plant.width/6;
+      ctx.lineCap='round';
+      ctx.beginPath();
+      ctx.moveTo(plant.x,baseY);
+      ctx.lineTo(endX,endY); // Straight lines for performance
+      ctx.stroke();
+
+      ctx.fillStyle=`hsla(${plant.hue+20},70%,${55*lightMul}%,${(lightsOn?0.6:0.4)*fadeAlpha})`;
+      ctx.beginPath();
+      ctx.arc(endX,endY,plant.width/8,0,Math.PI*2);
+      ctx.fill();
+    }
+  }
+}
+
+function drawPlants(time){
+  for(const plant of plants){
+    drawPlant(plant,time);
+  }
+}
+
+function drawDecoration(deco,time){
+  const lightMul=lightsOn?1:0.6;
+  const bobAmount=0; // Static decorations for performance
+
+  if(deco.type==='rock'){
+    const x=deco.x;
+    const y=deco.y+bobAmount;
+    const grad=ctx.createRadialGradient(x-deco.size*0.2,y-deco.size*0.2,0,x,y,deco.size);
+    grad.addColorStop(0,`hsla(${deco.hue},30%,${60*lightMul}%,1)`);
+    grad.addColorStop(1,`hsla(${deco.hue},40%,${30*lightMul}%,1)`);
+    ctx.fillStyle=grad;
+    ctx.beginPath();
+    ctx.ellipse(x,y,deco.size*0.8,deco.size*0.6,0,0,Math.PI*2);
+    ctx.fill();
+
+    ctx.fillStyle=`hsla(${deco.hue},20%,${70*lightMul}%,0.6)`;
+    ctx.beginPath();
+    ctx.ellipse(x-deco.size*0.3,y-deco.size*0.2,deco.size*0.3,deco.size*0.2,0,0,Math.PI*2);
+    ctx.fill();
+  }
+  else if(deco.type==='driftwood'){
+    const x=deco.x;
+    const y=deco.y+bobAmount;
+
+    // Main log shape
+    ctx.fillStyle=`hsla(${deco.hue},40%,${25*lightMul}%,0.9)`;
+    ctx.beginPath();
+    ctx.ellipse(x,y,deco.size*0.6,deco.size*0.2,0.3,0,Math.PI*2);
+    ctx.fill();
+
+    // Branch sticking up
+    const branchX=x+deco.size*0.3;
+    const branchY=y-deco.size*0.4;
+    ctx.strokeStyle=`hsla(${deco.hue},35%,${30*lightMul}%,0.8)`;
+    ctx.lineWidth=deco.size*0.08;
+    ctx.lineCap='round';
+    ctx.beginPath();
+    ctx.moveTo(x,y);
+    ctx.lineTo(branchX,branchY);
+    ctx.stroke();
+
+    // Texture lines
+    for(let i=0;i<3;i++){
+      ctx.strokeStyle=`hsla(${deco.hue},30%,${20*lightMul}%,0.6)`;
+      ctx.lineWidth=2;
+      ctx.beginPath();
+      ctx.moveTo(x-deco.size*0.4,y-5+i*5);
+      ctx.lineTo(x+deco.size*0.4,y-5+i*5);
+      ctx.stroke();
+    }
+  }
+  else if(deco.type==='rock_formation'){
+    const x=deco.x;
+    const y=deco.y+bobAmount;
+
+    // Large main rock
+    const grad1=ctx.createRadialGradient(x-deco.size*0.2,y-deco.size*0.3,0,x,y,deco.size*0.8);
+    grad1.addColorStop(0,`hsla(${deco.hue},35%,${50*lightMul}%,1)`);
+    grad1.addColorStop(1,`hsla(${deco.hue},45%,${25*lightMul}%,1)`);
+    ctx.fillStyle=grad1;
+    ctx.beginPath();
+    ctx.ellipse(x,y,deco.size*0.7,deco.size*0.5,0,0,Math.PI*2);
+    ctx.fill();
+
+    // Secondary rocks
+    const rock2X=x-deco.size*0.4;
+    const rock2Y=y+deco.size*0.2;
+    const grad2=ctx.createRadialGradient(rock2X,rock2Y-deco.size*0.1,0,rock2X,rock2Y,deco.size*0.3);
+    grad2.addColorStop(0,`hsla(${deco.hue+10},30%,${55*lightMul}%,1)`);
+    grad2.addColorStop(1,`hsla(${deco.hue+10},40%,${30*lightMul}%,1)`);
+    ctx.fillStyle=grad2;
+    ctx.beginPath();
+    ctx.ellipse(rock2X,rock2Y,deco.size*0.3,deco.size*0.2,0,0,Math.PI*2);
+    ctx.fill();
+
+    const rock3X=x+deco.size*0.3;
+    const rock3Y=y+deco.size*0.1;
+    ctx.fillStyle=`hsla(${deco.hue-5},35%,${45*lightMul}%,1)`;
+    ctx.beginPath();
+    ctx.ellipse(rock3X,rock3Y,deco.size*0.25,deco.size*0.15,0,0,Math.PI*2);
+    ctx.fill();
+  }
+  else if(deco.type==='cave'){
+    const x=deco.x;
+    const y=deco.y+bobAmount;
+
+    // Cave entrance/archway
+    const archGrad=ctx.createRadialGradient(x,y-deco.size*0.2,0,x,y,deco.size*0.8);
+    archGrad.addColorStop(0,`hsla(${deco.hue},40%,${40*lightMul}%,1)`);
+    archGrad.addColorStop(1,`hsla(${deco.hue},50%,${20*lightMul}%,1)`);
+    ctx.fillStyle=archGrad;
+    ctx.beginPath();
+    ctx.ellipse(x,y,deco.size*0.6,deco.size*0.4,0,0,Math.PI*2);
+    ctx.fill();
+
+    // Dark cave opening
+    ctx.fillStyle=`hsla(${deco.hue},20%,${5*lightMul}%,0.9)`;
+    ctx.beginPath();
+    ctx.ellipse(x,y-deco.size*0.1,deco.size*0.25,deco.size*0.15,0,0,Math.PI*2);
+    ctx.fill();
+  }
+  else if(deco.type==='castle'){
+    const x=deco.x;
+    const y=deco.y+bobAmount;
+    const baseWidth=deco.size*0.8;
+    const baseHeight=deco.size*0.6;
+    const towerWidth=deco.size*0.3;
+    const towerHeight=deco.size*0.4;
+
+    ctx.fillStyle=`hsla(${deco.hue},40%,${45*lightMul}%,${fadeAlpha})`;
+    ctx.fillRect(x-baseWidth/2,y-baseHeight/2,baseWidth,baseHeight);
+
+    ctx.fillStyle=`hsla(${deco.hue},35%,${55*lightMul}%,${fadeAlpha})`;
+    ctx.fillRect(x-towerWidth/2,y-baseHeight/2-towerHeight,towerWidth,towerHeight);
+
+    ctx.fillStyle=`hsla(${deco.hue+20},50%,${35*lightMul}%,${fadeAlpha})`;
+    const flagHeight=deco.size*0.15;
+    ctx.fillRect(x-2,y-baseHeight/2-towerHeight-flagHeight,4,flagHeight);
+
+    const flagWave=0; // Static flag for performance
+    ctx.fillStyle=`hsla(${(deco.hue+180)%360},70%,${60*lightMul}%,${fadeAlpha})`;
+    ctx.beginPath();
+    ctx.moveTo(x+2,y-baseHeight/2-towerHeight-flagHeight);
+    ctx.lineTo(x+flagHeight+flagWave,y-baseHeight/2-towerHeight-flagHeight*0.7);
+    ctx.lineTo(x+2,y-baseHeight/2-towerHeight-flagHeight*0.4);
+    ctx.fill();
+  }
+  else if(deco.type==='chest'){
+    const x=deco.x;
+    const y=deco.y+bobAmount;
+    const width=deco.size*0.8;
+    const height=deco.size*0.4;
+
+    ctx.fillStyle=`hsla(${deco.hue},60%,${40*lightMul}%,1)`;
+    ctx.fillRect(x-width/2,y-height,width,height);
+
+    ctx.fillStyle=`hsla(${deco.hue},70%,${50*lightMul}%,1)`;
+    ctx.fillRect(x-width/2,y-height,width,height*0.3);
+
+    ctx.fillStyle=`hsla(${deco.hue+40},80%,${70*lightMul}%,1)`;
+    ctx.beginPath();
+    ctx.arc(x,y-height*0.7,width*0.08,0,Math.PI*2);
+    ctx.fill();
+
+    if(Math.sin(time*0.003+deco.bobPhase)>0.7){
+      ctx.fillStyle=`hsla(${(deco.hue+180)%360},90%,${80*lightMul}%,0.8)`;
+      for(let i=0;i<3;i++){
+        const sparkleX=x+Math.sin(time*0.01+i)*width*0.2;
+        const sparkleY=y-height*0.5+Math.cos(time*0.008+i)*height*0.1;
+        ctx.beginPath();
+        ctx.arc(sparkleX,sparkleY,2,0,Math.PI*2);
+        ctx.fill();
+      }
+    }
+  }
+}
+
+function drawDecorations(time){
+  for(const deco of decorations){
+    drawDecoration(deco,time);
+  }
+}
+
+function ageLabelMS(ms){const s=Math.floor(ms/1000);if(s<60)return s+'s';const m=Math.floor(ms/60000);if(m<60)return m+'m';const h=ms/3600000;return (h<24?Math.floor(h)+'u':Math.floor(h/24)+'d')}
+function ageLabel(f,now){return ageLabelMS(now-f.bornAt)}
+
+function drawFish(f,t,now){
+  const s=fishSize(f,now);const a=Math.atan2(f.vy,f.vx);
+  ctx.save();ctx.translate(f.x,f.y);ctx.rotate(a);
+  const dimBase=1-(1-healthPct(f,now)/100)*0.4;const lightMul=lightsOn?1:0.6;let dim=dimBase*lightMul;
+  let fishHue=f.hue;
+  if(discoOn){
+    const colorShift=(Math.sin(t*0.08+f.x*0.01)*60);
+    fishHue=(f.hue+colorShift)%360;
+    dim*=1.2;
+    const glow=ctx.createRadialGradient(0,0,0,0,0,s*1.5);
+    glow.addColorStop(0,`hsla(${fishHue},100%,70%,0.3)`);
+    glow.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=glow;ctx.beginPath();ctx.arc(0,0,s*1.5,0,Math.PI*2);ctx.fill();
+  }
+  const bodyGrad=ctx.createLinearGradient(-s*0.6,0,s*0.6,0);
+  bodyGrad.addColorStop(0,`hsla(${fishHue},90%,${60*dim}%,1)`);bodyGrad.addColorStop(1,`hsla(${(fishHue+50)%360},80%,${50*dim}%,1)`);
+  ctx.fillStyle=bodyGrad;ctx.beginPath();ctx.ellipse(0,0,s*0.9,s*0.55,0,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle=`hsla(${(fishHue+20)%360},80%,${55*dim}%,1)`;ctx.beginPath();ctx.moveTo(-s*0.9,0);ctx.lineTo(-s*1.4,-s*0.35);ctx.lineTo(-s*1.2,0);ctx.lineTo(-s*1.4,s*0.35);ctx.closePath();ctx.fill();
+  const finW=s*0.45;const finH=s*0.25;const finWave=Math.sin(t*(discoOn?0.04:0.02)+f.x*0.03)*0.5+0.5;
+  ctx.save();ctx.translate(-s*0.35,0);ctx.rotate((finWave-0.5)*(discoOn?1.2:0.6));ctx.fillStyle=`hsla(${(fishHue+70)%360},85%,${65*dim}%,1)`;ctx.beginPath();ctx.ellipse(0,0,finW,finH,0,0,Math.PI*2);ctx.fill();ctx.restore();
+  ctx.fillStyle=lightsOn?'#fff':'#d8e1e8';ctx.beginPath();ctx.arc(s*0.35,-s*0.08,s*0.11,0,Math.PI*2);ctx.fill();ctx.fillStyle=lightsOn?'#000':'#24323c';ctx.beginPath();ctx.arc(s*0.37,-s*0.08,s*0.05,0,Math.PI*2);ctx.fill();
+  ctx.restore();
+  const hp=healthPct(f,now);const label1=f.name;const label2=ageLabel(f,now);
+  const labelAlpha=lightsOn?0.92:0.7;
+  ctx.font=`600 ${Math.floor(s*0.5)}px system-ui,Segoe UI,Roboto,Arial`;const pad=6;const tw1=ctx.measureText(label1).width;
+  ctx.font=`500 ${Math.floor(s*0.38)}px system-ui,Segoe UI,Roboto,Arial`;const tw2=ctx.measureText(label2).width;
+  const lw=Math.max(90,Math.max(tw1,tw2)+pad*2);const lh=s*0.6+16;const lx=Math.round(clamp(f.x-lw/2,6,W-lw-6));const ly=Math.round(f.y-s*1.5);
+  ctx.fillStyle=`rgba(255,255,255,${labelAlpha})`;roundRect(lx,ly,lw,lh,8);ctx.fill();
+  ctx.fillStyle='#071319';ctx.textBaseline='top';ctx.font=`600 ${Math.floor(s*0.5)}px system-ui,Segoe UI,Roboto,Arial`;ctx.fillText(label1,Math.round(lx+pad),Math.round(ly+2));
+  ctx.font=`500 ${Math.floor(s*0.38)}px system-ui,Segoe UI,Roboto,Arial`;ctx.fillText(label2,Math.round(lx+pad),Math.round(ly+4+Math.floor(s*0.5)));
+  const barW=lw-pad*2;const barH=6;const bx=Math.round(lx+pad);const by=Math.round(ly+lh-barH-2);
+  ctx.fillStyle='rgba(50,50,50,0.6)';ctx.fillRect(bx,by,barW,barH);
+  ctx.fillStyle=hp>50?'#3ecf5c':hp>25?'#f2c94c':'#eb5757';
+  ctx.fillRect(bx,by,Math.round((hp/100)*barW),barH);
+}
+
+function roundRect(x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath()}
+
+function handleBottomDwelling(f) {
+  // Steer towards bottom area
+  const targetY = H - 60 + rand(-20, 20);
+  const targetX = f.x + rand(-30, 30);
+  steerTowards(f, targetX, targetY, 0.03);
+
+  // Slower movement when bottom dwelling
+  f.vx *= 0.8;
+  f.vy *= 0.8;
+}
+
+function handleWallFollowing(f) {
+  const margin = 30;
+
+  // If no wall target set, find closest wall
+  if (!f.wallFollowTarget) {
+    const distToLeft = f.x;
+    const distToRight = W - f.x;
+    const distToTop = f.y;
+    const distToBottom = H - f.y;
+
+    const minDist = Math.min(distToLeft, distToRight, distToTop, distToBottom);
+    if (minDist === distToLeft) f.wallFollowTarget = 'left';
+    else if (minDist === distToRight) f.wallFollowTarget = 'right';
+    else if (minDist === distToTop) f.wallFollowTarget = 'top';
+    else f.wallFollowTarget = 'bottom';
+  }
+
+  // Follow the wall
+  switch(f.wallFollowTarget) {
+    case 'left':
+      steerTowards(f, margin, f.y + rand(-40, 40), 0.04);
+      break;
+    case 'right':
+      steerTowards(f, W - margin, f.y + rand(-40, 40), 0.04);
+      break;
+    case 'top':
+      steerTowards(f, f.x + rand(-40, 40), margin, 0.04);
+      break;
+    case 'bottom':
+      steerTowards(f, f.x + rand(-40, 40), H - margin, 0.04);
+      break;
+  }
+}
+
+function handleResting(f) {
+  // Very slow movement, mostly stay in place
+  f.vx *= 0.3;
+  f.vy *= 0.3;
+
+  // Small gentle floating motion
+  const time = Date.now() * 0.001;
+  f.vx += Math.sin(time + f.x * 0.01) * 0.02;
+  f.vy += Math.cos(time * 0.7 + f.y * 0.01) * 0.015;
+}
+
+function handleSurfaceSwimming(f) {
+  // Steer towards surface area
+  const targetY = 40 + rand(-10, 20);
+  const targetX = f.x + rand(-40, 40);
+  steerTowards(f, targetX, targetY, 0.03);
+}
+
+function handleSchooling(f) {
+  const schoolRadius = 80;
+  const separationRadius = 25;
+  let nearby = [];
+
+  // Find nearby fish
+  for(const other of fishes) {
+    if(other === f) continue;
+    const dist = Math.hypot(other.x - f.x, other.y - f.y);
+    if(dist < schoolRadius) {
+      nearby.push({fish: other, distance: dist});
+    }
+  }
+
+  if(nearby.length > 0) {
+    // Separation: avoid getting too close
+    let sepX = 0, sepY = 0;
+    let tooClose = 0;
+    for(const n of nearby) {
+      if(n.distance < separationRadius) {
+        sepX += (f.x - n.fish.x) / n.distance;
+        sepY += (f.y - n.fish.y) / n.distance;
+        tooClose++;
+      }
+    }
+    if(tooClose > 0) {
+      sepX /= tooClose;
+      sepY /= tooClose;
+      f.vx += sepX * 0.1;
+      f.vy += sepY * 0.1;
+    }
+
+    // Cohesion: move towards center of group
+    let centerX = 0, centerY = 0;
+    for(const n of nearby) {
+      centerX += n.fish.x;
+      centerY += n.fish.y;
+    }
+    centerX /= nearby.length;
+    centerY /= nearby.length;
+    steerTowards(f, centerX, centerY, 0.02);
+
+    // Alignment: match velocity of nearby fish
+    let avgVx = 0, avgVy = 0;
+    for(const n of nearby) {
+      avgVx += n.fish.vx;
+      avgVy += n.fish.vy;
+    }
+    avgVx /= nearby.length;
+    avgVy /= nearby.length;
+    f.vx += (avgVx - f.vx) * 0.05;
+    f.vy += (avgVy - f.vy) * 0.05;
+  }
+}
+
+function updateFish(f,dt,now){
+  let target=null;let best=1e9;for(const p of foods){const d=(p.x-f.x)**2+(p.y-f.y)**2;if(d<best){best=d;target=p}}
+  const hp=healthPct(f,now);
+
+  // Update behavior timer
+  f.behaviorTimer--;
+
+  // High priority: food seeking (existing behavior)
+  if(target){
+    steerTowards(f,target.x,target.y,0.05);
+    // Reset to normal behavior when food is found
+    if(f.behaviorState !== 'normal') {
+      f.behaviorState = 'normal';
+      f.behaviorTimer = 0;
+      f.wallFollowTarget = null;
+    }
+  }
+  // Medium priority: pump attraction (existing behavior)
+  else if(pumpOn || now<pumpJustOnUntil){
+    if(pumpOn){steerTowards(f,pumpPos.x,H-30,0.006)}
+    if(now<pumpJustOnUntil){steerTowards(f,pumpPos.x,H-30,0.045)}
+    // Reset to normal behavior when near pump
+    if(f.behaviorState !== 'normal') {
+      f.behaviorState = 'normal';
+      f.behaviorTimer = 0;
+      f.wallFollowTarget = null;
+    }
+  }
+  // Low priority: special behaviors or normal wandering
+  else {
+    // Check if behavior timer expired, switch to new behavior
+    if(f.behaviorTimer <= 0) {
+      const randVal = Math.random();
+      if(randVal < 0.10) { // 10% chance for bottom dwelling
+        f.behaviorState = 'bottom_dwelling';
+        f.behaviorTimer = Math.floor(rand(300, 900)); // 5-15 seconds at 60fps
+        f.wallFollowTarget = null;
+      } else if(randVal < 0.25) { // 15% chance for wall following
+        f.behaviorState = 'wall_following';
+        f.behaviorTimer = Math.floor(rand(480, 1200)); // 8-20 seconds
+        f.wallFollowTarget = null;
+      } else if(randVal < 0.33) { // 8% chance for resting
+        f.behaviorState = 'resting';
+        f.behaviorTimer = Math.floor(rand(180, 600)); // 3-10 seconds
+        f.wallFollowTarget = null;
+      } else if(randVal < 0.38) { // 5% chance for surface swimming
+        f.behaviorState = 'surface_swimming';
+        f.behaviorTimer = Math.floor(rand(240, 720)); // 4-12 seconds
+        f.wallFollowTarget = null;
+      } else if(randVal < 0.55) { // 17% chance for schooling
+        f.behaviorState = 'schooling';
+        f.behaviorTimer = Math.floor(rand(360, 1080)); // 6-18 seconds
+        f.wallFollowTarget = null;
+      } else { // 45% chance for normal behavior
+        f.behaviorState = 'normal';
+        f.behaviorTimer = Math.floor(rand(120, 480)); // 2-8 seconds
+        f.wallFollowTarget = null;
+      }
+    }
+
+    // Execute current behavior
+    switch(f.behaviorState) {
+      case 'bottom_dwelling':
+        handleBottomDwelling(f);
+        break;
+      case 'wall_following':
+        handleWallFollowing(f);
+        break;
+      case 'resting':
+        handleResting(f);
+        break;
+      case 'surface_swimming':
+        handleSurfaceSwimming(f);
+        break;
+      case 'schooling':
+        handleSchooling(f);
+        break;
+      case 'normal':
+      default:
+        // Natural swimming behavior - gradual direction changes
+        f.turnTimer--;if(f.turnTimer<=0){
+          f.turnTimer=Math.floor(rand(30,120));
+          // Set new target direction instead of direct velocity change
+          const targetAngle = Math.random() * Math.PI * 2;
+          const horizontalBias = 0.7; // Prefer horizontal directions
+          f.targetVx = Math.cos(targetAngle) * f.speed * (Math.abs(Math.cos(targetAngle)) * horizontalBias + (1-horizontalBias));
+          f.targetVy = Math.sin(targetAngle) * f.speed * 0.3; // Reduced vertical component
+        }
+        // Gradually steer towards target direction
+        if(f.targetVx !== undefined && f.targetVy !== undefined) {
+          const steerStrength = 0.03; // How quickly fish changes direction
+          f.vx += (f.targetVx - f.vx) * steerStrength;
+          f.vy += (f.targetVy - f.vy) * steerStrength;
+        }
+        const randomChance=discoOn?0.02:0.008;if(Math.random()<randomChance){
+          // Random course corrections - gradual
+          const correctionAngle = Math.random() * Math.PI * 2;
+          f.targetVx += Math.cos(correctionAngle) * 0.1;
+          f.targetVy += Math.sin(correctionAngle) * 0.05; // Reduced vertical corrections
+        }
+        if(hp<35){const ty=f.sickTop?40:H-40;steerTowards(f,f.x+rand(-60,60),ty,0.02)}
+        break;
+    }
+  }
+
+  if(discoOn&&Math.random()<0.003){
+    // Disco mode still prefers horizontal movement but allows more vertical
+    const angle=Math.random()*Math.PI*2;
+    const force=0.3;
+    const horizontalBias=Math.abs(Math.cos(angle))*0.8+0.2; // Favor horizontal angles
+    // Update target velocities instead of direct velocity change
+    f.targetVx += Math.cos(angle)*force*horizontalBias;
+    f.targetVy += Math.sin(angle)*force*(1-horizontalBias*0.6); // Reduce vertical component
+  }
+  const slow=clamp(0.4+hp/120,0.4,discoOn?1.4:1.1);f.vx*=0.99;f.vy*=0.99;f.vx*=slow;f.vy*=slow;limitSpeed(f);f.x+=f.vx;f.y+=f.vy;bounceOffWalls(f);
+  for(let i=foods.length-1;i>=0;i--){const p=foods[i];if(Math.hypot(p.x-f.x,p.y-f.y)<fishSize(f,now)*0.7+p.r){foods.splice(i,1);f.blink=8;f.lastEat=Date.now();f.eats++;if(ws && ws.readyState === WebSocket.OPEN){ws.send(JSON.stringify({command:'updateFishStats',fishName:f.name,stats:{eats:f.eats,lastEat:f.lastEat}}))}}}
+
+  // Pooping logic - fish poop 15-60 minutes after eating
+  const timeSinceEat = now - f.lastEat;
+  const timeSincePoop = now - f.lastPoop;
+  const minPoopInterval = 15 * 60 * 1000; // 15 minutes
+  const maxPoopInterval = 60 * 60 * 1000; // 60 minutes
+
+  if(timeSinceEat > minPoopInterval && timeSincePoop > minPoopInterval && Math.random() < 0.002) {
+    // Create poop at fish location
+    poops.push({
+      x: f.x + rand(-5, 5),
+      y: f.y + rand(5, 15), // Slightly below fish
+      createdAt: now,
+      size: rand(3, 6)
+    });
+    f.lastPoop = now;
+  }
+
+  if(Date.now()-f.lastEat>=f.hungerWindow) f.dead=true;
+}
+
+function drawLists(){
+  const now=Date.now();
+  const deadListEl=document.getElementById('deadList');
+  const deadPanelEl=document.getElementById('deadPanel');
+  const oldestListEl=document.getElementById('oldestList');
+  const livingListEl=document.getElementById('livingList');
+  const newestListEl=document.getElementById('newestList');
+  function fmtItem(idx,label){const d=document.createElement('div');d.className='item';const b=document.createElement('span');b.className='label';b.textContent=idx;d.appendChild(b);d.appendChild(document.createTextNode(' '+label));return d}
+  deadListEl.innerHTML='';
+  const recent=deadLog.slice(-TOP_N).reverse();
+  if(deadLog.length>0){deadPanelEl.style.display='block';for(let i=0;i<recent.length;i++){const it=recent[i];const ago=now-it.diedAt;const age=it.diedAt-it.bornAt;deadListEl.appendChild(fmtItem(i+1,`${it.name} · ${ageLabelMS(age)} oud · ${ageLabelMS(ago)} geleden`))}}else{deadPanelEl.style.display='none'}
+  oldestListEl.innerHTML='';
+  const combined=[];for(const f of fishes){combined.push({name:f.name,age:now-f.bornAt,type:'live'})}for(const d of deadLog){combined.push({name:d.name,age:(d.diedAt-d.bornAt),type:'dead'})}
+  combined.sort((a,b)=>b.age-a.age);combined.slice(0,TOP_N).forEach((x,i)=>{oldestListEl.appendChild(fmtItem(i+1,`${x.name} · ${ageLabelMS(x.age)} ${x.type==='live'?'levend':'†'}`))});
+  livingListEl.innerHTML='';
+  const livingAges=[...fishes].map(f=>({name:f.name,age:now-f.bornAt})).sort((a,b)=>b.age-a.age).slice(0,TOP_N);
+  livingAges.forEach((x,i)=>livingListEl.appendChild(fmtItem(i+1,`${x.name} · ${ageLabelMS(x.age)}`)));
+  newestListEl.innerHTML='';
+  const newest=[...fishes].sort((a,b)=>b.bornAt-a.bornAt).slice(0,TOP_N);
+  newest.forEach((f,i)=>newestListEl.appendChild(fmtItem(i+1,`${f.name} · ${ageLabelMS(now-f.bornAt)} geleden geboren`)));
+}
+
+function drawQR(){
+  const el=document.getElementById('qr');
+
+  // Request current access code from server
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({ command: 'getAccessCode' }));
+  }
+}
+
+function updateQRWithCode(accessCode) {
+  const el=document.getElementById('qr');
+  const controllerUrl = `${window.location.protocol}//${window.location.host}/controller?code=${accessCode}`;
+
+  // Use a more reliable QR code service
+  const qrUrl = `https://chart.googleapis.com/chart?chs=200x200&cht=qr&chl=${encodeURIComponent(controllerUrl)}`;
+
+  // Create img element instead of drawing on canvas
+  el.style.display = 'none';
+  let img = el.parentNode.querySelector('.qr-img');
+  if (!img) {
+    img = document.createElement('img');
+    img.className = 'qr-img';
+    img.style.cssText = 'display: block; width: 100%; margin: 0 auto; aspect-ratio: 1/1; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,.25); background: #fff';
+    el.parentNode.insertBefore(img, el);
+
+    // Add error handling
+    img.onerror = function() {
+      console.log('QR code loading failed, trying fallback...');
+      // Fallback to qr-server API with cache busting
+      this.src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(controllerUrl)}&t=${Date.now()}`;
+    };
+  }
+
+  // Add visual feedback during update
+  img.style.opacity = '0.5';
+  img.style.filter = 'blur(2px)';
+
+  // Add cache busting to force reload
+  img.src = qrUrl + '&t=' + Date.now();
+  img.alt = 'QR Code naar Controller';
+
+  // Restore visual clarity when loaded
+  img.onload = function() {
+    this.style.opacity = '1';
+    this.style.filter = 'none';
+    this.style.transition = 'opacity 0.3s ease, filter 0.3s ease';
+  };
+
+  console.log('QR code updated with URL:', controllerUrl);
+}
+
+// WebSocket connection for receiving commands
+let ws = null;
+
+function initWebSocket() {
+    try {
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const port = window.location.port ? `:${window.location.port}` : '';
+        ws = new WebSocket(`${protocol}//${window.location.hostname}${port}`);
+
+        ws.onopen = function() {
+            console.log('WebSocket verbonden met server');
+            // Request current game state from server
+            ws.send(JSON.stringify({ command: 'getGameState' }));
+            // Request access code for QR
+            ws.send(JSON.stringify({ command: 'getAccessCode' }));
+            // Request version info
+            ws.send(JSON.stringify({ command: 'getVersion' }));
+        };
+
+        ws.onmessage = function(event) {
+            try {
+                const data = JSON.parse(event.data);
+                handleRemoteCommand(data);
+            } catch (error) {
+                console.error('Fout bij verwerken WebSocket bericht:', error);
+            }
+        };
+
+        ws.onclose = function() {
+            console.log('WebSocket verbinding gesloten, probeer opnieuw...');
+            setTimeout(initWebSocket, 3000);
+        };
+
+        ws.onerror = function(error) {
+            console.error('WebSocket fout:', error);
+        };
+    } catch (error) {
+        console.error('Kan geen WebSocket verbinding maken:', error);
+        setTimeout(initWebSocket, 3000);
+    }
+}
+
+function handleRemoteCommand(data) {
+    switch (data.type) {
+        case 'gameState':
+            loadGameState(data.data);
+            break;
+        case 'accessCode':
+            updateQRWithCode(data.code);
+            break;
+        case 'version':
+            document.getElementById('versionNumber').textContent = data.version;
+            break;
+        default:
+            // Handle regular commands
+            switch (data.command) {
+                case 'feed':
+                    feed();
+                    break;
+                case 'addFish':
+                    addFish(data.fishData || data.name, data.fishCounter);
+                    break;
+                case 'toggleLight':
+                    toggleLight();
+                    break;
+                case 'toggleDisco':
+                    toggleDisco();
+                    break;
+                case 'togglePump':
+                    togglePump();
+                    break;
+                case 'cleanTank':
+                    cleanTank();
+                    break;
+                default:
+                    console.log('Onbekend commando:', data.command);
+            }
+    }
+}
+
+function loadGameState(state) {
+    console.log('Game state geladen van server:', state);
+
+    // Update global variables
+    lastFed = state.lastFed;
+    fishCounter = state.fishCounter;
+    lightsOn = state.lightsOn;
+    discoOn = state.discoOn;
+    pumpOn = state.pumpOn;
+
+    // Clear current fishes and load from server
+    fishes.length = 0;
+    state.fishes.forEach(serverFish => {
+        const fish = makeFishFromData(serverFish);
+        if (fish) fishes.push(fish);
+    });
+
+    // Load dead log
+    deadLog.length = 0;
+    state.deadLog.forEach(deadFish => {
+        deadLog.push(deadFish);
+    });
+
+    // Update UI
+    updateLightUI();
+    updateDiscoUI();
+    updatePumpUI();
+    updateCooldown();
+    drawLists();
+
+    console.log(`Geladen: ${fishes.length} vissen, ${deadLog.length} overleden vissen`);
+}
+
+function makeFishFromData(serverFish) {
+    const f = {
+        x: rand(50, W-50),
+        y: rand(50, H-50),
+        vx: rand(-1, 1),
+        vy: rand(-0.5, 0.5),
+        // Use saved visual properties or fallback to random (for backwards compatibility)
+        speed: serverFish.speed !== undefined ? serverFish.speed : rand(0.7, 1.2),
+        baseSize: serverFish.baseSize !== undefined ? serverFish.baseSize : rand(18, 30),
+        hue: serverFish.hue !== undefined ? serverFish.hue : Math.floor(rand(0, 360)),
+        sickTop: serverFish.sickTop !== undefined ? serverFish.sickTop : (Math.random() < 0.5),
+        hungerWindow: serverFish.hungerWindow !== undefined ? serverFish.hungerWindow : (DAY * rand(0.9, 1.1)),
+        // Movement properties (still random each time)
+        dir: Math.random() * Math.PI * 2,
+        turnTimer: Math.floor(rand(30, 120)),
+        blink: 0,
+        // Persistent data
+        name: serverFish.name,
+        lastEat: serverFish.lastEat || Date.now(),
+        bornAt: serverFish.addedAt || serverFish.bornAt || Date.now(),
+        eats: serverFish.eats || 0,
+        // Behavior state (new, defaults to normal)
+        behaviorState: 'normal',
+        behaviorTimer: 0,
+        wallFollowTarget: null,
+        lastPoop: Date.now()
+    };
+    return f;
+}
+
+function updateLightUI() {
+    document.getElementById('tank').style.background = lightsOn ? BG : BG_NIGHT;
+    document.getElementById('lightStatus').textContent = 'Licht: ' + (lightsOn ? 'aan' : 'uit');
+    document.body.classList.toggle('light', lightsOn);
+    document.body.classList.toggle('dark', !lightsOn);
+}
+
+function updateDiscoUI() {
+    document.getElementById('discoStatus').textContent = 'Disco: ' + (discoOn ? 'aan' : 'uit');
+}
+
+function updatePumpUI() {
+    document.getElementById('pumpStatus').textContent = 'Pomp: ' + (pumpOn ? 'aan' : 'uit');
+    if (pumpOn) {
+        pumpPos.x = W - 70;
+        pumpJustOnUntil = Date.now() + 3000;
+    }
+}
+
+function feed(){const now=Date.now();if(now-lastFed<FEED_CD)return;lastFed=now;makeFood();updateCooldown()}
+function addFish(nameOrData, newCounter){
+    if(fishes.length>=36)return;
+    if(newCounter)fishCounter=newCounter;
+
+    if(typeof nameOrData === 'object') {
+        // Received fish data object from server
+        const fish = makeFishFromData(nameOrData);
+        if(fish) fishes.push(fish);
+    } else {
+        // Received just name (legacy support)
+        const fishName = nameOrData || `Vis ${fishCounter}`;
+        makeFish(undefined,undefined,fishName);
+    }
+}
+function toggleLight(){lightsOn=!lightsOn;document.getElementById('tank').style.background=lightsOn?BG:BG_NIGHT;document.getElementById('lightStatus').textContent='Licht: '+(lightsOn?'aan':'uit');document.body.classList.toggle('light',lightsOn);document.body.classList.toggle('dark',!lightsOn)}
+function toggleDisco(){discoOn=!discoOn;document.getElementById('discoStatus').textContent='Disco: '+(discoOn?'aan':'uit')}
+function togglePump(){pumpOn=!pumpOn;document.getElementById('pumpStatus').textContent='Pomp: '+(pumpOn?'aan':'uit');if(pumpOn){pumpPos.x=W-70;pumpJustOnUntil=Date.now()+3000}}
+function cleanTank(){poops.length=0;console.log('Tank opgeruimd! Alle poep weggehaald.')}
+function updateCooldown(){
+    const cd=document.getElementById('cooldown');
+    const left=Math.max(0,FEED_CD-(Date.now()-lastFed));
+
+    if(left<=0){
+        const mins=Math.round(FEED_CD/60000);
+        cd.textContent=`Klaar om te voeren (1×/${mins}min)`;
+        cd.classList.add('ready');
+    } else {
+        // Better time formatting like ageLabelMS
+        const timeText = ageLabelMS(left);
+        cd.textContent=`Voeren kan over ${timeText}`;
+        cd.classList.remove('ready');
+    }
+}
+
+// Event listeners zijn verwijderd - controls zijn nu in de controller pagina
+
+function regenerateDecor(){
+  setupPlants();
+  setupDecorations();
+  console.log('Nieuwe decoratie gegenereerd!');
+}
+
+function init(){document.getElementById('tank').style.background=BG;document.body.classList.add('dark');document.body.classList.remove('light');lightsOn=true;document.getElementById('lightStatus').textContent='Licht: aan';resize();updateCooldown();drawLists();initWebSocket()}
+init();
+
+let t=0;let lastListUpdate=0;let lastCooldownUpdate=0;let lastDecorUpdate=0;
+let fadeState='idle';let fadeAlpha=1;let fadeStartTime=0;
+const LIST_UPDATE_INTERVAL=2000;const COOLDOWN_UPDATE_INTERVAL=1000;const DECOR_UPDATE_INTERVAL=3600000; // 1 hour
+const FADE_DURATION=1500; // 1.5 seconds for each fade phase
+
+function loop(){const now=Date.now();const dt=Math.min(0.05,(now-lastT)/1000);lastT=now;t++;
+
+clearFrame(t/60);
+
+// Draw background elements first (behind fish)
+const backPlants=plants.filter(p=>p.zIndex==='back');
+const frontPlants=plants.filter(p=>p.zIndex==='front');
+const backDecorations=decorations.filter(d=>d.zIndex==='back');
+const frontDecorations=decorations.filter(d=>d.zIndex==='front');
+
+// Background layer
+for(const plant of backPlants){drawPlant(plant,t)}
+for(const deco of backDecorations){drawDecoration(deco,t)}
+
+if(pumpOn&&Math.random()<0.6){for(let i=0;i<2;i++)makeBubble()}
+drawBubbles();drawFood();drawPoops();
+
+// Fish layer
+for(const f of fishes){updateFish(f,dt,now);drawFish(f,t,now)}
+
+// Foreground layer
+for(const plant of frontPlants){drawPlant(plant,t)}
+for(const deco of frontDecorations){drawDecoration(deco,t)}
+
+for(let i=fishes.length-1;i>=0;i--){if(fishes[i].dead){const deadFish={name:fishes[i].name,bornAt:fishes[i].bornAt,diedAt:Date.now()};deadLog.push(deadFish);fishes.splice(i,1);if(ws && ws.readyState === WebSocket.OPEN){ws.send(JSON.stringify({command:'fishDied',fish:deadFish}))}}}
+
+if(now-lastListUpdate>LIST_UPDATE_INTERVAL){drawLists();lastListUpdate=now}
+if(now-lastCooldownUpdate>COOLDOWN_UPDATE_INTERVAL){updateCooldown();lastCooldownUpdate=now}
+
+// Handle decoratie fade system
+if(fadeState==='idle'&&now-lastDecorUpdate>DECOR_UPDATE_INTERVAL){
+  // Start fade out
+  fadeState='fading_out';
+  fadeStartTime=now;
+} else if(fadeState==='fading_out'){
+  const fadeProgress=(now-fadeStartTime)/FADE_DURATION;
+  if(fadeProgress>=1){
+    // Switch to fade in and generate new decor
+    fadeState='fading_in';
+    fadeStartTime=now;
+    fadeAlpha=0;
+    regenerateDecor();
+    lastDecorUpdate=now;
+  } else {
+    fadeAlpha=1-fadeProgress;
+  }
+} else if(fadeState==='fading_in'){
+  const fadeProgress=(now-fadeStartTime)/FADE_DURATION;
+  if(fadeProgress>=1){
+    fadeState='idle';
+    fadeAlpha=1;
+  } else {
+    fadeAlpha=fadeProgress;
+  }
+}
+
+requestAnimationFrame(loop)}loop();
+</script>
+</body>
+</html>

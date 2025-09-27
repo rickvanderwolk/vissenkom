@@ -1,0 +1,73 @@
+{
+  "lightsOn": true,
+  "discoOn": false,
+  "pumpOn": false,
+  "lastFed": 1758954816444,
+  "feedCooldown": 3600000,
+  "fishes": [
+    {
+      "name": "Test 1",
+      "addedAt": 1758954804619,
+      "bornAt": 1758954804619,
+      "lastEat": 1758954836188,
+      "eats": 2,
+      "baseSize": 19,
+      "hue": 231,
+      "speed": 0.756419648063122,
+      "sickTop": true,
+      "hungerWindow": 166396779.1243531
+    },
+    {
+      "name": "Test 2",
+      "addedAt": 1758954807272,
+      "bornAt": 1758954807272,
+      "lastEat": 1758954823345,
+      "eats": 2,
+      "baseSize": 26,
+      "hue": 316,
+      "speed": 1.130661533939553,
+      "sickTop": true,
+      "hungerWindow": 161942135.29141593
+    },
+    {
+      "name": "Test 3",
+      "addedAt": 1758954809663,
+      "bornAt": 1758954809663,
+      "lastEat": 1758954837586,
+      "eats": 3,
+      "baseSize": 23,
+      "hue": 226,
+      "speed": 1.072614353227515,
+      "sickTop": true,
+      "hungerWindow": 172177573.0828632
+    },
+    {
+      "name": "Test 4",
+      "addedAt": 1758954826203,
+      "bornAt": 1758954826203,
+      "lastEat": 1758954826203,
+      "eats": 0,
+      "baseSize": 22,
+      "hue": 274,
+      "speed": 0.8287726682109476,
+      "sickTop": true,
+      "hungerWindow": 182493742.37297952
+    },
+    {
+      "name": "Test 5",
+      "addedAt": 1758954834388,
+      "bornAt": 1758954834388,
+      "lastEat": 1758954834388,
+      "eats": 0,
+      "baseSize": 26,
+      "hue": 108,
+      "speed": 0.7902708026144363,
+      "sickTop": false,
+      "hungerWindow": 173567953.1537268
+    }
+  ],
+  "deadLog": [],
+  "fishCounter": 6,
+  "currentAccessCode": "590850",
+  "accessCodeExpiry": 1758958387663
+}

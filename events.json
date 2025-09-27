@@ -1,0 +1,118 @@
+[
+  {
+    "timestamp": 1758954787686,
+    "type": "access_code_generated",
+    "data": {
+      "code": "590850",
+      "expiresAt": 1758958387663,
+      "validFor": "1 hour"
+    }
+  },
+  {
+    "timestamp": 1758954801247,
+    "type": "controller_access",
+    "data": {
+      "code": "590850",
+      "timestamp": 1758954801246
+    }
+  },
+  {
+    "timestamp": 1758954804619,
+    "type": "fish_added",
+    "data": {
+      "name": "Test 1",
+      "baseSize": 19,
+      "hue": 231,
+      "speed": 0.756419648063122,
+      "fishCounter": 2
+    }
+  },
+  {
+    "timestamp": 1758954807272,
+    "type": "fish_added",
+    "data": {
+      "name": "Test 2",
+      "baseSize": 26,
+      "hue": 316,
+      "speed": 1.130661533939553,
+      "fishCounter": 3
+    }
+  },
+  {
+    "timestamp": 1758954809663,
+    "type": "fish_added",
+    "data": {
+      "name": "Test 3",
+      "baseSize": 23,
+      "hue": 226,
+      "speed": 1.072614353227515,
+      "fishCounter": 4
+    }
+  },
+  {
+    "timestamp": 1758954816444,
+    "type": "feed",
+    "data": {
+      "timestamp": 1758954816444,
+      "cooldownMinutes": 60
+    }
+  },
+  {
+    "timestamp": 1758954826203,
+    "type": "fish_added",
+    "data": {
+      "name": "Test 4",
+      "baseSize": 22,
+      "hue": 274,
+      "speed": 0.8287726682109476,
+      "fishCounter": 5
+    }
+  },
+  {
+    "timestamp": 1758954834388,
+    "type": "fish_added",
+    "data": {
+      "name": "Test 5",
+      "baseSize": 26,
+      "hue": 108,
+      "speed": 0.7902708026144363,
+      "fishCounter": 6
+    }
+  },
+  {
+    "timestamp": 1758955050043,
+    "type": "controller_access",
+    "data": {
+      "code": "590850",
+      "timestamp": 1758955050043
+    }
+  },
+  {
+    "timestamp": 1758955055026,
+    "type": "light_toggle",
+    "data": {
+      "state": "uit"
+    }
+  },
+  {
+    "timestamp": 1758955057448,
+    "type": "light_toggle",
+    "data": {
+      "state": "aan"
+    }
+  },
+  {
+    "timestamp": 1758955064207,
+    "type": "pump_toggle",
+    "data": {
+      "state": "aan"
+    }
+  },
+  {
+    "timestamp": 1758955068658,
+    "type": "pump_toggle",
+    "data": {
+      "state": "uit"
+    }
+  }
+]
