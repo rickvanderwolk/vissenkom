@@ -973,7 +973,16 @@ function updateFish(f,dt,now){
     f.targetVx = clamp(f.targetVx, -f.speed * 1.5, f.speed * 1.5);
     f.targetVy = clamp(f.targetVy, -f.speed * 0.8, f.speed * 0.8);
   }
-  const slow=clamp(0.4+hp/120,0.4,discoOn?1.4:1.1);
+  // Better speed curve: minimal slowdown until critical health
+  let slow;
+  if(hp > 50) {
+    slow = 0.95; // 100-50% health: almost no slowdown
+  } else if(hp > 25) {
+    slow = 0.80; // 50-25% health: moderate slowdown
+  } else {
+    slow = 0.55; // 25-0% health: significant slowdown
+  }
+  if(discoOn) slow *= 1.2; // Disco mode speed boost
 
   // Apply friction and speed adjustments
   f.vx*=0.99;f.vy*=0.99;f.vx*=slow;f.vy*=slow;
