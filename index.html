@@ -905,27 +905,27 @@ function updateFish(f,dt,now){
     // Check if behavior timer expired, switch to new behavior
     if(f.behaviorTimer <= 0) {
       const randVal = Math.random();
-      if(randVal < 0.10) { // 10% chance for bottom dwelling
+      if(randVal < 0.03) { // 3% chance for bottom dwelling
         f.behaviorState = 'bottom_dwelling';
         f.behaviorTimer = Math.floor(rand(300, 900)); // 5-15 seconds at 60fps
         f.wallFollowTarget = null;
-      } else if(randVal < 0.25) { // 15% chance for wall following
+      } else if(randVal < 0.18) { // 15% chance for wall following
         f.behaviorState = 'wall_following';
         f.behaviorTimer = Math.floor(rand(480, 1200)); // 8-20 seconds
         f.wallFollowTarget = null;
-      } else if(randVal < 0.33) { // 8% chance for resting
+      } else if(randVal < 0.26) { // 8% chance for resting
         f.behaviorState = 'resting';
         f.behaviorTimer = Math.floor(rand(180, 600)); // 3-10 seconds
         f.wallFollowTarget = null;
-      } else if(randVal < 0.38) { // 5% chance for surface swimming
+      } else if(randVal < 0.31) { // 5% chance for surface swimming
         f.behaviorState = 'surface_swimming';
         f.behaviorTimer = Math.floor(rand(240, 720)); // 4-12 seconds
         f.wallFollowTarget = null;
-      } else if(randVal < 0.55) { // 17% chance for schooling
+      } else if(randVal < 0.48) { // 17% chance for schooling
         f.behaviorState = 'schooling';
         f.behaviorTimer = Math.floor(rand(360, 1080)); // 6-18 seconds
         f.wallFollowTarget = null;
-      } else { // 45% chance for normal behavior
+      } else { // 52% chance for normal behavior
         f.behaviorState = 'normal';
         f.behaviorTimer = Math.floor(rand(120, 480)); // 2-8 seconds
         f.wallFollowTarget = null;
