@@ -189,7 +189,7 @@ function discoEffects(time){
   ctx.globalCompositeOperation='source-over';
 }
 
-function makeFish(x=rand(50,W-50),y=rand(50,H-50),name){const base=rand(18,30);let hue=Math.floor(rand(0,360));if(isNaN(hue))hue=0;const initialVx=rand(-1.2,1.2);const initialVy=rand(-.2,.2);const f={x,y,vx:initialVx,vy:initialVy,speed:rand(0.7,1.2),baseSize:base,hue,dir:Math.random()*Math.PI*2,turnTimer:Math.floor(rand(30,120)),blink:0,name:name||`Vis ${fishCounter++}`,lastEat:Date.now(),bornAt:Date.now(),eats:0,sickTop:Math.random()<0.5,hungerWindow:DAY*rand(0.9,1.1),behaviorState:'normal',behaviorTimer:0,wallFollowTarget:null,lastPoop:Date.now(),targetVx:initialVx,targetVy:initialVy};fishes.push(f)}
+function makeFish(x=rand(50,W-50),y=rand(50,H-50),name){const base=rand(18,30);let hue=Math.floor(rand(0,360));if(isNaN(hue))hue=0;const initialVx=rand(-1.2,1.2);const initialVy=rand(-.2,.2);const f={x,y,vx:initialVx,vy:initialVy,speed:rand(0.7,1.2),baseSize:base,hue,dir:Math.random()*Math.PI*2,turnTimer:Math.floor(rand(30,120)),blink:0,name:name||`Vis ${fishCounter++}`,lastEat:Date.now(),bornAt:Date.now(),eats:0,sickTop:Math.random()<0.5,hungerWindow:DAY*rand(0.9,1.1),behaviorState:'normal',behaviorTimer:0,wallFollowTarget:null,exploreTarget:null,circleCenter:null,followTarget:null,lastPoop:Date.now(),targetVx:initialVx,targetVy:initialVy};fishes.push(f)}
 for(let i=0;i<8;i++)makeFish();
 
 function makeFood(){const n=Math.max(8,fishes.length);for(let i=0;i<n;i++){foods.push({x:rand(40,W-40),y:50+rand(0,30),vy:rand(0.7,1.5),r:7,ttl:6000})}}
@@ -255,6 +255,9 @@ function bounceOffWalls(f){
       f.behaviorState = 'normal';
       f.behaviorTimer = 0;
       f.wallFollowTarget = null;
+      f.exploreTarget = null;
+      f.circleCenter = null;
+      f.followTarget = null;
     }
   }
   // Bounce off right wall
@@ -872,6 +875,77 @@ function handleSchooling(f) {
   }
 }
 
+function handleExploring(f) {
+  // Fish explores by swimming to interesting points (plants, decorations, or random spots)
+  if (!f.exploreTarget || Math.hypot(f.exploreTarget.x - f.x, f.exploreTarget.y - f.y) < 40) {
+    // Pick a new explore target
+    const targetType = Math.random();
+    if (targetType < 0.4 && plants.length > 0) {
+      // Explore near a plant
+      const plant = plants[Math.floor(Math.random() * plants.length)];
+      f.exploreTarget = {x: plant.x + rand(-30, 30), y: plant.y - plant.height * 0.5 + rand(-40, 40)};
+    } else if (targetType < 0.6 && decorations.length > 0) {
+      // Explore near a decoration
+      const deco = decorations[Math.floor(Math.random() * decorations.length)];
+      f.exploreTarget = {x: deco.x + rand(-40, 40), y: deco.y + rand(-30, 30)};
+    } else {
+      // Explore a random spot
+      f.exploreTarget = {x: rand(60, W - 60), y: rand(60, H - 60)};
+    }
+  }
+  steerTowards(f, f.exploreTarget.x, f.exploreTarget.y, 0.04);
+}
+
+function handleCircling(f) {
+  // Fish makes circular swimming patterns
+  if (!f.circleCenter) {
+    // Set up circle parameters
+    f.circleCenter = {x: f.x, y: f.y};
+    f.circleRadius = rand(40, 80);
+    f.circleAngle = Math.atan2(f.vy, f.vx);
+    f.circleSpeed = rand(0.03, 0.06);
+    f.circleDirection = Math.random() < 0.5 ? 1 : -1;
+  }
+
+  // Update angle
+  f.circleAngle += f.circleSpeed * f.circleDirection;
+
+  // Calculate target position on circle
+  const targetX = f.circleCenter.x + Math.cos(f.circleAngle) * f.circleRadius;
+  const targetY = f.circleCenter.y + Math.sin(f.circleAngle) * f.circleRadius;
+
+  steerTowards(f, targetX, targetY, 0.05);
+}
+
+function handleFollowing(f) {
+  // Fish follows another fish
+  if (!f.followTarget || !fishes.includes(f.followTarget)) {
+    // Find a new fish to follow (prefer larger, healthy fish)
+    const candidates = fishes.filter(other => other !== f);
+    if (candidates.length > 0) {
+      f.followTarget = candidates[Math.floor(Math.random() * candidates.length)];
+    }
+  }
+
+  if (f.followTarget) {
+    // Follow at a comfortable distance
+    const dist = Math.hypot(f.followTarget.x - f.x, f.followTarget.y - f.y);
+    const followDistance = 40;
+
+    if (dist > followDistance + 10) {
+      // Too far, swim closer
+      steerTowards(f, f.followTarget.x, f.followTarget.y, 0.04);
+    } else if (dist < followDistance - 10) {
+      // Too close, back away a bit
+      steerTowards(f, f.x * 2 - f.followTarget.x, f.y * 2 - f.followTarget.y, 0.02);
+    } else {
+      // Just right, match velocity
+      f.vx += (f.followTarget.vx - f.vx) * 0.03;
+      f.vy += (f.followTarget.vy - f.vy) * 0.03;
+    }
+  }
+}
+
 function updateFish(f,dt,now){
   let target=null;let best=1e9;for(const p of foods){const d=(p.x-f.x)**2+(p.y-f.y)**2;if(d<best){best=d;target=p}}
   const hp=healthPct(f,now);
@@ -887,6 +961,9 @@ function updateFish(f,dt,now){
       f.behaviorState = 'normal';
       f.behaviorTimer = 0;
       f.wallFollowTarget = null;
+      f.exploreTarget = null;
+      f.circleCenter = null;
+      f.followTarget = null;
     }
   }
   // Medium priority: pump attraction (existing behavior)
@@ -898,6 +975,9 @@ function updateFish(f,dt,now){
       f.behaviorState = 'normal';
       f.behaviorTimer = 0;
       f.wallFollowTarget = null;
+      f.exploreTarget = null;
+      f.circleCenter = null;
+      f.followTarget = null;
     }
   }
   // Low priority: special behaviors or normal wandering
@@ -905,27 +985,39 @@ function updateFish(f,dt,now){
     // Check if behavior timer expired, switch to new behavior
     if(f.behaviorTimer <= 0) {
       const randVal = Math.random();
-      if(randVal < 0.10) { // 10% chance for bottom dwelling
+      if(randVal < 0.03) { // 3% chance for bottom dwelling
         f.behaviorState = 'bottom_dwelling';
         f.behaviorTimer = Math.floor(rand(300, 900)); // 5-15 seconds at 60fps
         f.wallFollowTarget = null;
-      } else if(randVal < 0.25) { // 15% chance for wall following
+      } else if(randVal < 0.13) { // 10% chance for wall following
         f.behaviorState = 'wall_following';
         f.behaviorTimer = Math.floor(rand(480, 1200)); // 8-20 seconds
         f.wallFollowTarget = null;
-      } else if(randVal < 0.33) { // 8% chance for resting
+      } else if(randVal < 0.18) { // 5% chance for resting
         f.behaviorState = 'resting';
         f.behaviorTimer = Math.floor(rand(180, 600)); // 3-10 seconds
         f.wallFollowTarget = null;
-      } else if(randVal < 0.38) { // 5% chance for surface swimming
+      } else if(randVal < 0.23) { // 5% chance for surface swimming
         f.behaviorState = 'surface_swimming';
         f.behaviorTimer = Math.floor(rand(240, 720)); // 4-12 seconds
         f.wallFollowTarget = null;
-      } else if(randVal < 0.55) { // 17% chance for schooling
+      } else if(randVal < 0.33) { // 10% chance for schooling
         f.behaviorState = 'schooling';
         f.behaviorTimer = Math.floor(rand(360, 1080)); // 6-18 seconds
         f.wallFollowTarget = null;
-      } else { // 45% chance for normal behavior
+      } else if(randVal < 0.45) { // 12% chance for exploring
+        f.behaviorState = 'exploring';
+        f.behaviorTimer = Math.floor(rand(420, 960)); // 7-16 seconds
+        f.exploreTarget = null;
+      } else if(randVal < 0.53) { // 8% chance for circling
+        f.behaviorState = 'circling';
+        f.behaviorTimer = Math.floor(rand(300, 720)); // 5-12 seconds
+        f.circleCenter = null;
+      } else if(randVal < 0.58) { // 5% chance for following
+        f.behaviorState = 'following';
+        f.behaviorTimer = Math.floor(rand(480, 1200)); // 8-20 seconds
+        f.followTarget = null;
+      } else { // 42% chance for normal behavior
         f.behaviorState = 'normal';
         f.behaviorTimer = Math.floor(rand(120, 480)); // 2-8 seconds
         f.wallFollowTarget = null;
@@ -948,6 +1040,15 @@ function updateFish(f,dt,now){
         break;
       case 'schooling':
         handleSchooling(f);
+        break;
+      case 'exploring':
+        handleExploring(f);
+        break;
+      case 'circling':
+        handleCircling(f);
+        break;
+      case 'following':
+        handleFollowing(f);
         break;
       case 'normal':
       default:
@@ -1309,11 +1410,13 @@ function makeFishFromData(serverFish) {
     if(isNaN(startX) || startX < 50 || startX > W - 50) startX = W / 2;
     if(isNaN(startY) || startY < 50 || startY > H - 50) startY = H / 2;
 
+    const initialVx = rand(-1, 1);
+    const initialVy = rand(-0.5, 0.5);
     const f = {
         x: startX,
         y: startY,
-        vx: rand(-1, 1),
-        vy: rand(-0.5, 0.5),
+        vx: initialVx,
+        vy: initialVy,
         // Use saved visual properties or fallback to random (for backwards compatibility)
         speed: serverFish.speed !== undefined ? serverFish.speed : rand(0.7, 1.2),
         baseSize: serverFish.baseSize !== undefined ? serverFish.baseSize : rand(18, 30),
@@ -1333,7 +1436,12 @@ function makeFishFromData(serverFish) {
         behaviorState: 'normal',
         behaviorTimer: 0,
         wallFollowTarget: null,
-        lastPoop: Date.now()
+        exploreTarget: null,
+        circleCenter: null,
+        followTarget: null,
+        lastPoop: Date.now(),
+        targetVx: initialVx,
+        targetVy: initialVy
     };
     return f;
 }
