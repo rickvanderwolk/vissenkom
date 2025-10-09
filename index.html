@@ -192,7 +192,7 @@ function discoEffects(time){
 function makeFish(x=rand(50,W-50),y=rand(50,H-50),name){const base=rand(18,30);let hue=Math.floor(rand(0,360));if(isNaN(hue))hue=0;const initialVx=rand(-1.2,1.2);const initialVy=rand(-.2,.2);const f={x,y,vx:initialVx,vy:initialVy,speed:rand(0.7,1.2),baseSize:base,hue,dir:Math.random()*Math.PI*2,turnTimer:Math.floor(rand(30,120)),blink:0,name:name||`Vis ${fishCounter++}`,lastEat:Date.now(),bornAt:Date.now(),eats:0,sickTop:Math.random()<0.5,hungerWindow:DAY*rand(0.9,1.1),behaviorState:'normal',behaviorTimer:0,wallFollowTarget:null,lastPoop:Date.now(),targetVx:initialVx,targetVy:initialVy};fishes.push(f)}
 for(let i=0;i<8;i++)makeFish();
 
-function makeFood(){const n=Math.max(8,fishes.length);for(let i=0;i<n;i++){foods.push({x:rand(40,W-40),y:50+rand(0,30),vy:rand(0.7,1.5),r:7,ttl:2000})}}
+function makeFood(){const n=Math.max(8,fishes.length);for(let i=0;i<n;i++){foods.push({x:rand(40,W-40),y:50+rand(0,30),vy:rand(0.7,1.5),r:7,ttl:6000})}}
 function makeBubble(){const x=pumpPos.x+rand(-6,6);const r=rand(2,6);bubbles.push({x,y:H-30,vy:rand(0.8,1.8),vx:rand(-0.2,0.2),r,ttl:rand(200,380)})}
 
 function healthPct(f,now){return clamp(100*(1-((now-f.lastEat)/f.hungerWindow)),0,100)}
@@ -350,7 +350,18 @@ function drawLamps(time){
 }
 
 function clearFrame(time){ctx.fillStyle=lightsOn?BG:BG_NIGHT;ctx.fillRect(0,0,W,H);drawLamps(time);discoEffects(time)}
-function drawFood(){for(let i=foods.length-1;i>=0;i--){const p=foods[i];p.y+=p.vy;p.ttl--;ctx.fillStyle='#ffb37a';ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fill();if(p.y>H-16||p.ttl<=0){foods.splice(i,1)}}}
+function drawFood(){for(let i=foods.length-1;i>=0;i--){const p=foods[i];
+  // Als voer de bodem bereikt, stop met vallen
+  if(p.y >= H-16){
+    p.y = H-16;  // Blijf op de bodem
+    p.vy = 0;     // Stop met vallen
+  } else {
+    p.y+=p.vy;    // Blijf vallen als nog niet op bodem
+  }
+  p.ttl--;
+  ctx.fillStyle='#ffb37a';ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fill();
+  // Verwijder alleen als ttl verloopt (niet meer als het de bodem raakt)
+  if(p.ttl<=0){foods.splice(i,1)}}}
 function drawBubbles(){for(let i=bubbles.length-1;i>=0;i--){const b=bubbles[i];b.y-=b.vy;b.x+=b.vx;b.ttl--;ctx.globalAlpha=lightsOn?0.7:0.5;ctx.fillStyle='#bfeaf5';ctx.beginPath();ctx.arc(b.x,b.y,b.r,0,Math.PI*2);ctx.fill();ctx.globalAlpha=1;if(b.y<-10||b.ttl<=0){bubbles.splice(i,1)}}}
 
 function drawPoops(){
