@@ -196,7 +196,7 @@ function makeFood(){const n=Math.max(8,fishes.length);for(let i=0;i<n;i++){foods
 function makeBubble(){const x=pumpPos.x+rand(-6,6);const r=rand(2,6);bubbles.push({x,y:H-30,vy:rand(0.8,1.8),vx:rand(-0.2,0.2),r,ttl:rand(200,380)})}
 
 function healthPct(f,now){return clamp(100*(1-((now-f.lastEat)/f.hungerWindow)),0,100)}
-function fishSize(f,now){const ageDays=clamp((now-f.bornAt)/DAY,0,365);const growth=1+Math.min(0.5,ageDays*0.06+f.eats*0.03);return f.baseSize*growth}
+function fishSize(f,now){const ageDays=(now-f.bornAt)/DAY;const growth=1+Math.log(1+ageDays*0.15)*0.35+Math.log(1+f.eats*0.5)*0.25;return f.baseSize*growth}
 function steerTowards(f,tx,ty,str){
   // Validate inputs to prevent jumping
   if(isNaN(tx) || isNaN(ty) || isNaN(str)) return;
