@@ -1171,6 +1171,7 @@ function fallbackToExternalQR(canvas, controllerUrl, accessCode) {
 
 // WebSocket connection for receiving commands
 let ws = null;
+let currentVersion = null; // Store current version to detect changes
 
 function initWebSocket() {
     try {
@@ -1229,7 +1230,17 @@ function handleRemoteCommand(data) {
             updateQRWithCode(data.code);
             break;
         case 'version':
-            document.getElementById('versionNumber').textContent = data.version;
+            // Check if version has changed (and currentVersion is not empty)
+            if (currentVersion && currentVersion !== data.version) {
+                console.log('🔄 Nieuwe versie gedetecteerd:', data.version, '(was:', currentVersion, ')');
+                console.log('🔄 Pagina wordt opnieuw geladen...');
+                location.reload();
+            } else {
+                // First time receiving version or same version
+                currentVersion = data.version;
+                document.getElementById('versionNumber').textContent = data.version;
+                console.log('✅ Huidige versie:', currentVersion);
+            }
             break;
         default:
             // Handle regular commands
