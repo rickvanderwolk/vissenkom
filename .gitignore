@@ -3,3 +3,4 @@ node_modules
 .idea
 events.json
 gamestate.json
+config.json

@@ -7,6 +7,23 @@ const path = require('path');
 const packageInfo = JSON.parse(fs.readFileSync(path.join(__dirname, 'package.json'), 'utf8'));
 const VERSION = packageInfo.version;
 
+// Load config.json for customizable settings
+let config = {
+    showFooter: true,
+    footerLink: 'https://github.com/rickvanderwolk/vissenkom',
+    footerLinkText: 'View on GitHub'
+};
+try {
+    const configFile = path.join(__dirname, 'config.json');
+    if (fs.existsSync(configFile)) {
+        const configData = JSON.parse(fs.readFileSync(configFile, 'utf8'));
+        config = { ...config, ...configData };
+        console.log('Config geladen:', config);
+    }
+} catch (error) {
+    console.error('Fout bij laden config:', error);
+}
+
 // Create HTTP server for serving files
 const server = http.createServer((req, res) => {
     let filePath = '';
@@ -299,6 +316,9 @@ function handleCommand(data, fromClient) {
             break;
         case 'getVersion':
             sendToClient(fromClient, { type: 'version', version: VERSION });
+            break;
+        case 'getConfig':
+            sendToClient(fromClient, { type: 'config', config: config });
             break;
         default:
             console.log('Onbekend commando:', data.command);

@@ -22,3 +22,15 @@ npm start
 3. Open je browser:
 
 Ga naar http://localhost:3000
+
+## Configuratie (optioneel)
+
+De applicatie werkt direct zonder configuratie. Als je de footer in de controller wilt aanpassen, kopieer dan `config.example.json` naar `config.json` en pas de waarden aan:
+
+```bash
+cp config.example.json config.json
+```
+
+Beschikbare opties:
+- `footerText`: Tekst in de footer (bijv. "Powered by Vissenkom")
+- `footerLink`: URL waar de footer naartoe linkt (optioneel)

@@ -434,7 +434,9 @@
 
         <div class="version-display">
             <div style="text-align: center; margin-top: 20px; opacity: 0.7; font-size: 0.9em;">
-                Versie <span id="versionNumber">...</span>
+                Vissenkom v<span id="versionNumber">...</span>
+            </div>
+            <div id="footerText" style="text-align: center; margin-top: 10px; opacity: 0.6; font-size: 0.85em;">
             </div>
         </div>
     </div>
@@ -508,6 +510,7 @@
                     setConnectionStatus(true);
                     requestStatus();
                     requestVersion();
+                    requestConfig();
                 };
 
                 ws.onmessage = function(event) {
@@ -614,6 +617,10 @@
             sendCommand('getVersion');
         }
 
+        function requestConfig() {
+            sendCommand('getConfig');
+        }
+
         function handleMessage(message) {
             switch (message.type) {
                 case 'status':
@@ -625,8 +632,38 @@
                 case 'version':
                     document.getElementById('versionNumber').textContent = message.version;
                     break;
+                case 'config':
+                    updateFooter(message.config);
+                    break;
                 default:
                     console.log('Onbekend bericht:', message);
+            }
+        }
+
+        function updateFooter(config) {
+            const footerEl = document.getElementById('footerText');
+            if (!footerEl) return;
+
+            // Check if footer should be shown (default to true if not specified)
+            const showFooter = config.showFooter !== undefined ? config.showFooter : true;
+
+            if (!showFooter) {
+                // Hide footer if showFooter is false
+                footerEl.style.display = 'none';
+                return;
+            }
+
+            // Show footer
+            footerEl.style.display = 'block';
+
+            if (config.footerLink && config.footerLink.trim() !== '') {
+                // Determine link text: use footerLinkText if provided, otherwise use the URL itself
+                const linkText = config.footerLinkText && config.footerLinkText.trim() !== ''
+                    ? config.footerLinkText
+                    : config.footerLink;
+
+                // Create clickable link
+                footerEl.innerHTML = `<a href="${config.footerLink}" target="_blank" rel="noopener noreferrer" style="color: #50e3c2; text-decoration: none;">${linkText}</a>`;
             }
         }
 
