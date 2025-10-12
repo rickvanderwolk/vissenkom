@@ -1026,7 +1026,7 @@ function updateFish(f,dt,now){
   const minPoopInterval = 15 * 60 * 1000; // 15 minutes
   const maxPoopInterval = 60 * 60 * 1000; // 60 minutes
 
-  if(timeSinceEat > minPoopInterval && timeSincePoop > minPoopInterval && Math.random() < 0.002) {
+  if(timeSinceEat > minPoopInterval && timeSincePoop > minPoopInterval && Math.random() < 0.000002) {
     // Create poop at fish location
     poops.push({
       x: f.x + rand(-5, 5),
