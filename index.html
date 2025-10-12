@@ -189,7 +189,7 @@ function discoEffects(time){
   ctx.globalCompositeOperation='source-over';
 }
 
-function makeFish(x=rand(50,W-50),y=rand(50,H-50),name){const base=rand(18,30);let hue=Math.floor(rand(0,360));if(isNaN(hue))hue=0;const initialVx=rand(-1.2,1.2);const initialVy=rand(-.2,.2);const f={x,y,vx:initialVx,vy:initialVy,speed:rand(0.7,1.2),baseSize:base,hue,dir:Math.random()*Math.PI*2,turnTimer:Math.floor(rand(30,120)),blink:0,name:name||`Vis ${fishCounter++}`,lastEat:Date.now(),bornAt:Date.now(),eats:0,sickTop:Math.random()<0.5,hungerWindow:DAY*rand(0.9,1.1),behaviorState:'normal',behaviorTimer:0,wallFollowTarget:null,lastPoop:Date.now(),targetVx:initialVx,targetVy:initialVy};fishes.push(f)}
+function makeFish(x=rand(50,W-50),y=rand(50,H-50),name){const base=rand(18,30);let hue=Math.floor(rand(0,360));if(isNaN(hue))hue=0;const initialVx=rand(-1.2,1.2);const initialVy=rand(-.15,.15);const f={x,y,vx:initialVx,vy:initialVy,speed:rand(0.7,1.2),baseSize:base,hue,dir:Math.random()*Math.PI*2,turnTimer:Math.floor(rand(600,1800)),blink:0,name:name||`Vis ${fishCounter++}`,lastEat:Date.now(),bornAt:Date.now(),eats:0,sickTop:Math.random()<0.5,hungerWindow:DAY*rand(0.9,1.1),behaviorState:'normal',behaviorTimer:0,wallFollowTarget:null,lastPoop:Date.now(),targetVx:initialVx,targetVy:initialVy};fishes.push(f)}
 for(let i=0;i<8;i++)makeFish();
 
 function makeFood(){const n=Math.max(8,fishes.length);for(let i=0;i<n;i++){foods.push({x:rand(40,W-40),y:50+rand(0,30),vy:rand(0.7,1.5),r:7,ttl:6000})}}
@@ -741,7 +741,7 @@ function drawFish(f,t,now){
   ctx.font=ageFont;const tw2=ctx.measureText(label2).width;
   const lw=Math.max(90,Math.max(tw1,tw2)+pad*2);
   const lh=50;
-  const lx=Math.round(clamp(f.x-lw/2,6,W-lw-6));const ly=Math.round(f.y-s*1.5);
+  const lx=Math.round(clamp(f.x-lw/2,6,W-lw-6));const ly=Math.round(f.y-Math.max(s*2.0,65));
   ctx.fillStyle=`rgba(255,255,255,${labelAlpha})`;roundRect(lx,ly,lw,lh,12);ctx.fill();
   ctx.fillStyle=lightsOn?'#2d5f5f':'#4a7c7c';ctx.textBaseline='top';
   ctx.font=nameFont;ctx.fillText(label1,Math.round(lx+pad),Math.round(ly+6));
@@ -905,27 +905,27 @@ function updateFish(f,dt,now){
     // Check if behavior timer expired, switch to new behavior
     if(f.behaviorTimer <= 0) {
       const randVal = Math.random();
-      if(randVal < 0.03) { // 3% chance for bottom dwelling
+      if(randVal < 0.03) { // 3% bottom dwelling (0-3%)
         f.behaviorState = 'bottom_dwelling';
         f.behaviorTimer = Math.floor(rand(300, 900)); // 5-15 seconds at 60fps
         f.wallFollowTarget = null;
-      } else if(randVal < 0.18) { // 15% chance for wall following
+      } else if(randVal < 0.18) { // 15% wall following (3-18%)
         f.behaviorState = 'wall_following';
         f.behaviorTimer = Math.floor(rand(480, 1200)); // 8-20 seconds
         f.wallFollowTarget = null;
-      } else if(randVal < 0.26) { // 8% chance for resting
+      } else if(randVal < 0.26) { // 8% resting (18-26%)
         f.behaviorState = 'resting';
         f.behaviorTimer = Math.floor(rand(180, 600)); // 3-10 seconds
         f.wallFollowTarget = null;
-      } else if(randVal < 0.31) { // 5% chance for surface swimming
+      } else if(randVal < 0.27) { // 1% surface swimming (26-27%)
         f.behaviorState = 'surface_swimming';
         f.behaviorTimer = Math.floor(rand(240, 720)); // 4-12 seconds
         f.wallFollowTarget = null;
-      } else if(randVal < 0.48) { // 17% chance for schooling
+      } else if(randVal < 0.44) { // 17% schooling (27-44%)
         f.behaviorState = 'schooling';
         f.behaviorTimer = Math.floor(rand(360, 1080)); // 6-18 seconds
         f.wallFollowTarget = null;
-      } else { // 52% chance for normal behavior
+      } else { // 56% normal behavior (44-100%)
         f.behaviorState = 'normal';
         f.behaviorTimer = Math.floor(rand(120, 480)); // 2-8 seconds
         f.wallFollowTarget = null;
@@ -953,25 +953,20 @@ function updateFish(f,dt,now){
       default:
         // Natural swimming behavior - gradual direction changes
         f.turnTimer--;if(f.turnTimer<=0){
-          f.turnTimer=Math.floor(rand(30,120));
+          f.turnTimer=Math.floor(rand(600,1800)); // 10-30 seconds between turns
           // Set new target direction instead of direct velocity change
           const targetAngle = Math.random() * Math.PI * 2;
-          const horizontalBias = 0.7; // Prefer horizontal directions
+          const horizontalBias = 0.85; // Strong preference for horizontal directions
           f.targetVx = Math.cos(targetAngle) * f.speed * (Math.abs(Math.cos(targetAngle)) * horizontalBias + (1-horizontalBias));
-          f.targetVy = Math.sin(targetAngle) * f.speed * 0.3; // Reduced vertical component
+          f.targetVy = Math.sin(targetAngle) * f.speed * 0.2; // Reduced vertical component for more horizontal swimming
         }
         // Gradually steer towards target direction
         if(f.targetVx !== undefined && f.targetVy !== undefined) {
-          const steerStrength = 0.03; // How quickly fish changes direction
+          const steerStrength = 0.15; // How quickly fish changes direction (faster to avoid jittering)
           f.vx += (f.targetVx - f.vx) * steerStrength;
           f.vy += (f.targetVy - f.vy) * steerStrength;
         }
-        const randomChance=discoOn?0.02:0.008;if(Math.random()<randomChance){
-          // Random course corrections - gradual
-          const correctionAngle = Math.random() * Math.PI * 2;
-          f.targetVx += Math.cos(correctionAngle) * 0.1;
-          f.targetVy += Math.sin(correctionAngle) * 0.05; // Reduced vertical corrections
-        }
+        // Removed random course corrections to reduce jittering
         if(hp<35){const ty=f.sickTop?40:H-40;steerTowards(f,f.x+rand(-60,60),ty,0.02)}
         break;
     }
@@ -1333,7 +1328,7 @@ function makeFishFromData(serverFish) {
         hungerWindow: serverFish.hungerWindow !== undefined ? serverFish.hungerWindow : (DAY * rand(0.9, 1.1)),
         // Movement properties (still random each time)
         dir: Math.random() * Math.PI * 2,
-        turnTimer: Math.floor(rand(30, 120)),
+        turnTimer: Math.floor(rand(600, 1800)),
         blink: 0,
         // Persistent data
         name: serverFish.name,
