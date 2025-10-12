@@ -189,7 +189,7 @@ function discoEffects(time){
   ctx.globalCompositeOperation='source-over';
 }
 
-function makeFish(x=rand(50,W-50),y=rand(50,H-50),name){const base=rand(18,30);let hue=Math.floor(rand(0,360));if(isNaN(hue))hue=0;const initialVx=rand(-1.2,1.2);const initialVy=rand(-.15,.15);const f={x,y,vx:initialVx,vy:initialVy,speed:rand(0.7,1.2),baseSize:base,hue,dir:Math.random()*Math.PI*2,turnTimer:Math.floor(rand(600,1800)),blink:0,name:name||`Vis ${fishCounter++}`,lastEat:Date.now(),bornAt:Date.now(),eats:0,sickTop:Math.random()<0.5,hungerWindow:DAY*rand(0.9,1.1),behaviorState:'normal',behaviorTimer:0,wallFollowTarget:null,lastPoop:Date.now(),targetVx:initialVx,targetVy:initialVy};fishes.push(f)}
+function makeFish(x=rand(50,W-50),y=rand(50,H-50),name){const base=rand(18,30);let hue=Math.floor(rand(0,360));if(isNaN(hue))hue=0;const initialVx=rand(-2.5,2.5);const initialVy=rand(-.3,.3);const f={x,y,vx:initialVx,vy:initialVy,speed:rand(1.5,2.5),baseSize:base,hue,dir:Math.random()*Math.PI*2,turnTimer:Math.floor(rand(600,1800)),blink:0,name:name||`Vis ${fishCounter++}`,lastEat:Date.now(),bornAt:Date.now(),eats:0,sickTop:Math.random()<0.5,hungerWindow:DAY*rand(0.9,1.1),behaviorState:'normal',behaviorTimer:0,wallFollowTarget:null,lastPoop:Date.now(),targetVx:initialVx,targetVy:initialVy};fishes.push(f)}
 for(let i=0;i<8;i++)makeFish();
 
 function makeFood(){const n=Math.max(8,fishes.length);for(let i=0;i<n;i++){foods.push({x:rand(40,W-40),y:50+rand(0,30),vy:rand(0.7,1.5),r:7,ttl:6000})}}
@@ -226,7 +226,7 @@ function limitSpeed(f){
 
   const sp=Math.hypot(f.vx,f.vy);
   const max=f.speed*1.8;
-  const min=0.2;
+  const min=0.6;
 
   if(sp > max && sp > 0){
     f.vx = f.vx/sp*max;
@@ -248,9 +248,12 @@ function bounceOffWalls(f){
 
   // Bounce off left wall
   if(f.x < margin) {
-    f.x = margin + 1; // Add small buffer to prevent sticking
-    f.vx = Math.abs(f.vx) + 0.1; // Add small velocity to prevent zero velocity
-    // Reset behavior to normal if stuck in corner
+    f.x = margin + 1;
+    f.vx = Math.abs(f.vx) + 0.1;
+    // Update target velocity to match bounce
+    f.targetVx = Math.abs(f.targetVx || f.vx);
+    // Reset turn timer so fish picks new direction soon
+    f.turnTimer = Math.floor(rand(60, 180));
     if(f.behaviorState !== 'normal') {
       f.behaviorState = 'normal';
       f.behaviorTimer = 0;
@@ -261,6 +264,10 @@ function bounceOffWalls(f){
   if(f.x > W - margin) {
     f.x = W - margin - 1;
     f.vx = -Math.abs(f.vx) - 0.1;
+    // Update target velocity to match bounce
+    f.targetVx = -Math.abs(f.targetVx || f.vx);
+    // Reset turn timer so fish picks new direction soon
+    f.turnTimer = Math.floor(rand(60, 180));
     if(f.behaviorState !== 'normal') {
       f.behaviorState = 'normal';
       f.behaviorTimer = 0;
@@ -271,6 +278,10 @@ function bounceOffWalls(f){
   if(f.y < margin) {
     f.y = margin + 1;
     f.vy = Math.abs(f.vy) + 0.1;
+    // Update target velocity to match bounce
+    f.targetVy = Math.abs(f.targetVy || f.vy);
+    // Reset turn timer so fish picks new direction soon
+    f.turnTimer = Math.floor(rand(60, 180));
     if(f.behaviorState !== 'normal') {
       f.behaviorState = 'normal';
       f.behaviorTimer = 0;
@@ -281,6 +292,10 @@ function bounceOffWalls(f){
   if(f.y > H - margin) {
     f.y = H - margin - 1;
     f.vy = -Math.abs(f.vy) - 0.1;
+    // Update target velocity to match bounce
+    f.targetVy = -Math.abs(f.targetVy || f.vy);
+    // Reset turn timer so fish picks new direction soon
+    f.turnTimer = Math.floor(rand(60, 180));
     if(f.behaviorState !== 'normal') {
       f.behaviorState = 'normal';
       f.behaviorTimer = 0;
@@ -954,15 +969,26 @@ function updateFish(f,dt,now){
         // Natural swimming behavior - gradual direction changes
         f.turnTimer--;if(f.turnTimer<=0){
           f.turnTimer=Math.floor(rand(600,1800)); // 10-30 seconds between turns
-          // Set new target direction instead of direct velocity change
-          const targetAngle = Math.random() * Math.PI * 2;
-          const horizontalBias = 0.85; // Strong preference for horizontal directions
-          f.targetVx = Math.cos(targetAngle) * f.speed * (Math.abs(Math.cos(targetAngle)) * horizontalBias + (1-horizontalBias));
-          f.targetVy = Math.sin(targetAngle) * f.speed * 0.2; // Reduced vertical component for more horizontal swimming
+
+          // Calculate current direction from velocity
+          const currentAngle = Math.atan2(f.vy, f.vx);
+
+          // Small angle change (max 45 degrees = π/4 radians) for smooth turns
+          const angleChange = rand(-Math.PI/4, Math.PI/4); // Random change between -45° and +45°
+          let newAngle = currentAngle + angleChange;
+
+          // Normalize angle to -PI to PI range
+          while (newAngle > Math.PI) newAngle -= Math.PI * 2;
+          while (newAngle < -Math.PI) newAngle += Math.PI * 2;
+
+          // Set target velocities - use full speed for target
+          f.targetVx = Math.cos(newAngle) * f.speed;
+          f.targetVy = Math.sin(newAngle) * f.speed * 0.25; // Reduced vertical component
         }
-        // Gradually steer towards target direction
+
+        // Gradually steer towards target direction - ONLY when we have a target
         if(f.targetVx !== undefined && f.targetVy !== undefined) {
-          const steerStrength = 0.15; // How quickly fish changes direction (faster to avoid jittering)
+          const steerStrength = 0.12; // Medium steering for smooth but visible turns
           f.vx += (f.targetVx - f.vx) * steerStrength;
           f.vy += (f.targetVy - f.vy) * steerStrength;
         }
@@ -1321,7 +1347,7 @@ function makeFishFromData(serverFish) {
         vx: rand(-1, 1),
         vy: rand(-0.5, 0.5),
         // Use saved visual properties or fallback to random (for backwards compatibility)
-        speed: serverFish.speed !== undefined ? serverFish.speed : rand(0.7, 1.2),
+        speed: serverFish.speed !== undefined ? serverFish.speed : rand(1.5, 2.5),
         baseSize: serverFish.baseSize !== undefined ? serverFish.baseSize : rand(18, 30),
         hue: hue,
         sickTop: serverFish.sickTop !== undefined ? serverFish.sickTop : (Math.random() < 0.5),
