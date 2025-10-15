@@ -395,6 +395,10 @@ function clearFrame(time){
   // Save context and translate to viewport area
   ctx.save();
   ctx.translate(viewportConfig.offsetLeft,viewportConfig.offsetTop);
+  // Clip to viewport area to prevent rendering outside bounds
+  ctx.beginPath();
+  ctx.rect(0,0,W,H);
+  ctx.clip();
   // Fill viewport area with background color
   ctx.fillStyle=lightsOn?BG:BG_NIGHT;
   ctx.fillRect(0,0,W,H);
@@ -1076,6 +1080,10 @@ function updateFish(f,dt,now){
   f.x += f.vx;
   f.y += f.vy;
 
+  // Hard clamp position to viewport bounds (safety net)
+  f.x = clamp(f.x, 0, W);
+  f.y = clamp(f.y, 0, H);
+
   // Validate position after updating
   if(isNaN(f.x)) f.x = W / 2;
   if(isNaN(f.y)) f.y = H / 2;
@@ -1507,6 +1515,10 @@ const frontDecorations=decorations.filter(d=>d.zIndex==='front');
 // Apply viewport transform for all drawing
 ctx.save();
 ctx.translate(viewportConfig.offsetLeft,viewportConfig.offsetTop);
+// Clip to viewport area to prevent rendering outside bounds
+ctx.beginPath();
+ctx.rect(0,0,W,H);
+ctx.clip();
 
 // Background layer
 for(const plant of backPlants){drawPlant(plant,t)}
