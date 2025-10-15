@@ -6,14 +6,14 @@
 <title>Vissenkom Demo</title>
 
 <style>
-html,body{height:100%;margin:0;overflow:hidden}
+html,body{height:100%;margin:0;overflow:hidden;background:#000}
 body{font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;display:flex;flex-direction:column;transition:color .2s ease, background .2s ease}
-body.dark{background:#0b1e2d;color:#e9f1f7}
-body.light{background:#e9f1f7;color:#0b1e2d}
+body.dark{background:#000;color:#e9f1f7}
+body.light{background:#000;color:#0b1e2d}
 button{appearance:none;border:none;border-radius:10px;padding:8px 12px;font-weight:600;background:#50e3c2;color:#0b1e2d;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,.25);transition:transform .05s ease, opacity .2s ease, filter .2s ease;font-size:13px}
 button:active{transform:translateY(1px)}
 button[disabled]{opacity:.45;filter:saturate(.2) brightness(.9);cursor:not-allowed}
-#tank{flex:1;position:relative}
+#tank{flex:1;position:relative;background:#000}
 canvas#c{position:absolute;inset:0;width:100%;height:100%;display:block;z-index:1}
 .side{position:absolute;left:8px;top:8px;z-index:4;display:flex;flex-direction:column;gap:8px;max-width:220px}
 .panel{backdrop-filter:blur(6px);padding:8px 10px;border-radius:10px;line-height:1.25;box-shadow:0 4px 12px rgba(0,0,0,.25)}
@@ -83,7 +83,29 @@ body.light #cooldown.ready{background:rgba(255,215,0,.9);color:#0b1e2d;box-shado
 const cv=document.getElementById('c');const ctx=cv.getContext('2d');
 const rand=(a,b)=>Math.random()*(b-a)+a;const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 let lamps=[];let W=0,H=0;
-function resize(){W=cv.width=cv.clientWidth;H=cv.height=cv.clientHeight;setupLamps();setupPlants();setupDecorations();drawQR()}window.addEventListener('resize',resize);
+let viewportConfig={offsetTop:0,offsetBottom:0,offsetLeft:0,offsetRight:0};
+function resize(){
+  const fullW=cv.clientWidth;
+  const fullH=cv.clientHeight;
+  cv.width=fullW;
+  cv.height=fullH;
+  W=fullW-(viewportConfig.offsetLeft+viewportConfig.offsetRight);
+  H=fullH-(viewportConfig.offsetTop+viewportConfig.offsetBottom);
+  updateUIPositions();
+  setupLamps();setupPlants();setupDecorations();drawQR()
+}
+function updateUIPositions(){
+  const side=document.querySelector('.side');
+  const statusbar=document.querySelector('.statusbar');
+  if(side){
+    side.style.left=(viewportConfig.offsetLeft+8)+'px';
+    side.style.top=(viewportConfig.offsetTop+8)+'px';
+  }
+  if(statusbar){
+    statusbar.style.bottom=(viewportConfig.offsetBottom+8)+'px';
+  }
+}
+window.addEventListener('resize',resize);
 const DAY_MIN=2*24*60;const DAY=DAY_MIN*60*1000;const FEED_CD=60*60*1000;
 const BG='#083042';const BG_NIGHT='#04121a';
 const fishes=[];const foods=[];const deadLog=[];const bubbles=[];const poops=[];
@@ -364,7 +386,22 @@ function drawLamps(time){
   }
 }
 
-function clearFrame(time){ctx.fillStyle=lightsOn?BG:BG_NIGHT;ctx.fillRect(0,0,W,H);drawLamps(time);discoEffects(time)}
+function clearFrame(time){
+  const fullW=cv.width;
+  const fullH=cv.height;
+  // Fill entire canvas with black first
+  ctx.fillStyle='#000';
+  ctx.fillRect(0,0,fullW,fullH);
+  // Save context and translate to viewport area
+  ctx.save();
+  ctx.translate(viewportConfig.offsetLeft,viewportConfig.offsetTop);
+  // Fill viewport area with background color
+  ctx.fillStyle=lightsOn?BG:BG_NIGHT;
+  ctx.fillRect(0,0,W,H);
+  drawLamps(time);
+  discoEffects(time);
+  ctx.restore();
+}
 function drawFood(){for(let i=foods.length-1;i>=0;i--){const p=foods[i];
   // Als voer de bodem bereikt, stop met vallen
   if(p.y >= H-16){
@@ -1208,6 +1245,8 @@ function initWebSocket() {
             ws.send(JSON.stringify({ command: 'getAccessCode' }));
             // Request version info
             ws.send(JSON.stringify({ command: 'getVersion' }));
+            // Request config for viewport settings
+            ws.send(JSON.stringify({ command: 'getConfig' }));
         };
 
         ws.onmessage = function(event) {
@@ -1249,6 +1288,13 @@ function handleRemoteCommand(data) {
         case 'accessCode':
             console.log('🔄 Received new access code from server:', data.code);
             updateQRWithCode(data.code);
+            break;
+        case 'config':
+            console.log('🔄 Received config from server:', data.config);
+            if(data.config && data.config.viewport) {
+                viewportConfig = data.config.viewport;
+                resize(); // Recalculate viewport dimensions
+            }
             break;
         case 'version':
             // Check if version has changed (and currentVersion is not empty)
@@ -1458,6 +1504,10 @@ const frontPlants=plants.filter(p=>p.zIndex==='front');
 const backDecorations=decorations.filter(d=>d.zIndex==='back');
 const frontDecorations=decorations.filter(d=>d.zIndex==='front');
 
+// Apply viewport transform for all drawing
+ctx.save();
+ctx.translate(viewportConfig.offsetLeft,viewportConfig.offsetTop);
+
 // Background layer
 for(const plant of backPlants){drawPlant(plant,t)}
 for(const deco of backDecorations){drawDecoration(deco,t)}
@@ -1471,6 +1521,8 @@ for(const f of fishes){updateFish(f,dt,now);drawFish(f,t,now)}
 // Foreground layer
 for(const plant of frontPlants){drawPlant(plant,t)}
 for(const deco of frontDecorations){drawDecoration(deco,t)}
+
+ctx.restore();
 
 for(let i=fishes.length-1;i>=0;i--){if(fishes[i].dead){const deadFish={name:fishes[i].name,bornAt:fishes[i].bornAt,diedAt:Date.now()};deadLog.push(deadFish);fishes.splice(i,1);if(ws && ws.readyState === WebSocket.OPEN){ws.send(JSON.stringify({command:'fishDied',fish:deadFish}))}}}
 

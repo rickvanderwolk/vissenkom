@@ -1,5 +1,11 @@
 {
   "showFooter": true,
   "footerLink": "https://github.com/rickvanderwolk/vissenkom",
-  "footerLinkText": "View on GitHub"
+  "footerLinkText": "View on GitHub",
+  "viewport": {
+    "offsetTop": 0,
+    "offsetBottom": 0,
+    "offsetLeft": 0,
+    "offsetRight": 0
+  }
 }
