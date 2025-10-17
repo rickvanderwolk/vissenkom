@@ -203,7 +203,14 @@ function setupPlants(){
     const swayPhase=rand(0,Math.PI*2);
     const movePhase=rand(0,Math.PI*2);
     const branchiness=rand(0.5,0.9);
-    plants.push({type,x,y:H-sandHeight,height,width,segments,hue,swayPhase,movePhase,branchiness,zIndex});
+
+    // Variatie in hoogte: planten mogen op verschillende dieptes groeien
+    // Van helemaal onderaan (H) tot aan de top van het zand (H-sandHeight)
+    const minY=H-5; // Net boven de bodem
+    const maxY=H-sandHeight+15; // Tot wat boven het zand
+    const plantY=rand(minY,maxY);
+
+    plants.push({type,x,y:plantY,height,width,segments,hue,swayPhase,movePhase,branchiness,zIndex});
   }
 }
 
@@ -217,7 +224,14 @@ function setupDecorations(){
     const size=rand(80,140);
     const bobPhase=rand(0,Math.PI*2);
     const zIndex=Math.random()<0.7?'back':'front';
-    decorations.push({type:'castle',x,y:H-sandHeight-size/2+10,size,hue:rand(200,220),bobPhase,zIndex});
+    // Variatie in hoogte: van onderkant zand tot wat hoger
+    // y is het middenpunt van het kasteel, dus voor een kasteel dat op de bodem staat:
+    // minimaal: H - size/2 (onderkant zit op H)
+    // maximaal: H - sandHeight (onderkant zit op zandhoogte)
+    const minY=H-size/2; // Helemaal onderaan
+    const maxY=H-sandHeight+10; // Bijna bovenop zand
+    const y=rand(minY,maxY);
+    decorations.push({type:'castle',x,y,size,hue:rand(200,220),bobPhase,zIndex});
   }
 }
 function lampHueFor(L,time){if(!discoOn)return L.hueBase;const speed=2.5;const range=340;const wave=(Math.sin(time*speed+L.phase)+1)/2;return (L.hueBase+wave*range)%360}
