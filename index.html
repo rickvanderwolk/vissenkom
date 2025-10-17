@@ -1142,6 +1142,12 @@ function getBehaviorEmoji(behaviorState) {
     case 'resting': return '💤';
     case 'surface_swimming': return '⬆️';
     case 'schooling': return '👥';
+    case 'playful': return '🎉';
+    case 'energetic': return '⚡';
+    case 'jumping': return '🦘';
+    case 'lazy': return '😴';
+    case 'curious': return '🔍';
+    case 'dancing': return '💃';
     case 'normal':
     default: return '🐟';
   }
@@ -1265,6 +1271,144 @@ function handleSchooling(f) {
   }
 }
 
+function handlePlayful(f) {
+  // Fast swimming with sudden direction changes
+  // Quick random turns every 30-90 frames (0.5-1.5 seconds)
+  if(!f.playfulTurnTimer) f.playfulTurnTimer = 0;
+  f.playfulTurnTimer--;
+
+  if(f.playfulTurnTimer <= 0) {
+    f.playfulTurnTimer = Math.floor(rand(30, 90));
+    // Sharp random direction change
+    const angle = rand(0, Math.PI * 2);
+    f.targetVx = Math.cos(angle) * f.speed * 1.3; // 30% faster
+    f.targetVy = Math.sin(angle) * f.speed * 0.5;
+  }
+
+  // Quick steering for playful darting
+  if(f.targetVx !== undefined && f.targetVy !== undefined) {
+    f.vx += (f.targetVx - f.vx) * 0.2; // Fast steering
+    f.vy += (f.targetVy - f.vy) * 0.2;
+  }
+}
+
+function handleEnergetic(f) {
+  // Super fast zigzag sprint pattern
+  if(!f.energeticTimer) f.energeticTimer = 0;
+  f.energeticTimer++;
+
+  // Zigzag every 20 frames
+  if(f.energeticTimer % 20 === 0) {
+    const baseAngle = Math.atan2(f.vy, f.vx);
+    const zigzag = (Math.floor(f.energeticTimer / 20) % 2 === 0) ? Math.PI / 6 : -Math.PI / 6;
+    const newAngle = baseAngle + zigzag;
+
+    f.targetVx = Math.cos(newAngle) * f.speed * 1.8; // 80% faster!
+    f.targetVy = Math.sin(newAngle) * f.speed * 0.6;
+  }
+
+  // Very fast steering
+  if(f.targetVx !== undefined && f.targetVy !== undefined) {
+    f.vx += (f.targetVx - f.vx) * 0.25;
+    f.vy += (f.targetVy - f.vy) * 0.25;
+  }
+}
+
+function handleJumping(f) {
+  // Jumping behavior: swim up fast, then drop down
+  if(!f.jumpPhase) f.jumpPhase = 'up';
+  if(!f.jumpTimer) f.jumpTimer = 0;
+
+  if(f.jumpPhase === 'up') {
+    // Swim up towards surface
+    const targetY = 30;
+    steerTowards(f, f.x + rand(-20, 20), targetY, 0.08);
+
+    // When near surface, switch to down
+    if(f.y < 50) {
+      f.jumpPhase = 'down';
+      f.jumpTimer = Math.floor(rand(60, 120));
+    }
+  } else {
+    // Drop down
+    f.vy += 0.15; // Gravity effect
+    f.vx *= 0.98; // Slow horizontal movement
+
+    f.jumpTimer--;
+    if(f.jumpTimer <= 0) {
+      f.jumpPhase = 'up';
+    }
+  }
+}
+
+function handleLazy(f) {
+  // Very slow drifting, mostly sinking
+  f.vx *= 0.85; // Heavy damping
+  f.vy *= 0.85;
+
+  // Slow sinking
+  f.vy += 0.02;
+
+  // Tiny random drift
+  const time = Date.now() * 0.0005;
+  f.vx += Math.sin(time + f.x * 0.02) * 0.01;
+  f.vy += Math.cos(time * 0.3 + f.y * 0.02) * 0.008;
+}
+
+function handleCurious(f) {
+  // Find something to investigate: decorations, plants, or other fish
+  if(!f.curiousTarget || Math.random() < 0.02) {
+    const options = [];
+
+    // Add decorations as targets
+    decorations.forEach(d => options.push({x: d.x, y: d.y}));
+
+    // Add plants as targets
+    plants.forEach(p => options.push({x: p.x, y: p.y}));
+
+    // Add other fish as targets
+    fishes.forEach(other => {
+      if(other !== f) options.push({x: other.x, y: other.y});
+    });
+
+    // Pick random target
+    if(options.length > 0) {
+      f.curiousTarget = options[Math.floor(rand(0, options.length))];
+    }
+  }
+
+  // Swim towards target
+  if(f.curiousTarget) {
+    steerTowards(f, f.curiousTarget.x, f.curiousTarget.y, 0.04);
+
+    // When close, pick new target
+    const dist = Math.hypot(f.curiousTarget.x - f.x, f.curiousTarget.y - f.y);
+    if(dist < 30) {
+      f.curiousTarget = null;
+    }
+  }
+}
+
+function handleDancing(f) {
+  // Oscillating up and down movement (dancing)
+  if(!f.danceTimer) f.danceTimer = 0;
+  f.danceTimer++;
+
+  // Sine wave for up/down motion
+  const danceSpeed = 0.1;
+  const amplitude = 2.0;
+  const verticalForce = Math.sin(f.danceTimer * danceSpeed) * amplitude;
+
+  f.vy += verticalForce * 0.1;
+
+  // Slight horizontal sway
+  f.vx += Math.cos(f.danceTimer * danceSpeed * 0.7) * 0.05;
+
+  // Keep moving forward slowly
+  const baseAngle = Math.atan2(f.vy, f.vx);
+  f.vx += Math.cos(baseAngle) * 0.02;
+}
+
 function updateFish(f,dt,now){
   let target=null;let best=1e9;for(const p of foods){const d=(p.x-f.x)**2+(p.y-f.y)**2;if(d<best){best=d;target=p}}
   const hp=healthPct(f,now);
@@ -1312,23 +1456,47 @@ function updateFish(f,dt,now){
         f.behaviorState = 'bottom_dwelling';
         f.behaviorTimer = Math.floor(rand(300, 900)); // 5-15 seconds at 60fps
         f.wallFollowTarget = null;
-      } else if(randVal < 0.18) { // 15% wall following (3-18%)
+      } else if(randVal < 0.13) { // 10% wall following (3-13%)
         f.behaviorState = 'wall_following';
         f.behaviorTimer = Math.floor(rand(480, 1200)); // 8-20 seconds
         f.wallFollowTarget = null;
-      } else if(randVal < 0.26) { // 8% resting (18-26%)
+      } else if(randVal < 0.19) { // 6% resting (13-19%)
         f.behaviorState = 'resting';
         f.behaviorTimer = Math.floor(rand(180, 600)); // 3-10 seconds
         f.wallFollowTarget = null;
-      } else if(randVal < 0.27) { // 1% surface swimming (26-27%)
+      } else if(randVal < 0.20) { // 1% surface swimming (19-20%)
         f.behaviorState = 'surface_swimming';
         f.behaviorTimer = Math.floor(rand(240, 720)); // 4-12 seconds
         f.wallFollowTarget = null;
-      } else if(randVal < 0.44) { // 17% schooling (27-44%)
+      } else if(randVal < 0.32) { // 12% schooling (20-32%)
         f.behaviorState = 'schooling';
         f.behaviorTimer = Math.floor(rand(360, 1080)); // 6-18 seconds
         f.wallFollowTarget = null;
-      } else { // 56% normal behavior (44-100%)
+      } else if(randVal < 0.40) { // 8% playful (32-40%)
+        f.behaviorState = 'playful';
+        f.behaviorTimer = Math.floor(rand(180, 480)); // 3-8 seconds
+        f.wallFollowTarget = null;
+      } else if(randVal < 0.47) { // 7% energetic (40-47%)
+        f.behaviorState = 'energetic';
+        f.behaviorTimer = Math.floor(rand(120, 360)); // 2-6 seconds
+        f.wallFollowTarget = null;
+      } else if(randVal < 0.51) { // 4% jumping (47-51%)
+        f.behaviorState = 'jumping';
+        f.behaviorTimer = Math.floor(rand(240, 600)); // 4-10 seconds
+        f.wallFollowTarget = null;
+      } else if(randVal < 0.56) { // 5% lazy (51-56%)
+        f.behaviorState = 'lazy';
+        f.behaviorTimer = Math.floor(rand(300, 900)); // 5-15 seconds
+        f.wallFollowTarget = null;
+      } else if(randVal < 0.65) { // 9% curious (56-65%)
+        f.behaviorState = 'curious';
+        f.behaviorTimer = Math.floor(rand(360, 900)); // 6-15 seconds
+        f.wallFollowTarget = null;
+      } else if(randVal < 0.71) { // 6% dancing (65-71%)
+        f.behaviorState = 'dancing';
+        f.behaviorTimer = Math.floor(rand(240, 720)); // 4-12 seconds
+        f.wallFollowTarget = null;
+      } else { // 29% normal behavior (71-100%)
         f.behaviorState = 'normal';
         f.behaviorTimer = Math.floor(rand(120, 480)); // 2-8 seconds
         f.wallFollowTarget = null;
@@ -1351,6 +1519,24 @@ function updateFish(f,dt,now){
         break;
       case 'schooling':
         handleSchooling(f);
+        break;
+      case 'playful':
+        handlePlayful(f);
+        break;
+      case 'energetic':
+        handleEnergetic(f);
+        break;
+      case 'jumping':
+        handleJumping(f);
+        break;
+      case 'lazy':
+        handleLazy(f);
+        break;
+      case 'curious':
+        handleCurious(f);
+        break;
+      case 'dancing':
+        handleDancing(f);
         break;
       case 'normal':
       default:
