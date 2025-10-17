@@ -216,6 +216,7 @@ for(let i=0;i<8;i++)makeFish();
 
 function makeFood(){const n=Math.max(8,fishes.length);for(let i=0;i<n;i++){foods.push({x:rand(40,W-40),y:50+rand(0,30),vy:rand(0.7,1.5),r:7,ttl:6000})}}
 function makeBubble(){const x=pumpPos.x+rand(-6,6);const r=rand(2,6);bubbles.push({x,y:H-30,vy:rand(0.8,1.8),vx:rand(-0.2,0.2),r,ttl:rand(200,380)})}
+function makeFishBubble(fx,fy){const r=rand(1.5,3.5);bubbles.push({x:fx+rand(-8,8),y:fy+rand(-5,5),vy:rand(0.6,1.2),vx:rand(-0.3,0.3),r,ttl:rand(150,300)})}
 
 function healthPct(f,now){return clamp(100*(1-((now-f.lastEat)/f.hungerWindow)),0,100)}
 function fishSize(f,now){const ageDays=(now-f.bornAt)/DAY;const growth=1+Math.log(1+ageDays*0.15)*0.35+Math.log(1+f.eats*0.5)*0.25;return f.baseSize*growth}
@@ -438,8 +439,9 @@ function drawPoops(){
 
 function drawPlant(plant,time){
   const lightMul=lightsOn?1:0.6;
-  const swayAmount=0; // Static plants for performance
-  const moveAmount=0; // Static plants for performance
+  // Heel subtiele sway voor meer leven
+  const swayAmount=Math.sin(time*0.015+plant.swayPhase)*3;
+  const moveAmount=Math.sin(time*0.008+plant.movePhase)*2;
 
   if(plant.type==='seaweed' || plant.type==='kelp'){
     const segmentHeight=plant.height/plant.segments;
@@ -447,7 +449,8 @@ function drawPlant(plant,time){
 
     for(let i=0;i<plant.segments;i++){
       const y=plant.y-i*segmentHeight;
-      const x=plant.x;
+      const sway=(i/plant.segments)*swayAmount*swayMultiplier;
+      const x=plant.x+sway;
       const width=plant.width*(1-i*0.02/plant.segments);
       const alpha=(lightsOn?0.9:0.6)*fadeAlpha;
 
@@ -503,8 +506,8 @@ function drawPlant(plant,time){
     for(let i=0;i<plant.segments;i++){
       const offsetX=(i-plant.segments/2)*bladeSpacing;
       const x=plant.x+offsetX;
-      const bladeHeight=plant.height*(0.8+0.2*(i%3)/2); // Static variation
-      const topX=x;
+      const bladeHeight=plant.height*(0.8+0.2*(i%3)/2);
+      const topX=x+swayAmount*0.6; // Subtiele sway aan de top
       const alpha=(lightsOn?0.8:0.5)*fadeAlpha;
 
       ctx.strokeStyle=`hsla(${plant.hue},80%,${40*lightMul}%,${alpha})`;
@@ -512,7 +515,7 @@ function drawPlant(plant,time){
       ctx.lineCap='round';
       ctx.beginPath();
       ctx.moveTo(x,plant.y);
-      ctx.lineTo(topX,plant.y-bladeHeight); // Straight lines for performance
+      ctx.lineTo(topX,plant.y-bladeHeight);
       ctx.stroke();
     }
   }
@@ -545,7 +548,8 @@ function drawPlant(plant,time){
     const segmentHeight=plant.height/plant.segments;
     for(let i=0;i<plant.segments;i++){
       const y=plant.y-i*segmentHeight;
-      const x=plant.x;
+      const sway=(i/plant.segments)*swayAmount*0.8;
+      const x=plant.x+sway;
       const width=plant.width*(1-i*0.01/plant.segments);
       const alpha=(lightsOn?0.8:0.5)*fadeAlpha;
 
@@ -554,7 +558,7 @@ function drawPlant(plant,time){
       ctx.lineCap='round';
       ctx.beginPath();
       ctx.moveTo(plant.x,plant.y);
-      ctx.lineTo(x,y); // Straight lines for performance
+      ctx.lineTo(x,y);
       ctx.stroke();
     }
   }
@@ -758,6 +762,18 @@ function ageLabel(f,now){return ageLabelMS(now-f.bornAt)}
 
 function drawFish(f,t,now){
   const s=fishSize(f,now);const a=Math.atan2(f.vy,f.vx);
+
+  // Subtiele schaduw onder de vis voor diepte-effect
+  if(lightsOn){
+    ctx.save();
+    ctx.globalAlpha=0.15;
+    ctx.fillStyle='#000';
+    ctx.beginPath();
+    ctx.ellipse(f.x+2,f.y+s*1.3,s*0.7,s*0.3,a,0,Math.PI*2);
+    ctx.fill();
+    ctx.restore();
+  }
+
   ctx.save();ctx.translate(f.x,f.y);ctx.rotate(a);
   const dimBase=1-(1-healthPct(f,now)/100)*0.4;const lightMul=lightsOn?1:0.6;let dim=dimBase*lightMul;
 
@@ -787,6 +803,21 @@ function drawFish(f,t,now){
   const finW=s*0.45;const finH=s*0.25;const finWave=Math.sin(t*(discoOn?0.04:0.02)+f.x*0.03)*0.5+0.5;
   ctx.save();ctx.translate(-s*0.35,0);ctx.rotate((finWave-0.5)*(discoOn?1.2:0.6));ctx.fillStyle=`hsla(${Math.round((fishHue+70)%360)},85%,${65*dim}%,1)`;ctx.beginPath();ctx.ellipse(0,0,finW,finH,0,0,Math.PI*2);ctx.fill();ctx.restore();
   ctx.fillStyle=lightsOn?'#fff':'#d8e1e8';ctx.beginPath();ctx.arc(s*0.35,-s*0.08,s*0.11,0,Math.PI*2);ctx.fill();ctx.fillStyle=lightsOn?'#000':'#24323c';ctx.beginPath();ctx.arc(s*0.37,-s*0.08,s*0.05,0,Math.PI*2);ctx.fill();
+
+  // Af en toe een glinsterend sterretje op de vis (alleen als gezond en licht aan)
+  if(lightsOn && healthPct(f,now)>50 && Math.sin(t*0.1+f.x*0.05)>0.85){
+    ctx.fillStyle='rgba(255,255,255,0.9)';
+    const sparkX=s*0.2;
+    const sparkY=-s*0.15;
+    ctx.beginPath();
+    ctx.arc(sparkX,sparkY,s*0.06,0,Math.PI*2);
+    ctx.fill();
+    // Extra klein glinstertje
+    ctx.beginPath();
+    ctx.arc(sparkX+s*0.12,sparkY+s*0.08,s*0.03,0,Math.PI*2);
+    ctx.fill();
+  }
+
   ctx.restore();
   const hp=healthPct(f,now);const label1=f.name;const label2=ageLabel(f,now);
   const labelAlpha=lightsOn?0.92:0.7;
@@ -931,6 +962,16 @@ function handleSchooling(f) {
 function updateFish(f,dt,now){
   let target=null;let best=1e9;for(const p of foods){const d=(p.x-f.x)**2+(p.y-f.y)**2;if(d<best){best=d;target=p}}
   const hp=healthPct(f,now);
+
+  // Af en toe een bubbeltje bij de vis (2% kans per frame als gezond)
+  if(hp>30 && Math.random()<0.02){makeFishBubble(f.x,f.y)}
+
+  // Heel af en toe een snelle "burst" beweging (0.3% kans)
+  if(Math.random()<0.003){
+    const burstAngle=rand(0,Math.PI*2);
+    f.vx+=Math.cos(burstAngle)*0.8;
+    f.vy+=Math.sin(burstAngle)*0.4;
+  }
 
   // Update behavior timer
   f.behaviorTimer--;
