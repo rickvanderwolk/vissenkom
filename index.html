@@ -1356,9 +1356,16 @@ function handleLazy(f) {
 }
 
 function handleCurious(f) {
-  // Find something to investigate: decorations, plants, or other fish
+  // Find something to investigate: decorations, plants, other fish, or the pump
   if(!f.curiousTarget || Math.random() < 0.02) {
     const options = [];
+
+    // If pump is on, add it as a high-priority target (add multiple times to increase chance)
+    if(pumpOn) {
+      for(let i = 0; i < 3; i++) {
+        options.push({x: pumpPos.x, y: H - 30});
+      }
+    }
 
     // Add decorations as targets
     decorations.forEach(d => options.push({x: d.x, y: d.y}));
@@ -1452,6 +1459,23 @@ function updateFish(f,dt,now){
     // Check if behavior timer expired, switch to new behavior
     if(f.behaviorTimer <= 0) {
       const randVal = Math.random();
+
+      // Adjust probabilities based on pump and disco state
+      let curiousThreshold = 0.65; // Base: 9% curious (56-65%)
+      let dancingThreshold = 0.71; // Base: 6% dancing (65-71%)
+
+      // When pump is on, increase curious behavior chance
+      if(pumpOn) {
+        curiousThreshold = 0.75; // Increase curious range to 19% (56-75%)
+      }
+
+      // When disco is on, increase dancing behavior chance
+      if(discoOn) {
+        dancingThreshold = curiousThreshold + 0.15; // Increase dancing range to ~15%
+      } else {
+        dancingThreshold = curiousThreshold + 0.06; // Normal 6% dancing
+      }
+
       if(randVal < 0.03) { // 3% bottom dwelling (0-3%)
         f.behaviorState = 'bottom_dwelling';
         f.behaviorTimer = Math.floor(rand(300, 900)); // 5-15 seconds at 60fps
@@ -1488,15 +1512,15 @@ function updateFish(f,dt,now){
         f.behaviorState = 'lazy';
         f.behaviorTimer = Math.floor(rand(300, 900)); // 5-15 seconds
         f.wallFollowTarget = null;
-      } else if(randVal < 0.65) { // 9% curious (56-65%)
+      } else if(randVal < curiousThreshold) { // Dynamic curious threshold (influenced by pump)
         f.behaviorState = 'curious';
         f.behaviorTimer = Math.floor(rand(360, 900)); // 6-15 seconds
         f.wallFollowTarget = null;
-      } else if(randVal < 0.71) { // 6% dancing (65-71%)
+      } else if(randVal < dancingThreshold) { // Dynamic dancing threshold (influenced by disco)
         f.behaviorState = 'dancing';
         f.behaviorTimer = Math.floor(rand(240, 720)); // 4-12 seconds
         f.wallFollowTarget = null;
-      } else { // 29% normal behavior (71-100%)
+      } else { // Remaining % normal behavior
         f.behaviorState = 'normal';
         f.behaviorTimer = Math.floor(rand(120, 480)); // 2-8 seconds
         f.wallFollowTarget = null;
