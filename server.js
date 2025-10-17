@@ -576,9 +576,28 @@ function handleUpdateFishStats(fishName, stats) {
         if (stats.eats !== undefined) fish.eats = stats.eats;
         if (stats.lastEat !== undefined) fish.lastEat = stats.lastEat;
 
-        console.log(`Stats bijgewerkt voor ${fishName}: eats=${fish.eats}`);
+        // Update visual properties (migration support)
+        if (stats.secondaryHueOffset !== undefined) fish.secondaryHueOffset = stats.secondaryHueOffset;
+        if (stats.saturation !== undefined) fish.saturation = stats.saturation;
+        if (stats.pattern !== undefined) fish.pattern = stats.pattern;
+        if (stats.patternCount !== undefined) fish.patternCount = stats.patternCount;
+        if (stats.patternIntensity !== undefined) fish.patternIntensity = stats.patternIntensity;
+        if (stats.bodyLengthRatio !== undefined) fish.bodyLengthRatio = stats.bodyLengthRatio;
+        if (stats.bodyHeightRatio !== undefined) fish.bodyHeightRatio = stats.bodyHeightRatio;
+        if (stats.tailSize !== undefined) fish.tailSize = stats.tailSize;
+        if (stats.tailShape !== undefined) fish.tailShape = stats.tailShape;
+        if (stats.finSize !== undefined) fish.finSize = stats.finSize;
+        if (stats.finShape !== undefined) fish.finShape = stats.finShape;
+        if (stats.eyeSize !== undefined) fish.eyeSize = stats.eyeSize;
 
-        // Auto-save will handle persistence (every 30s)
+        const hasVisualUpdate = stats.pattern !== undefined;
+        console.log(`Stats bijgewerkt voor ${fishName}${hasVisualUpdate ? ' (inclusief visuele properties)' : ''}`);
+
+        // Save immediately when visual properties are updated
+        if (hasVisualUpdate) {
+            saveState();
+        }
+        // Otherwise auto-save will handle persistence (every 30s)
     }
 }
 

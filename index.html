@@ -317,7 +317,83 @@ function discoEffects(time){
   ctx.globalCompositeOperation='source-over';
 }
 
-function makeFish(x=rand(50,W-50),y=rand(50,H-50),name){const base=rand(18,30);let hue=Math.floor(rand(0,360));if(isNaN(hue))hue=0;const initialVx=rand(-2.5,2.5);const initialVy=rand(-.3,.3);const f={x,y,vx:initialVx,vy:initialVy,speed:rand(1.5,2.5),baseSize:base,hue,dir:Math.random()*Math.PI*2,turnTimer:Math.floor(rand(600,1800)),blink:0,name:name||`Vis ${fishCounter++}`,lastEat:Date.now(),bornAt:Date.now(),eats:0,sickTop:Math.random()<0.5,hungerWindow:DAY*rand(0.9,1.1),behaviorState:'normal',behaviorTimer:0,wallFollowTarget:null,lastPoop:Date.now(),targetVx:initialVx,targetVy:initialVy};fishes.push(f)}
+function makeFish(x=rand(50,W-50),y=rand(50,H-50),name){
+  // Size range - more moderate
+  const base=rand(16,32);
+
+  // Color variation
+  let hue=Math.floor(rand(0,360));
+  if(isNaN(hue))hue=0;
+
+  // Secondary color for gradients - closer to main hue
+  const secondaryHueOffset = rand(25, 55);
+
+  // Saturation variation - more moderate
+  const saturation = Math.floor(rand(70, 95));
+
+  // Pattern type: plain, spots, or stripes
+  const patternRoll = Math.random();
+  let pattern = 'plain';
+  if(patternRoll < 0.3) pattern = 'spots';
+  else if(patternRoll < 0.55) pattern = 'stripes';
+
+  // Pattern properties - fewer, more subtle patterns
+  const patternCount = pattern === 'spots' ? Math.floor(rand(3, 5)) : Math.floor(rand(2, 4));
+  const patternIntensity = rand(0.4, 0.6);
+
+  // Body shape variations - more moderate
+  const bodyLengthRatio = rand(0.8, 1.2); // subtle thin to chubby
+  const bodyHeightRatio = rand(0.5, 0.65); // subtle flat to round
+
+  // Tail shape variations - more moderate
+  const tailSize = rand(1.0, 1.4);
+  const tailShape = Math.random() < 0.5 ? 'triangle' : 'fan';
+
+  // Fin variations - more moderate
+  const finSize = rand(0.4, 0.55);
+  const finShape = Math.random() < 0.6 ? 'round' : 'pointed';
+
+  // Eye size variation - more moderate
+  const eyeSize = rand(0.09, 0.13);
+
+  const initialVx=rand(-2.5,2.5);
+  const initialVy=rand(-.3,.3);
+
+  const f={
+    x,y,vx:initialVx,vy:initialVy,
+    speed:rand(1.5,2.5),
+    baseSize:base,
+    hue,
+    secondaryHueOffset,
+    saturation,
+    pattern,
+    patternCount,
+    patternIntensity,
+    bodyLengthRatio,
+    bodyHeightRatio,
+    tailSize,
+    tailShape,
+    finSize,
+    finShape,
+    eyeSize,
+    dir:Math.random()*Math.PI*2,
+    turnTimer:Math.floor(rand(600,1800)),
+    blink:0,
+    name:name||`Vis ${fishCounter++}`,
+    lastEat:Date.now(),
+    bornAt:Date.now(),
+    eats:0,
+    sickTop:Math.random()<0.5,
+    hungerWindow:DAY*rand(0.9,1.1),
+    behaviorState:'normal',
+    behaviorTimer:0,
+    wallFollowTarget:null,
+    lastPoop:Date.now(),
+    targetVx:initialVx,
+    targetVy:initialVy
+  };
+  fishes.push(f);
+}
 for(let i=0;i<8;i++)makeFish();
 
 function makeFood(){const n=Math.max(8,fishes.length);for(let i=0;i<n;i++){foods.push({x:rand(40,W-40),y:50+rand(0,30),vy:rand(0.7,1.5),r:7,ttl:6000})}}
@@ -1053,13 +1129,27 @@ function ageLabel(f,now){return ageLabelMS(now-f.bornAt)}
 function drawFish(f,t,now){
   const s=fishSize(f,now);const a=Math.atan2(f.vy,f.vx);
 
+  // Use fish-specific visual properties with fallbacks for old fish
+  const bodyLengthRatio = f.bodyLengthRatio || 0.9;
+  const bodyHeightRatio = f.bodyHeightRatio || 0.55;
+  const tailSize = f.tailSize || 1.2;
+  const tailShape = f.tailShape || 'triangle';
+  const finSize = f.finSize || 0.45;
+  const finShape = f.finShape || 'round';
+  const eyeSize = f.eyeSize || 0.11;
+  const saturation = f.saturation || 85;
+  const secondaryHueOffset = f.secondaryHueOffset || 50;
+  const pattern = f.pattern || 'plain';
+  const patternCount = f.patternCount || 5;
+  const patternIntensity = f.patternIntensity || 0.5;
+
   // Subtiele schaduw onder de vis voor diepte-effect
   if(lightsOn){
     ctx.save();
     ctx.globalAlpha=0.15;
     ctx.fillStyle='#000';
     ctx.beginPath();
-    ctx.ellipse(f.x+2,f.y+s*1.3,s*0.7,s*0.3,a,0,Math.PI*2);
+    ctx.ellipse(f.x+2,f.y+s*1.3,s*0.7*bodyLengthRatio,s*0.3,a,0,Math.PI*2);
     ctx.fill();
     ctx.restore();
   }
@@ -1086,18 +1176,106 @@ function drawFish(f,t,now){
     glow.addColorStop(1,'rgba(0,0,0,0)');
     ctx.fillStyle=glow;ctx.beginPath();ctx.arc(0,0,s*1.5,0,Math.PI*2);ctx.fill();
   }
-  const bodyGrad=ctx.createLinearGradient(-s*0.6,0,s*0.6,0);
-  bodyGrad.addColorStop(0,`hsla(${Math.round(fishHue)},90%,${60*dim}%,1)`);bodyGrad.addColorStop(1,`hsla(${Math.round((fishHue+50)%360)},80%,${50*dim}%,1)`);
-  ctx.fillStyle=bodyGrad;ctx.beginPath();ctx.ellipse(0,0,s*0.9,s*0.55,0,0,Math.PI*2);ctx.fill();
-  ctx.fillStyle=`hsla(${Math.round((fishHue+20)%360)},80%,${55*dim}%,1)`;ctx.beginPath();ctx.moveTo(-s*0.9,0);ctx.lineTo(-s*1.4,-s*0.35);ctx.lineTo(-s*1.2,0);ctx.lineTo(-s*1.4,s*0.35);ctx.closePath();ctx.fill();
-  const finW=s*0.45;const finH=s*0.25;const finWave=Math.sin(t*(discoOn?0.04:0.02)+f.x*0.03)*0.5+0.5;
-  ctx.save();ctx.translate(-s*0.35,0);ctx.rotate((finWave-0.5)*(discoOn?1.2:0.6));ctx.fillStyle=`hsla(${Math.round((fishHue+70)%360)},85%,${65*dim}%,1)`;ctx.beginPath();ctx.ellipse(0,0,finW,finH,0,0,Math.PI*2);ctx.fill();ctx.restore();
-  ctx.fillStyle=lightsOn?'#fff':'#d8e1e8';ctx.beginPath();ctx.arc(s*0.35,-s*0.08,s*0.11,0,Math.PI*2);ctx.fill();ctx.fillStyle=lightsOn?'#000':'#24323c';ctx.beginPath();ctx.arc(s*0.37,-s*0.08,s*0.05,0,Math.PI*2);ctx.fill();
+
+  // Draw body with variable shape
+  const bodyGrad=ctx.createLinearGradient(-s*0.6*bodyLengthRatio,0,s*0.6*bodyLengthRatio,0);
+  bodyGrad.addColorStop(0,`hsla(${Math.round(fishHue)},${saturation}%,${60*dim}%,1)`);
+  bodyGrad.addColorStop(1,`hsla(${Math.round((fishHue+secondaryHueOffset)%360)},${saturation-10}%,${50*dim}%,1)`);
+  ctx.fillStyle=bodyGrad;
+  ctx.beginPath();
+  ctx.ellipse(0,0,s*0.9*bodyLengthRatio,s*bodyHeightRatio,0,0,Math.PI*2);
+  ctx.fill();
+
+  // Draw pattern overlay - clipped to body shape
+  if(pattern === 'spots') {
+    ctx.save();
+    // Clip to body ellipse
+    ctx.beginPath();
+    ctx.ellipse(0,0,s*0.85*bodyLengthRatio,s*bodyHeightRatio*0.9,0,0,Math.PI*2);
+    ctx.clip();
+
+    // More subtle pattern color
+    ctx.fillStyle=`hsla(${Math.round((fishHue+180)%360)},${saturation*0.8}%,${35*dim}%,${patternIntensity*0.6})`;
+    for(let i=0; i<patternCount; i++) {
+      const spotX = (i/patternCount - 0.5) * s * 1.2 * bodyLengthRatio;
+      const spotY = ((i % 2) - 0.5) * s * 0.6 * bodyHeightRatio;
+      const spotSize = s * 0.1;
+      ctx.beginPath();
+      ctx.arc(spotX, spotY, spotSize, 0, Math.PI*2);
+      ctx.fill();
+    }
+    ctx.restore();
+  } else if(pattern === 'stripes') {
+    ctx.save();
+    // Clip to body ellipse
+    ctx.beginPath();
+    ctx.ellipse(0,0,s*0.85*bodyLengthRatio,s*bodyHeightRatio*0.9,0,0,Math.PI*2);
+    ctx.clip();
+
+    // More subtle pattern color
+    ctx.fillStyle=`hsla(${Math.round((fishHue+180)%360)},${saturation*0.7}%,${35*dim}%,${patternIntensity*0.5})`;
+    for(let i=0; i<patternCount; i++) {
+      const stripeX = (i/(patternCount-1) - 0.5) * s * 1.4 * bodyLengthRatio;
+      ctx.fillRect(stripeX - s*0.03, -s*bodyHeightRatio*0.8, s*0.06, s*bodyHeightRatio*1.6);
+    }
+    ctx.restore();
+  }
+
+  // Draw tail with variable shape and size
+  ctx.fillStyle=`hsla(${Math.round((fishHue+20)%360)},${saturation}%,${55*dim}%,1)`;
+  ctx.beginPath();
+  if(tailShape === 'fan') {
+    // Fan-shaped tail
+    ctx.moveTo(-s*0.9*bodyLengthRatio,0);
+    ctx.lineTo(-s*1.4*tailSize*bodyLengthRatio,-s*0.45*tailSize);
+    ctx.quadraticCurveTo(-s*1.5*tailSize*bodyLengthRatio, 0, -s*1.4*tailSize*bodyLengthRatio, s*0.45*tailSize);
+    ctx.closePath();
+  } else {
+    // Triangle tail
+    ctx.moveTo(-s*0.9*bodyLengthRatio,0);
+    ctx.lineTo(-s*1.4*tailSize*bodyLengthRatio,-s*0.35*tailSize);
+    ctx.lineTo(-s*1.2*tailSize*bodyLengthRatio,0);
+    ctx.lineTo(-s*1.4*tailSize*bodyLengthRatio,s*0.35*tailSize);
+    ctx.closePath();
+  }
+  ctx.fill();
+
+  // Draw fin with variable shape and size
+  const finW=s*finSize*bodyLengthRatio;
+  const finH=s*finSize*0.5;
+  const finWave=Math.sin(t*(discoOn?0.04:0.02)+f.x*0.03)*0.5+0.5;
+  ctx.save();
+  ctx.translate(-s*0.35*bodyLengthRatio,0);
+  ctx.rotate((finWave-0.5)*(discoOn?1.2:0.6));
+  ctx.fillStyle=`hsla(${Math.round((fishHue+70)%360)},${saturation}%,${65*dim}%,1)`;
+  ctx.beginPath();
+  if(finShape === 'pointed') {
+    // Pointed fin
+    ctx.moveTo(0, 0);
+    ctx.lineTo(-finW*0.5, -finH);
+    ctx.lineTo(finW*0.5, 0);
+    ctx.closePath();
+  } else {
+    // Round fin
+    ctx.ellipse(0,0,finW,finH,0,0,Math.PI*2);
+  }
+  ctx.fill();
+  ctx.restore();
+
+  // Draw eye with variable size
+  ctx.fillStyle=lightsOn?'#fff':'#d8e1e8';
+  ctx.beginPath();
+  ctx.arc(s*0.35*bodyLengthRatio,-s*0.08,s*eyeSize,0,Math.PI*2);
+  ctx.fill();
+  ctx.fillStyle=lightsOn?'#000':'#24323c';
+  ctx.beginPath();
+  ctx.arc(s*0.37*bodyLengthRatio,-s*0.08,s*eyeSize*0.45,0,Math.PI*2);
+  ctx.fill();
 
   // Af en toe een glinsterend sterretje op de vis (alleen als gezond en licht aan)
   if(lightsOn && healthPct(f,now)>50 && Math.sin(t*0.1+f.x*0.05)>0.85){
     ctx.fillStyle='rgba(255,255,255,0.9)';
-    const sparkX=s*0.2;
+    const sparkX=s*0.2*bodyLengthRatio;
     const sparkY=-s*0.15;
     ctx.beginPath();
     ctx.arc(sparkX,sparkY,s*0.06,0,Math.PI*2);
@@ -2179,6 +2357,14 @@ function makeFishFromData(serverFish) {
     if(isNaN(startX) || startX < 50 || startX > W - 50) startX = W / 2;
     if(isNaN(startY) || startY < 50 || startY > H - 50) startY = H / 2;
 
+    // MIGRATION: Add visual properties if they don't exist (for old fish)
+    // This ensures all fish get the new visual variety, even old ones
+    const needsMigration = serverFish.pattern === undefined;
+
+    if(needsMigration) {
+        console.log(`🎨 Migrating visual properties for fish: ${serverFish.name}`);
+    }
+
     const f = {
         x: startX,
         y: startY,
@@ -2190,6 +2376,21 @@ function makeFishFromData(serverFish) {
         hue: hue,
         sickTop: serverFish.sickTop !== undefined ? serverFish.sickTop : (Math.random() < 0.5),
         hungerWindow: serverFish.hungerWindow !== undefined ? serverFish.hungerWindow : (DAY * rand(0.9, 1.1)),
+
+        // NEW VISUAL PROPERTIES - migrate old fish to have these
+        secondaryHueOffset: serverFish.secondaryHueOffset !== undefined ? serverFish.secondaryHueOffset : rand(20, 80),
+        saturation: serverFish.saturation !== undefined ? serverFish.saturation : Math.floor(rand(60, 100)),
+        pattern: serverFish.pattern !== undefined ? serverFish.pattern : (Math.random() < 0.35 ? 'spots' : Math.random() < 0.5 ? 'stripes' : 'plain'),
+        patternCount: serverFish.patternCount !== undefined ? serverFish.patternCount : Math.floor(rand(3, 8)),
+        patternIntensity: serverFish.patternIntensity !== undefined ? serverFish.patternIntensity : rand(0.3, 0.7),
+        bodyLengthRatio: serverFish.bodyLengthRatio !== undefined ? serverFish.bodyLengthRatio : rand(0.7, 1.4),
+        bodyHeightRatio: serverFish.bodyHeightRatio !== undefined ? serverFish.bodyHeightRatio : rand(0.4, 0.7),
+        tailSize: serverFish.tailSize !== undefined ? serverFish.tailSize : rand(0.8, 1.6),
+        tailShape: serverFish.tailShape !== undefined ? serverFish.tailShape : (Math.random() < 0.5 ? 'triangle' : 'fan'),
+        finSize: serverFish.finSize !== undefined ? serverFish.finSize : rand(0.3, 0.6),
+        finShape: serverFish.finShape !== undefined ? serverFish.finShape : (Math.random() < 0.6 ? 'round' : 'pointed'),
+        eyeSize: serverFish.eyeSize !== undefined ? serverFish.eyeSize : rand(0.08, 0.15),
+
         // Movement properties (still random each time)
         dir: Math.random() * Math.PI * 2,
         turnTimer: Math.floor(rand(600, 1800)),
@@ -2203,8 +2404,33 @@ function makeFishFromData(serverFish) {
         behaviorState: 'normal',
         behaviorTimer: 0,
         wallFollowTarget: null,
-        lastPoop: Date.now()
+        lastPoop: Date.now(),
+        targetVx: serverFish.vx || rand(-1, 1),
+        targetVy: serverFish.vy || rand(-0.5, 0.5)
     };
+
+    // Send updated fish data back to server if migration happened
+    if(needsMigration && ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({
+            command: 'updateFishStats',
+            fishName: f.name,
+            stats: {
+                secondaryHueOffset: f.secondaryHueOffset,
+                saturation: f.saturation,
+                pattern: f.pattern,
+                patternCount: f.patternCount,
+                patternIntensity: f.patternIntensity,
+                bodyLengthRatio: f.bodyLengthRatio,
+                bodyHeightRatio: f.bodyHeightRatio,
+                tailSize: f.tailSize,
+                tailShape: f.tailShape,
+                finSize: f.finSize,
+                finShape: f.finShape,
+                eyeSize: f.eyeSize
+            }
+        }));
+    }
+
     return f;
 }
 
