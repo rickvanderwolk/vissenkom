@@ -159,6 +159,7 @@ function setupParticles(){
 
 function setupPlants(){
   plants.length=0;
+  const sandHeight=70;
   const numPlants=Math.floor(rand(4,7));
   for(let i=0;i<numPlants;i++){
     const plantTypes=['seaweed','kelp','fern','grass','anubias','vallisneria'];
@@ -202,12 +203,13 @@ function setupPlants(){
     const swayPhase=rand(0,Math.PI*2);
     const movePhase=rand(0,Math.PI*2);
     const branchiness=rand(0.5,0.9);
-    plants.push({type,x,y:H-15,height,width,segments,hue,swayPhase,movePhase,branchiness,zIndex});
+    plants.push({type,x,y:H-sandHeight,height,width,segments,hue,swayPhase,movePhase,branchiness,zIndex});
   }
 }
 
 function setupDecorations(){
   decorations.length=0;
+  const sandHeight=70;
 
   // Af en toe een kasteeltje
   if(Math.random()<0.3){
@@ -215,7 +217,7 @@ function setupDecorations(){
     const size=rand(80,140);
     const bobPhase=rand(0,Math.PI*2);
     const zIndex=Math.random()<0.7?'back':'front';
-    decorations.push({type:'castle',x,y:H-size/2,size,hue:rand(200,220),bobPhase,zIndex});
+    decorations.push({type:'castle',x,y:H-sandHeight-size/2+10,size,hue:rand(200,220),bobPhase,zIndex});
   }
 }
 function lampHueFor(L,time){if(!discoOn)return L.hueBase;const speed=2.5;const range=340;const wave=(Math.sin(time*speed+L.phase)+1)/2;return (L.hueBase+wave*range)%360}
@@ -455,6 +457,77 @@ function drawStars(time){
       ctx.fillStyle=starColor.replace(/[\d.]+\)$/,`${alpha*0.3})`);
       ctx.beginPath();
       ctx.arc(star.x,star.y,star.size*1.8,0,Math.PI*2);
+      ctx.fill();
+    }
+  }
+}
+
+function drawSandBottom(time){
+  const sandHeight=70;
+  const sandTop=H-sandHeight;
+
+  // Zand gradient (lichter boven, donkerder onder)
+  const sandGrad=ctx.createLinearGradient(0,sandTop,0,H);
+  if(lightsOn){
+    sandGrad.addColorStop(0,'#E5C89A'); // Licht zand boven
+    sandGrad.addColorStop(0.5,'#D4AF7A'); // Midden zand
+    sandGrad.addColorStop(1,'#B89968'); // Donkerder zand onder
+  } else {
+    sandGrad.addColorStop(0,'#8A7556'); // Donker zand boven (nacht)
+    sandGrad.addColorStop(0.5,'#6D5D45'); // Midden
+    sandGrad.addColorStop(1,'#544736'); // Donkerst (nacht)
+  }
+
+  // Teken basis zandlaag met golvende bovenkant
+  ctx.fillStyle=sandGrad;
+  ctx.beginPath();
+  ctx.moveTo(0,H);
+  ctx.lineTo(0,sandTop);
+
+  // Golvende duinen aan de top
+  for(let x=0;x<=W;x+=5){
+    const wave1=Math.sin(x*0.015+time*0.003)*8;
+    const wave2=Math.sin(x*0.008+time*0.002)*5;
+    const wave3=Math.sin(x*0.025)*3;
+    const y=sandTop+wave1+wave2+wave3;
+    ctx.lineTo(x,y);
+  }
+
+  ctx.lineTo(W,H);
+  ctx.closePath();
+  ctx.fill();
+
+  // Subtiele schaduw op de duinen voor diepte
+  ctx.strokeStyle=lightsOn?'rgba(0,0,0,0.08)':'rgba(0,0,0,0.15)';
+  ctx.lineWidth=1.5;
+  ctx.beginPath();
+  for(let x=0;x<=W;x+=5){
+    const wave1=Math.sin(x*0.015+time*0.003)*8;
+    const wave2=Math.sin(x*0.008+time*0.002)*5;
+    const wave3=Math.sin(x*0.025)*3;
+    const y=sandTop+wave1+wave2+wave3;
+    if(x===0)ctx.moveTo(x,y);
+    else ctx.lineTo(x,y);
+  }
+  ctx.stroke();
+
+  // Zand textuur (kleine stipjes)
+  if(lightsOn){
+    ctx.fillStyle='rgba(0,0,0,0.04)';
+    for(let i=0;i<80;i++){
+      const x=rand(0,W);
+      const y=rand(sandTop,H);
+      ctx.beginPath();
+      ctx.arc(x,y,rand(0.5,1.5),0,Math.PI*2);
+      ctx.fill();
+    }
+    // Lichtere stipjes
+    ctx.fillStyle='rgba(255,255,255,0.1)';
+    for(let i=0;i<40;i++){
+      const x=rand(0,W);
+      const y=rand(sandTop,H);
+      ctx.beginPath();
+      ctx.arc(x,y,rand(0.5,1),0,Math.PI*2);
       ctx.fill();
     }
   }
@@ -1699,6 +1772,7 @@ ctx.rect(0,0,W,H);
 ctx.clip();
 
 // Background layer
+drawSandBottom(t/60);
 for(const plant of backPlants){drawPlant(plant,t)}
 for(const deco of backDecorations){drawDecoration(deco,t)}
 
