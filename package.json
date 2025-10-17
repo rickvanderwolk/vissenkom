@@ -1,6 +1,6 @@
 {
   "name": "vissenkom",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Vissenkom applicatie met WebSocket controller",
   "main": "server.js",
   "scripts": {
