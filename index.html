@@ -1109,7 +1109,10 @@ function drawFish(f,t,now){
   }
 
   ctx.restore();
-  const hp=healthPct(f,now);const label1=f.name;const label2=ageLabel(f,now);
+  const hp=healthPct(f,now);
+  const behaviorEmoji=appConfig.showBehaviorEmoji ? getBehaviorEmoji(f.behaviorState || 'normal') + ' ' : '';
+  const label1=behaviorEmoji + f.name;
+  const label2=ageLabel(f,now);
   const labelAlpha=lightsOn?0.92:0.7;
   const pad=6;
   const nameFont='600 14px system-ui,Segoe UI,Roboto,Arial';
@@ -1130,6 +1133,19 @@ function drawFish(f,t,now){
 }
 
 function roundRect(x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath()}
+
+// Behavior emoji mapping
+function getBehaviorEmoji(behaviorState) {
+  switch(behaviorState) {
+    case 'bottom_dwelling': return '⬇️';
+    case 'wall_following': return '🧱';
+    case 'resting': return '💤';
+    case 'surface_swimming': return '⬆️';
+    case 'schooling': return '👥';
+    case 'normal':
+    default: return '🐟';
+  }
+}
 
 function handleBottomDwelling(f) {
   // Steer towards bottom area
@@ -1569,6 +1585,7 @@ function fallbackToExternalQR(canvas, controllerUrl, accessCode) {
 // WebSocket connection for receiving commands
 let ws = null;
 let currentVersion = null; // Store current version to detect changes
+let appConfig = { showBehaviorEmoji: false }; // Store config from server
 
 function initWebSocket() {
     try {
@@ -1630,9 +1647,14 @@ function handleRemoteCommand(data) {
             break;
         case 'config':
             console.log('🔄 Received config from server:', data.config);
-            if(data.config && data.config.viewport) {
-                viewportConfig = data.config.viewport;
-                resize(); // Recalculate viewport dimensions
+            if(data.config) {
+                // Store full config
+                appConfig = { ...appConfig, ...data.config };
+                // Handle viewport config
+                if(data.config.viewport) {
+                    viewportConfig = data.config.viewport;
+                    resize(); // Recalculate viewport dimensions
+                }
             }
             break;
         case 'version':
