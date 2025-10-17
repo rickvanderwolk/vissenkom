@@ -1148,6 +1148,10 @@ function getBehaviorEmoji(behaviorState) {
     case 'lazy': return '😴';
     case 'curious': return '🔍';
     case 'dancing': return '💃';
+    case 'hiding': return '🫣';
+    case 'territorial': return '💢';
+    case 'floating': return '🎈';
+    case 'hunting': return '🎯';
     case 'normal':
     default: return '🐟';
   }
@@ -1416,6 +1420,191 @@ function handleDancing(f) {
   f.vx += Math.cos(baseAngle) * 0.02;
 }
 
+function handleHiding(f) {
+  // Find hiding spot: closest plant or decoration
+  if(!f.hideTarget || Math.random() < 0.01) {
+    let closest = null;
+    let minDist = Infinity;
+
+    // Check plants
+    plants.forEach(p => {
+      const dist = Math.hypot(p.x - f.x, p.y - f.y);
+      if(dist < minDist) {
+        minDist = dist;
+        closest = {x: p.x, y: p.y + rand(-15, 15)};
+      }
+    });
+
+    // Check decorations
+    decorations.forEach(d => {
+      const dist = Math.hypot(d.x - f.x, d.y - f.y);
+      if(dist < minDist) {
+        minDist = dist;
+        closest = {x: d.x + rand(-20, 20), y: d.y};
+      }
+    });
+
+    f.hideTarget = closest;
+  }
+
+  // Swim towards hiding spot
+  if(f.hideTarget) {
+    steerTowards(f, f.hideTarget.x, f.hideTarget.y, 0.04);
+
+    // When close, stay still
+    const dist = Math.hypot(f.hideTarget.x - f.x, f.hideTarget.y - f.y);
+    if(dist < 40) {
+      f.vx *= 0.9; // Heavy damping
+      f.vy *= 0.9;
+    }
+  } else {
+    // No hiding spots, just slow down
+    f.vx *= 0.95;
+    f.vy *= 0.95;
+  }
+}
+
+function handleTerritorial(f) {
+  // Define territory center if not set
+  if(!f.territoryCenter) {
+    f.territoryCenter = {x: f.x, y: f.y};
+    f.territoryRadius = rand(80, 150);
+  }
+
+  // Check for intruders in territory
+  let intruder = null;
+  let closestDist = Infinity;
+
+  fishes.forEach(other => {
+    if(other === f) return;
+    const dist = Math.hypot(other.x - f.territoryCenter.x, other.y - f.territoryCenter.y);
+    if(dist < f.territoryRadius && dist < closestDist) {
+      closestDist = dist;
+      intruder = other;
+    }
+  });
+
+  if(intruder) {
+    // Chase intruder aggressively
+    steerTowards(f, intruder.x, intruder.y, 0.08);
+
+    // Speed boost when chasing
+    const angle = Math.atan2(intruder.y - f.y, intruder.x - f.x);
+    f.vx += Math.cos(angle) * 0.15;
+    f.vy += Math.sin(angle) * 0.15;
+
+    // Make intruder flee if close enough
+    const chaseRadius = 60;
+    const distToIntruder = Math.hypot(intruder.x - f.x, intruder.y - f.y);
+    if(distToIntruder < chaseRadius) {
+      // Intruder flees away from territorial fish
+      const fleeAngle = Math.atan2(intruder.y - f.y, intruder.x - f.x);
+      intruder.vx += Math.cos(fleeAngle) * 0.25;
+      intruder.vy += Math.sin(fleeAngle) * 0.25;
+
+      // Reset intruder's behavior if they were doing something else
+      if(intruder.behaviorState !== 'normal' && intruder.behaviorState !== 'territorial') {
+        intruder.behaviorState = 'normal';
+        intruder.behaviorTimer = Math.floor(rand(60, 180));
+      }
+    }
+  } else {
+    // No intruder, patrol around territory center
+    const distToCenter = Math.hypot(f.x - f.territoryCenter.x, f.y - f.territoryCenter.y);
+
+    if(distToCenter > f.territoryRadius * 0.8) {
+      // Return to center
+      steerTowards(f, f.territoryCenter.x, f.territoryCenter.y, 0.04);
+    } else {
+      // Patrol in circles around center
+      if(!f.patrolAngle) f.patrolAngle = 0;
+      f.patrolAngle += 0.02;
+
+      const patrolRadius = f.territoryRadius * 0.5;
+      const targetX = f.territoryCenter.x + Math.cos(f.patrolAngle) * patrolRadius;
+      const targetY = f.territoryCenter.y + Math.sin(f.patrolAngle) * patrolRadius * 0.5;
+
+      steerTowards(f, targetX, targetY, 0.03);
+    }
+  }
+}
+
+function handleFloating(f) {
+  // Almost no movement, just gentle drifting
+  f.vx *= 0.92; // Strong damping
+  f.vy *= 0.92;
+
+  // Very subtle wave motion to simulate water currents
+  const time = Date.now() * 0.0003;
+  f.vx += Math.sin(time + f.x * 0.01) * 0.005;
+  f.vy += Math.cos(time * 0.8 + f.y * 0.01) * 0.003;
+
+  // Very slow vertical drift
+  f.vy += Math.sin(time * 0.5) * 0.01;
+}
+
+function handleHunting(f) {
+  // Initialize hunting state
+  if(!f.huntPhase) f.huntPhase = 'stalking';
+  if(!f.huntTarget) f.huntTimer = 0;
+
+  if(f.huntPhase === 'stalking') {
+    // Pick a target to hunt (other fish or random point)
+    if(!f.huntTarget || Math.random() < 0.02) {
+      // Sometimes hunt other fish
+      if(fishes.length > 1 && Math.random() < 0.4) {
+        const others = fishes.filter(other => other !== f);
+        f.huntTarget = others[Math.floor(rand(0, others.length))];
+      } else {
+        // Hunt random point
+        f.huntTarget = {
+          x: rand(50, W - 50),
+          y: rand(50, H - 50)
+        };
+      }
+      f.huntTimer = Math.floor(rand(120, 300)); // Time until lunge
+    }
+
+    // Slow, stealthy approach
+    const targetX = f.huntTarget.x || f.huntTarget.x;
+    const targetY = f.huntTarget.y || f.huntTarget.y;
+    steerTowards(f, targetX, targetY, 0.02); // Slow steering
+
+    // Move slowly while stalking
+    f.vx *= 0.93;
+    f.vy *= 0.93;
+
+    f.huntTimer--;
+
+    // Check distance to target
+    const dist = Math.hypot(targetX - f.x, targetY - f.y);
+
+    // Lunge if timer expired or very close
+    if(f.huntTimer <= 0 || dist < 80) {
+      f.huntPhase = 'lunging';
+      f.huntTimer = Math.floor(rand(30, 60)); // Lunge duration
+    }
+
+  } else if(f.huntPhase === 'lunging') {
+    // Rapid burst towards target
+    const targetX = f.huntTarget.x || f.huntTarget.x;
+    const targetY = f.huntTarget.y || f.huntTarget.y;
+
+    const lungeAngle = Math.atan2(targetY - f.y, targetX - f.x);
+    f.vx += Math.cos(lungeAngle) * 0.3;
+    f.vy += Math.sin(lungeAngle) * 0.3;
+
+    f.huntTimer--;
+
+    if(f.huntTimer <= 0) {
+      // Reset to stalking
+      f.huntPhase = 'stalking';
+      f.huntTarget = null;
+      f.huntTimer = 0;
+    }
+  }
+}
+
 function updateFish(f,dt,now){
   let target=null;let best=1e9;for(const p of foods){const d=(p.x-f.x)**2+(p.y-f.y)**2;if(d<best){best=d;target=p}}
   const hp=healthPct(f,now);
@@ -1512,6 +1701,26 @@ function updateFish(f,dt,now){
         f.behaviorState = 'lazy';
         f.behaviorTimer = Math.floor(rand(300, 900)); // 5-15 seconds
         f.wallFollowTarget = null;
+      } else if(randVal < 0.59) { // 3% hiding (56-59%)
+        f.behaviorState = 'hiding';
+        f.behaviorTimer = Math.floor(rand(240, 720)); // 4-12 seconds
+        f.wallFollowTarget = null;
+        f.hideTarget = null;
+      } else if(randVal < 0.62) { // 3% territorial (59-62%)
+        f.behaviorState = 'territorial';
+        f.behaviorTimer = Math.floor(rand(600, 1200)); // 10-20 seconds
+        f.wallFollowTarget = null;
+        f.territoryCenter = null;
+      } else if(randVal < 0.64) { // 2% floating (62-64%)
+        f.behaviorState = 'floating';
+        f.behaviorTimer = Math.floor(rand(180, 540)); // 3-9 seconds
+        f.wallFollowTarget = null;
+      } else if(randVal < 0.67) { // 3% hunting (64-67%)
+        f.behaviorState = 'hunting';
+        f.behaviorTimer = Math.floor(rand(360, 900)); // 6-15 seconds
+        f.wallFollowTarget = null;
+        f.huntPhase = null;
+        f.huntTarget = null;
       } else if(randVal < curiousThreshold) { // Dynamic curious threshold (influenced by pump)
         f.behaviorState = 'curious';
         f.behaviorTimer = Math.floor(rand(360, 900)); // 6-15 seconds
@@ -1561,6 +1770,18 @@ function updateFish(f,dt,now){
         break;
       case 'dancing':
         handleDancing(f);
+        break;
+      case 'hiding':
+        handleHiding(f);
+        break;
+      case 'territorial':
+        handleTerritorial(f);
+        break;
+      case 'floating':
+        handleFloating(f);
+        break;
+      case 'hunting':
+        handleHunting(f);
         break;
       case 'normal':
       default:
