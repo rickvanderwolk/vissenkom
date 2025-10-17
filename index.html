@@ -84,6 +84,7 @@ const cv=document.getElementById('c');const ctx=cv.getContext('2d');
 const rand=(a,b)=>Math.random()*(b-a)+a;const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 let lamps=[];let W=0,H=0;
 let viewportConfig={offsetTop:0,offsetBottom:0,offsetLeft:0,offsetRight:0};
+let decorInitialized=false;
 function resize(){
   const fullW=cv.clientWidth;
   const fullH=cv.clientHeight;
@@ -92,7 +93,14 @@ function resize(){
   W=fullW-(viewportConfig.offsetLeft+viewportConfig.offsetRight);
   H=fullH-(viewportConfig.offsetTop+viewportConfig.offsetBottom);
   updateUIPositions();
-  setupLamps();setupPlants();setupDecorations();drawQR()
+  setupLamps();
+  setupPlants();
+  // Only setup decorations once on initial load
+  if(!decorInitialized){
+    setupDecorations();
+    decorInitialized=true;
+  }
+  drawQR()
 }
 function updateUIPositions(){
   const side=document.querySelector('.side');
@@ -160,20 +168,121 @@ function setupPlants(){
     const swayPhase=rand(0,Math.PI*2);
     const movePhase=rand(0,Math.PI*2);
     const branchiness=rand(0.5,0.9);
-    plants.push({type,x,y:H-15,height,width,segments,hue,swayPhase,movePhase,branchiness,zIndex});
+
+    // Calculate ground wave at plant position
+    const groundHeight=H*0.15;
+    const baseGroundY=H-groundHeight;
+    const segments_wave=40;
+    const segmentIndex=Math.floor((x/W)*segments_wave);
+    const segmentProgress=(x/W)*segments_wave-segmentIndex;
+    const i1=segmentIndex;
+    const i2=Math.min(segmentIndex+1,segments_wave);
+
+    const wave1_1=Math.sin(i1*0.3)*15;
+    const wave2_1=Math.sin(i1*0.15+1)*10;
+    const wave3_1=Math.sin(i1*0.5+2)*8;
+    const y1=baseGroundY+wave1_1+wave2_1+wave3_1;
+
+    const wave1_2=Math.sin(i2*0.3)*15;
+    const wave2_2=Math.sin(i2*0.15+1)*10;
+    const wave3_2=Math.sin(i2*0.5+2)*8;
+    const y2=baseGroundY+wave1_2+wave2_2+wave3_2;
+
+    const groundY=y1+(y2-y1)*segmentProgress;
+
+    // Plants grow FROM the sand (some deeper than others)
+    const plantDepth=rand(10,25);
+    plants.push({type,x,y:groundY+plantDepth,height,width,segments,hue,swayPhase,movePhase,branchiness,zIndex});
   }
 }
 
 function setupDecorations(){
   decorations.length=0;
 
-  // Af en toe een kasteeltje
-  if(Math.random()<0.3){
-    const x=rand(80,W-80);
-    const size=rand(80,140);
-    const bobPhase=rand(0,Math.PI*2);
-    const zIndex=Math.random()<0.7?'back':'front';
-    decorations.push({type:'castle',x,y:H-size/2,size,hue:rand(200,220),bobPhase,zIndex});
+  // Generate 2-4 decorations for a nicely populated tank (reduced for less clutter)
+  const numDecorations=Math.floor(rand(2,5));
+
+  const decorationTypes=['rock','driftwood','rock_formation','cave','castle','chest','shell','coral','anchor','amphora'];
+
+  // Calculate ground wave for decoration placement
+  const groundHeight=H*0.15;
+  const baseGroundY=H-groundHeight;
+
+  for(let i=0;i<numDecorations;i++){
+    const type=decorationTypes[Math.floor(Math.random()*decorationTypes.length)];
+
+    // Prevent decorations from spawning too close to edges or each other
+    let x=rand(100,W-100);
+    let validPosition=false;
+    let attempts=0;
+
+    // Try to find a position not too close to existing decorations
+    while(!validPosition && attempts<10){
+      validPosition=true;
+      for(const deco of decorations){
+        if(Math.abs(deco.x-x)<120){
+          validPosition=false;
+          x=rand(100,W-100);
+          break;
+        }
+      }
+      attempts++;
+    }
+
+    // Bigger sizes with more variation
+    const size=rand(70,140);
+
+    // Calculate ground Y position at this X with wave
+    const segments=40;
+    const segmentIndex=Math.floor((x/W)*segments);
+    const segmentProgress=(x/W)*segments-segmentIndex;
+    const i1=segmentIndex;
+    const i2=Math.min(segmentIndex+1,segments);
+
+    const wave1_1=Math.sin(i1*0.3)*15;
+    const wave2_1=Math.sin(i1*0.15+1)*10;
+    const wave3_1=Math.sin(i1*0.5+2)*8;
+    const y1=baseGroundY+wave1_1+wave2_1+wave3_1;
+
+    const wave1_2=Math.sin(i2*0.3)*15;
+    const wave2_2=Math.sin(i2*0.15+1)*10;
+    const wave3_2=Math.sin(i2*0.5+2)*8;
+    const y2=baseGroundY+wave1_2+wave2_2+wave3_2;
+
+    // Interpolate between wave points
+    const groundY=y1+(y2-y1)*segmentProgress;
+
+    // Much more variation - some items almost fully buried, others just touching sand
+    const depthVariation=rand(5,60); // Big range for variety
+
+    // Different z-index probabilities for different types
+    let zIndex;
+    if(type==='coral' || type==='shell'){
+      zIndex=Math.random()<0.8?'back':'front'; // Mostly background
+    } else if(type==='castle' || type==='amphora'){
+      zIndex=Math.random()<0.3?'back':'front'; // Mostly foreground
+    } else {
+      zIndex=Math.random()<0.6?'back':'front'; // Mixed
+    }
+
+    // Type-specific hues for variety
+    let hue;
+    if(type==='coral'){
+      hue=rand(0,40); // Warm coral colors
+    } else if(type==='chest'){
+      hue=rand(30,45); // Golden/brown tones
+    } else if(type==='shell'){
+      hue=rand(25,45); // Warm sandy tones
+    } else if(type==='anchor'){
+      hue=rand(200,220); // Dark blue-grey metal
+    } else if(type==='amphora'){
+      hue=rand(20,35); // Terracotta/clay colors
+    } else {
+      hue=rand(190,210); // Blue-grey tones for rocks/stone
+    }
+
+    // Decorations follow the wavy ground line
+    decorations.push({type,x,y:groundY+depthVariation,size,hue,zIndex});
   }
 }
 function lampHueFor(L,time){if(!discoOn)return L.hueBase;const speed=2.5;const range=340;const wave=(Math.sin(time*speed+L.phase)+1)/2;return (L.hueBase+wave*range)%360}
@@ -592,159 +701,521 @@ function drawPlants(time){
 
 function drawDecoration(deco,time){
   const lightMul=lightsOn?1:0.6;
-  const bobAmount=0; // Static decorations for performance
+  const x=deco.x;
+  const y=deco.y;
 
-  if(deco.type==='rock'){
-    const x=deco.x;
-    const y=deco.y+bobAmount;
-    const grad=ctx.createRadialGradient(x-deco.size*0.2,y-deco.size*0.2,0,x,y,deco.size);
-    grad.addColorStop(0,`hsla(${deco.hue},30%,${60*lightMul}%,1)`);
-    grad.addColorStop(1,`hsla(${deco.hue},40%,${30*lightMul}%,1)`);
+  if(deco.type==='shell'){
+    // Shells sit on the bottom
+    const shellY=y-deco.size*0.25;
+
+    // Main shell body with gradient
+    const grad=ctx.createRadialGradient(x-deco.size*0.15,shellY-deco.size*0.15,0,x,shellY,deco.size*0.5);
+    grad.addColorStop(0,`hsla(${deco.hue},55%,${78*lightMul}%,${fadeAlpha})`);
+    grad.addColorStop(0.6,`hsla(${deco.hue},50%,${58*lightMul}%,${fadeAlpha})`);
+    grad.addColorStop(1,`hsla(${deco.hue},45%,${38*lightMul}%,${fadeAlpha})`);
     ctx.fillStyle=grad;
     ctx.beginPath();
-    ctx.ellipse(x,y,deco.size*0.8,deco.size*0.6,0,0,Math.PI*2);
+    ctx.ellipse(x,shellY,deco.size*0.45,deco.size*0.28,0.2,0,Math.PI*2);
     ctx.fill();
 
-    ctx.fillStyle=`hsla(${deco.hue},20%,${70*lightMul}%,0.6)`;
+    // Shell spiral ridges (more detailed)
+    const ridges=6;
+    for(let i=0;i<ridges;i++){
+      const ridgeProgress=i/(ridges-1);
+      ctx.strokeStyle=`hsla(${deco.hue-5},45%,${35*lightMul}%,${fadeAlpha*0.4})`;
+      ctx.lineWidth=1.2;
+      ctx.beginPath();
+      const ridgeY=shellY-deco.size*0.15+ridgeProgress*(deco.size*0.25);
+      const ridgeSize=deco.size*0.4*(1-ridgeProgress*0.3);
+      ctx.arc(x,ridgeY,ridgeSize,0.3,Math.PI-0.3);
+      ctx.stroke();
+    }
+
+    // Bright highlight
+    ctx.fillStyle=`hsla(${deco.hue+15},60%,${88*lightMul}%,${fadeAlpha*0.7})`;
     ctx.beginPath();
-    ctx.ellipse(x-deco.size*0.3,y-deco.size*0.2,deco.size*0.3,deco.size*0.2,0,0,Math.PI*2);
+    ctx.ellipse(x-deco.size*0.12,shellY-deco.size*0.08,deco.size*0.15,deco.size*0.1,0.2,0,Math.PI*2);
+    ctx.fill();
+
+    // Inner highlight
+    ctx.fillStyle=`hsla(${deco.hue+25},50%,${92*lightMul}%,${fadeAlpha*0.4})`;
+    ctx.beginPath();
+    ctx.ellipse(x-deco.size*0.08,shellY-deco.size*0.05,deco.size*0.08,deco.size*0.05,0.2,0,Math.PI*2);
+    ctx.fill();
+  }
+  else if(deco.type==='coral'){
+    // Coral grows from the bottom
+    const coralY=y-deco.size*0.3;
+
+    // Multiple coral branches
+    const branches=5;
+    for(let i=0;i<branches;i++){
+      const angle=(i/branches)*Math.PI*1.4-Math.PI*0.7;
+      const branchLength=deco.size*0.7;
+      const segments=6;
+
+      for(let s=0;s<segments;s++){
+        const progress=s/segments;
+        const segX=x+Math.sin(angle)*branchLength*progress*0.8;
+        const segY=coralY-Math.abs(Math.cos(angle))*branchLength*progress;
+        const segSize=deco.size*0.12*(1-progress*0.6);
+
+        // Multi-stop gradient for depth
+        const segGrad=ctx.createRadialGradient(segX-segSize*0.3,segY-segSize*0.3,0,segX,segY,segSize);
+        segGrad.addColorStop(0,`hsla(${deco.hue+10},75%,${(65-progress*5)*lightMul}%,${fadeAlpha})`);
+        segGrad.addColorStop(1,`hsla(${deco.hue-5},70%,${(45-progress*5)*lightMul}%,${fadeAlpha})`);
+        ctx.fillStyle=segGrad;
+        ctx.beginPath();
+        ctx.arc(segX,segY,segSize,0,Math.PI*2);
+        ctx.fill();
+
+        // Decorative polyps (static positions)
+        if(s>1 && i%2===0){
+          ctx.fillStyle=`hsla(${(deco.hue+200)%360},85%,${75*lightMul}%,${fadeAlpha*0.6})`;
+          ctx.beginPath();
+          ctx.arc(segX+(i*3)%5-2,segY+(i*2)%4-2,1.5,0,Math.PI*2);
+          ctx.fill();
+        }
+      }
+    }
+
+    // Base of coral
+    ctx.fillStyle=`hsla(${deco.hue},65%,${35*lightMul}%,${fadeAlpha})`;
+    ctx.beginPath();
+    ctx.ellipse(x,coralY+deco.size*0.05,deco.size*0.2,deco.size*0.1,0,0,Math.PI*2);
+    ctx.fill();
+  }
+  else if(deco.type==='anchor'){
+    // Anchor sits on the bottom
+    const anchorY=y-deco.size*0.4;
+    const anchorSize=deco.size;
+
+    // Anchor shank (vertical bar) with gradient
+    const shankGrad=ctx.createLinearGradient(x-anchorSize*0.08,anchorY-anchorSize*0.5,x+anchorSize*0.08,anchorY);
+    shankGrad.addColorStop(0,`hsla(${deco.hue},35%,${40*lightMul}%,${fadeAlpha})`);
+    shankGrad.addColorStop(1,`hsla(${deco.hue},30%,${28*lightMul}%,${fadeAlpha})`);
+    ctx.fillStyle=shankGrad;
+    ctx.fillRect(x-anchorSize*0.06,anchorY-anchorSize*0.5,anchorSize*0.12,anchorSize*0.55);
+
+    // Anchor crown (top ring)
+    ctx.strokeStyle=`hsla(${deco.hue},35%,${42*lightMul}%,${fadeAlpha})`;
+    ctx.lineWidth=anchorSize*0.08;
+    ctx.beginPath();
+    ctx.arc(x,anchorY-anchorSize*0.5,anchorSize*0.12,0,Math.PI*2);
+    ctx.stroke();
+
+    // Anchor arms (flukes) - larger and more defined
+    ctx.fillStyle=`hsla(${deco.hue},32%,${36*lightMul}%,${fadeAlpha})`;
+    // Left fluke
+    ctx.beginPath();
+    ctx.moveTo(x,anchorY+anchorSize*0.05);
+    ctx.lineTo(x-anchorSize*0.4,anchorY+anchorSize*0.2);
+    ctx.lineTo(x-anchorSize*0.5,anchorY+anchorSize*0.08);
+    ctx.lineTo(x-anchorSize*0.2,anchorY-anchorSize*0.05);
+    ctx.closePath();
+    ctx.fill();
+    // Right fluke
+    ctx.beginPath();
+    ctx.moveTo(x,anchorY+anchorSize*0.05);
+    ctx.lineTo(x+anchorSize*0.4,anchorY+anchorSize*0.2);
+    ctx.lineTo(x+anchorSize*0.5,anchorY+anchorSize*0.08);
+    ctx.lineTo(x+anchorSize*0.2,anchorY-anchorSize*0.05);
+    ctx.closePath();
+    ctx.fill();
+
+    // Rust/age spots (static positions)
+    ctx.fillStyle=`hsla(20,65%,${42*lightMul}%,${fadeAlpha*0.4})`;
+    ctx.beginPath();
+    ctx.arc(x-anchorSize*0.03,anchorY-anchorSize*0.2,3,0,Math.PI*2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(x+anchorSize*0.02,anchorY-anchorSize*0.35,2.5,0,Math.PI*2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(x-anchorSize*0.15,anchorY+anchorSize*0.1,2,0,Math.PI*2);
+    ctx.fill();
+  }
+  else if(deco.type==='amphora'){
+    // Amphora sits on bottom
+    const potY=y-deco.size*0.5;
+    const potSize=deco.size*0.7;
+
+    // Main pot body with better gradient
+    const potGrad=ctx.createRadialGradient(x-potSize*0.15,potY-potSize*0.2,0,x,potY,potSize);
+    potGrad.addColorStop(0,`hsla(${deco.hue},50%,${55*lightMul}%,${fadeAlpha})`);
+    potGrad.addColorStop(0.7,`hsla(${deco.hue},45%,${42*lightMul}%,${fadeAlpha})`);
+    potGrad.addColorStop(1,`hsla(${deco.hue},40%,${30*lightMul}%,${fadeAlpha})`);
+    ctx.fillStyle=potGrad;
+    ctx.beginPath();
+    ctx.ellipse(x,potY,potSize*0.35,potSize*0.5,0,0,Math.PI*2);
+    ctx.fill();
+
+    // Pot neck
+    ctx.fillStyle=`hsla(${deco.hue},42%,${48*lightMul}%,${fadeAlpha})`;
+    ctx.fillRect(x-potSize*0.12,potY-potSize*0.7,potSize*0.24,potSize*0.25);
+
+    // Handles (two curved handles) - bigger
+    ctx.strokeStyle=`hsla(${deco.hue},42%,${44*lightMul}%,${fadeAlpha})`;
+    ctx.lineWidth=potSize*0.06;
+    ctx.beginPath();
+    ctx.arc(x-potSize*0.18,potY-potSize*0.25,potSize*0.2,0,Math.PI);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(x+potSize*0.18,potY-potSize*0.25,potSize*0.2,0,Math.PI);
+    ctx.stroke();
+
+    // Ancient wave patterns
+    ctx.strokeStyle=`hsla(${(deco.hue+180)%360},65%,${52*lightMul}%,${fadeAlpha*0.6})`;
+    ctx.lineWidth=1.5;
+    for(let i=0;i<2;i++){
+      const patternY=potY-potSize*0.3+i*potSize*0.2;
+      ctx.beginPath();
+      for(let w=0;w<6;w++){
+        const waveX=x-potSize*0.25+w*potSize*0.1;
+        const waveY=patternY+Math.sin(w*1.2)*3;
+        if(w===0)ctx.moveTo(waveX,waveY);
+        else ctx.lineTo(waveX,waveY);
+      }
+      ctx.stroke();
+    }
+
+    // Crack detail (static)
+    ctx.strokeStyle=`hsla(${deco.hue},28%,${22*lightMul}%,${fadeAlpha*0.7})`;
+    ctx.lineWidth=1.2;
+    ctx.beginPath();
+    ctx.moveTo(x+potSize*0.08,potY-potSize*0.4);
+    ctx.lineTo(x+potSize*0.12,potY+potSize*0.2);
+    ctx.stroke();
+  }
+  else if(deco.type==='rock'){
+    // Rock sits on bottom
+    const rockY=y-deco.size*0.35;
+    const grad=ctx.createRadialGradient(x-deco.size*0.15,rockY-deco.size*0.15,0,x,rockY,deco.size*0.6);
+    grad.addColorStop(0,`hsla(${deco.hue},32%,${62*lightMul}%,${fadeAlpha})`);
+    grad.addColorStop(1,`hsla(${deco.hue},40%,${32*lightMul}%,${fadeAlpha})`);
+    ctx.fillStyle=grad;
+    ctx.beginPath();
+    ctx.ellipse(x,rockY,deco.size*0.5,deco.size*0.35,0,0,Math.PI*2);
+    ctx.fill();
+
+    // Highlight on rock
+    ctx.fillStyle=`hsla(${deco.hue},25%,${72*lightMul}%,${fadeAlpha*0.6})`;
+    ctx.beginPath();
+    ctx.ellipse(x-deco.size*0.18,rockY-deco.size*0.12,deco.size*0.15,deco.size*0.1,0,0,Math.PI*2);
     ctx.fill();
   }
   else if(deco.type==='driftwood'){
-    const x=deco.x;
-    const y=deco.y+bobAmount;
+    // Driftwood lies on bottom
+    const woodY=y-deco.size*0.15;
 
-    // Main log shape
-    ctx.fillStyle=`hsla(${deco.hue},40%,${25*lightMul}%,0.9)`;
+    // Main log with texture gradient
+    const logGrad=ctx.createLinearGradient(x-deco.size*0.5,woodY,x+deco.size*0.5,woodY);
+    logGrad.addColorStop(0,`hsla(${deco.hue},42%,${28*lightMul}%,${fadeAlpha})`);
+    logGrad.addColorStop(0.5,`hsla(${deco.hue},38%,${22*lightMul}%,${fadeAlpha})`);
+    logGrad.addColorStop(1,`hsla(${deco.hue},42%,${28*lightMul}%,${fadeAlpha})`);
+    ctx.fillStyle=logGrad;
     ctx.beginPath();
-    ctx.ellipse(x,y,deco.size*0.6,deco.size*0.2,0.3,0,Math.PI*2);
+    ctx.ellipse(x,woodY,deco.size*0.5,deco.size*0.15,0.2,0,Math.PI*2);
     ctx.fill();
 
     // Branch sticking up
-    const branchX=x+deco.size*0.3;
-    const branchY=y-deco.size*0.4;
-    ctx.strokeStyle=`hsla(${deco.hue},35%,${30*lightMul}%,0.8)`;
-    ctx.lineWidth=deco.size*0.08;
+    const branchX=x+deco.size*0.25;
+    const branchY=woodY-deco.size*0.35;
+    ctx.strokeStyle=`hsla(${deco.hue},38%,${26*lightMul}%,${fadeAlpha})`;
+    ctx.lineWidth=deco.size*0.06;
     ctx.lineCap='round';
     ctx.beginPath();
-    ctx.moveTo(x,y);
+    ctx.moveTo(x+deco.size*0.1,woodY);
     ctx.lineTo(branchX,branchY);
     ctx.stroke();
 
-    // Texture lines
-    for(let i=0;i<3;i++){
-      ctx.strokeStyle=`hsla(${deco.hue},30%,${20*lightMul}%,0.6)`;
-      ctx.lineWidth=2;
+    // Wood grain texture
+    for(let i=0;i<4;i++){
+      ctx.strokeStyle=`hsla(${deco.hue},32%,${18*lightMul}%,${fadeAlpha*0.5})`;
+      ctx.lineWidth=1;
       ctx.beginPath();
-      ctx.moveTo(x-deco.size*0.4,y-5+i*5);
-      ctx.lineTo(x+deco.size*0.4,y-5+i*5);
+      ctx.moveTo(x-deco.size*0.4,woodY-6+i*4);
+      ctx.lineTo(x+deco.size*0.4,woodY-6+i*4);
       ctx.stroke();
     }
   }
   else if(deco.type==='rock_formation'){
-    const x=deco.x;
-    const y=deco.y+bobAmount;
+    // Rock formation on bottom
+    const formY=y-deco.size*0.3;
 
     // Large main rock
-    const grad1=ctx.createRadialGradient(x-deco.size*0.2,y-deco.size*0.3,0,x,y,deco.size*0.8);
-    grad1.addColorStop(0,`hsla(${deco.hue},35%,${50*lightMul}%,1)`);
-    grad1.addColorStop(1,`hsla(${deco.hue},45%,${25*lightMul}%,1)`);
+    const grad1=ctx.createRadialGradient(x-deco.size*0.15,formY-deco.size*0.2,0,x,formY,deco.size*0.6);
+    grad1.addColorStop(0,`hsla(${deco.hue},36%,${54*lightMul}%,${fadeAlpha})`);
+    grad1.addColorStop(1,`hsla(${deco.hue},42%,${28*lightMul}%,${fadeAlpha})`);
     ctx.fillStyle=grad1;
     ctx.beginPath();
-    ctx.ellipse(x,y,deco.size*0.7,deco.size*0.5,0,0,Math.PI*2);
+    ctx.ellipse(x,formY,deco.size*0.5,deco.size*0.35,0,0,Math.PI*2);
     ctx.fill();
 
-    // Secondary rocks
-    const rock2X=x-deco.size*0.4;
-    const rock2Y=y+deco.size*0.2;
-    const grad2=ctx.createRadialGradient(rock2X,rock2Y-deco.size*0.1,0,rock2X,rock2Y,deco.size*0.3);
-    grad2.addColorStop(0,`hsla(${deco.hue+10},30%,${55*lightMul}%,1)`);
-    grad2.addColorStop(1,`hsla(${deco.hue+10},40%,${30*lightMul}%,1)`);
+    // Left rock
+    const rock2X=x-deco.size*0.35;
+    const rock2Y=formY+deco.size*0.15;
+    const grad2=ctx.createRadialGradient(rock2X,rock2Y-deco.size*0.08,0,rock2X,rock2Y,deco.size*0.25);
+    grad2.addColorStop(0,`hsla(${deco.hue+8},32%,${58*lightMul}%,${fadeAlpha})`);
+    grad2.addColorStop(1,`hsla(${deco.hue+8},38%,${32*lightMul}%,${fadeAlpha})`);
     ctx.fillStyle=grad2;
     ctx.beginPath();
-    ctx.ellipse(rock2X,rock2Y,deco.size*0.3,deco.size*0.2,0,0,Math.PI*2);
+    ctx.ellipse(rock2X,rock2Y,deco.size*0.22,deco.size*0.15,0,0,Math.PI*2);
     ctx.fill();
 
-    const rock3X=x+deco.size*0.3;
-    const rock3Y=y+deco.size*0.1;
-    ctx.fillStyle=`hsla(${deco.hue-5},35%,${45*lightMul}%,1)`;
+    // Right rock
+    const rock3X=x+deco.size*0.28;
+    const rock3Y=formY+deco.size*0.08;
+    ctx.fillStyle=`hsla(${deco.hue-4},34%,${48*lightMul}%,${fadeAlpha})`;
     ctx.beginPath();
-    ctx.ellipse(rock3X,rock3Y,deco.size*0.25,deco.size*0.15,0,0,Math.PI*2);
+    ctx.ellipse(rock3X,rock3Y,deco.size*0.18,deco.size*0.12,0,0,Math.PI*2);
     ctx.fill();
   }
   else if(deco.type==='cave'){
-    const x=deco.x;
-    const y=deco.y+bobAmount;
+    // Cave on bottom
+    const caveY=y-deco.size*0.35;
 
-    // Cave entrance/archway
-    const archGrad=ctx.createRadialGradient(x,y-deco.size*0.2,0,x,y,deco.size*0.8);
-    archGrad.addColorStop(0,`hsla(${deco.hue},40%,${40*lightMul}%,1)`);
-    archGrad.addColorStop(1,`hsla(${deco.hue},50%,${20*lightMul}%,1)`);
+    // Cave structure
+    const archGrad=ctx.createRadialGradient(x,caveY-deco.size*0.15,0,x,caveY,deco.size*0.6);
+    archGrad.addColorStop(0,`hsla(${deco.hue},42%,${44*lightMul}%,${fadeAlpha})`);
+    archGrad.addColorStop(1,`hsla(${deco.hue},48%,${22*lightMul}%,${fadeAlpha})`);
     ctx.fillStyle=archGrad;
     ctx.beginPath();
-    ctx.ellipse(x,y,deco.size*0.6,deco.size*0.4,0,0,Math.PI*2);
+    ctx.ellipse(x,caveY,deco.size*0.45,deco.size*0.3,0,0,Math.PI*2);
     ctx.fill();
 
     // Dark cave opening
-    ctx.fillStyle=`hsla(${deco.hue},20%,${5*lightMul}%,0.9)`;
+    ctx.fillStyle=`hsla(${deco.hue},22%,${8*lightMul}%,${fadeAlpha*0.95})`;
     ctx.beginPath();
-    ctx.ellipse(x,y-deco.size*0.1,deco.size*0.25,deco.size*0.15,0,0,Math.PI*2);
+    ctx.ellipse(x,caveY-deco.size*0.05,deco.size*0.2,deco.size*0.12,0,0,Math.PI*2);
     ctx.fill();
   }
   else if(deco.type==='castle'){
-    const x=deco.x;
-    const y=deco.y+bobAmount;
-    const baseWidth=deco.size*0.8;
-    const baseHeight=deco.size*0.6;
-    const towerWidth=deco.size*0.3;
-    const towerHeight=deco.size*0.4;
+    // Castle on bottom
+    const castleY=y-deco.size*0.45;
+    const baseWidth=deco.size*0.7;
+    const baseHeight=deco.size*0.5;
+    const towerWidth=deco.size*0.28;
+    const towerHeight=deco.size*0.38;
 
-    ctx.fillStyle=`hsla(${deco.hue},40%,${45*lightMul}%,${fadeAlpha})`;
-    ctx.fillRect(x-baseWidth/2,y-baseHeight/2,baseWidth,baseHeight);
+    // Castle base with gradient
+    const baseGrad=ctx.createLinearGradient(x,castleY-baseHeight*0.5,x,castleY+baseHeight*0.5);
+    baseGrad.addColorStop(0,`hsla(${deco.hue},42%,${48*lightMul}%,${fadeAlpha})`);
+    baseGrad.addColorStop(1,`hsla(${deco.hue},40%,${38*lightMul}%,${fadeAlpha})`);
+    ctx.fillStyle=baseGrad;
+    ctx.fillRect(x-baseWidth/2,castleY,baseWidth,baseHeight*0.8);
 
-    ctx.fillStyle=`hsla(${deco.hue},35%,${55*lightMul}%,${fadeAlpha})`;
-    ctx.fillRect(x-towerWidth/2,y-baseHeight/2-towerHeight,towerWidth,towerHeight);
+    // Castle tower
+    ctx.fillStyle=`hsla(${deco.hue},38%,${52*lightMul}%,${fadeAlpha})`;
+    ctx.fillRect(x-towerWidth/2,castleY-towerHeight,towerWidth,towerHeight);
 
-    ctx.fillStyle=`hsla(${deco.hue+20},50%,${35*lightMul}%,${fadeAlpha})`;
-    const flagHeight=deco.size*0.15;
-    ctx.fillRect(x-2,y-baseHeight/2-towerHeight-flagHeight,4,flagHeight);
-
-    const flagWave=0; // Static flag for performance
-    ctx.fillStyle=`hsla(${(deco.hue+180)%360},70%,${60*lightMul}%,${fadeAlpha})`;
-    ctx.beginPath();
-    ctx.moveTo(x+2,y-baseHeight/2-towerHeight-flagHeight);
-    ctx.lineTo(x+flagHeight+flagWave,y-baseHeight/2-towerHeight-flagHeight*0.7);
-    ctx.lineTo(x+2,y-baseHeight/2-towerHeight-flagHeight*0.4);
-    ctx.fill();
-  }
-  else if(deco.type==='chest'){
-    const x=deco.x;
-    const y=deco.y+bobAmount;
-    const width=deco.size*0.8;
-    const height=deco.size*0.4;
-
-    ctx.fillStyle=`hsla(${deco.hue},60%,${40*lightMul}%,1)`;
-    ctx.fillRect(x-width/2,y-height,width,height);
-
-    ctx.fillStyle=`hsla(${deco.hue},70%,${50*lightMul}%,1)`;
-    ctx.fillRect(x-width/2,y-height,width,height*0.3);
-
-    ctx.fillStyle=`hsla(${deco.hue+40},80%,${70*lightMul}%,1)`;
-    ctx.beginPath();
-    ctx.arc(x,y-height*0.7,width*0.08,0,Math.PI*2);
-    ctx.fill();
-
-    if(Math.sin(time*0.003+deco.bobPhase)>0.7){
-      ctx.fillStyle=`hsla(${(deco.hue+180)%360},90%,${80*lightMul}%,0.8)`;
-      for(let i=0;i<3;i++){
-        const sparkleX=x+Math.sin(time*0.01+i)*width*0.2;
-        const sparkleY=y-height*0.5+Math.cos(time*0.008+i)*height*0.1;
-        ctx.beginPath();
-        ctx.arc(sparkleX,sparkleY,2,0,Math.PI*2);
-        ctx.fill();
+    // Tower battlements
+    const battlementSize=towerWidth/5;
+    for(let i=0;i<5;i++){
+      if(i%2===0){
+        ctx.fillStyle=`hsla(${deco.hue},36%,${56*lightMul}%,${fadeAlpha})`;
+        ctx.fillRect(x-towerWidth/2+i*battlementSize,castleY-towerHeight,battlementSize,battlementSize*0.5);
       }
     }
+
+    // Flag pole
+    ctx.fillStyle=`hsla(${deco.hue+15},48%,${32*lightMul}%,${fadeAlpha})`;
+    const flagHeight=deco.size*0.18;
+    ctx.fillRect(x-1.5,castleY-towerHeight-flagHeight,3,flagHeight);
+
+    // Flag (static)
+    ctx.fillStyle=`hsla(${(deco.hue+180)%360},75%,${62*lightMul}%,${fadeAlpha})`;
+    ctx.beginPath();
+    ctx.moveTo(x+1.5,castleY-towerHeight-flagHeight);
+    ctx.lineTo(x+flagHeight*0.8,castleY-towerHeight-flagHeight*0.65);
+    ctx.lineTo(x+1.5,castleY-towerHeight-flagHeight*0.3);
+    ctx.fill();
+
+    // Window
+    ctx.fillStyle=`hsla(${deco.hue},25%,${15*lightMul}%,${fadeAlpha*0.8})`;
+    ctx.fillRect(x-towerWidth*0.15,castleY-towerHeight*0.5,towerWidth*0.3,towerHeight*0.25);
   }
+  else if(deco.type==='chest'){
+    // Chest on bottom
+    const chestY=y-deco.size*0.25;
+    const width=deco.size*0.6;
+    const height=deco.size*0.35;
+
+    // Chest main body with gradient
+    const chestGrad=ctx.createLinearGradient(x,chestY-height,x,chestY);
+    chestGrad.addColorStop(0,`hsla(${deco.hue},62%,${45*lightMul}%,${fadeAlpha})`);
+    chestGrad.addColorStop(1,`hsla(${deco.hue},58%,${35*lightMul}%,${fadeAlpha})`);
+    ctx.fillStyle=chestGrad;
+    ctx.fillRect(x-width/2,chestY-height,width,height);
+
+    // Chest lid (lighter)
+    ctx.fillStyle=`hsla(${deco.hue},68%,${52*lightMul}%,${fadeAlpha})`;
+    ctx.fillRect(x-width/2,chestY-height,width,height*0.25);
+
+    // Metal bands
+    ctx.fillStyle=`hsla(${deco.hue+35},20%,${30*lightMul}%,${fadeAlpha})`;
+    ctx.fillRect(x-width/2,chestY-height*0.6,width,height*0.08);
+    ctx.fillRect(x-width/2,chestY-height*0.3,width,height*0.08);
+
+    // Lock/clasp
+    ctx.fillStyle=`hsla(${deco.hue+38},75%,${68*lightMul}%,${fadeAlpha})`;
+    ctx.beginPath();
+    ctx.arc(x,chestY-height*0.6,width*0.06,0,Math.PI*2);
+    ctx.fill();
+
+    // Subtle sparkles (static positions for performance)
+    if(lightsOn){
+      ctx.fillStyle=`hsla(${(deco.hue+180)%360},88%,${78*lightMul}%,${fadeAlpha*0.5})`;
+      ctx.beginPath();
+      ctx.arc(x-width*0.15,chestY-height*0.7,1.5,0,Math.PI*2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(x+width*0.18,chestY-height*0.5,1.2,0,Math.PI*2);
+      ctx.fill();
+    }
+  }
+}
+
+// Cache ground texture elements (generated once)
+let groundTextureCache=null;
+function generateGroundTexture(){
+  const cache={grains:[],patches:[],pebbles:[]};
+
+  // Pre-generate grain positions
+  for(let i=0;i<200;i++){
+    cache.grains.push({
+      x:Math.random(),
+      y:Math.random(),
+      size:Math.random()*2.5+0.5,
+      isDark:Math.random()>0.5
+    });
+  }
+
+  // Pre-generate patch positions
+  for(let i=0;i<8;i++){
+    cache.patches.push({
+      x:Math.sin(i*1.5)*0.3+0.5,
+      y:Math.cos(i*1.2)*0.3+0.5,
+      size:60+Math.sin(i)*40,
+      isDark:i%2===0
+    });
+  }
+
+  // Pre-generate pebble positions
+  const pebbleCount=18;
+  for(let i=0;i<pebbleCount;i++){
+    cache.pebbles.push({
+      x:Math.sin(i*2.1)*0.4+0.5+(i-pebbleCount/2)/(pebbleCount+2),
+      yOffset:Math.sin(i*1.8)*0.25+0.35,
+      size:Math.abs(2+Math.sin(i*1.7)*3.5), // Ensure always positive
+      hue:195+i*6,
+      rotation:i*0.5
+    });
+  }
+
+  return cache;
+}
+
+function drawGround(){
+  if(!groundTextureCache)groundTextureCache=generateGroundTexture();
+
+  const lightMul=lightsOn?1:0.6;
+  const groundHeight=H*0.15;
+  const baseGroundY=H-groundHeight;
+
+  // Create wavy ground line
+  const wavePoints=[];
+  const segments=40;
+  for(let i=0;i<=segments;i++){
+    const x=(i/segments)*W;
+    const wave1=Math.sin(i*0.3)*15;
+    const wave2=Math.sin(i*0.15+1)*10;
+    const wave3=Math.sin(i*0.5+2)*8;
+    const y=baseGroundY+wave1+wave2+wave3;
+    wavePoints.push({x,y});
+  }
+
+  // Draw main sand base
+  ctx.beginPath();
+  ctx.moveTo(0,H);
+  for(const pt of wavePoints)ctx.lineTo(pt.x,pt.y);
+  ctx.lineTo(W,H);
+  ctx.closePath();
+
+  const sandGrad=ctx.createLinearGradient(0,baseGroundY-20,0,H);
+  sandGrad.addColorStop(0,`hsla(42,30%,${50*lightMul}%,1)`);
+  sandGrad.addColorStop(0.25,`hsla(40,32%,${44*lightMul}%,1)`);
+  sandGrad.addColorStop(0.5,`hsla(38,28%,${40*lightMul}%,1)`);
+  sandGrad.addColorStop(0.75,`hsla(36,30%,${36*lightMul}%,1)`);
+  sandGrad.addColorStop(1,`hsla(34,28%,${30*lightMul}%,1)`);
+  ctx.fillStyle=sandGrad;
+  ctx.fill();
+
+  // Sand layers
+  ctx.globalAlpha=0.2;
+  for(let i=0;i<5;i++){
+    const layerY=baseGroundY+groundHeight*0.3+(i*groundHeight*0.15);
+    ctx.fillStyle=i%2===0?`hsla(38,35%,${38*lightMul}%,1)`:`hsla(35,25%,${32*lightMul}%,1)`;
+    ctx.beginPath();
+    ctx.moveTo(0,layerY);
+    for(let x=0;x<=W;x+=20)ctx.lineTo(x,layerY+Math.sin(x*0.02+i)*3);
+    ctx.lineTo(W,layerY+6);
+    for(let x=W;x>=0;x-=20)ctx.lineTo(x,layerY+Math.sin(x*0.02+i)*3+6);
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.globalAlpha=1;
+
+  // Color patches
+  ctx.globalAlpha=0.12;
+  for(const patch of groundTextureCache.patches){
+    const patchX=patch.x*W;
+    const patchY=baseGroundY+patch.y*groundHeight;
+    const patchGrad=ctx.createRadialGradient(patchX,patchY,0,patchX,patchY,patch.size);
+    patchGrad.addColorStop(0,patch.isDark?`hsla(35,30%,${25*lightMul}%,0.8)`:`hsla(42,28%,${52*lightMul}%,0.8)`);
+    patchGrad.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=patchGrad;
+    ctx.beginPath();
+    ctx.arc(patchX,patchY,patch.size,0,Math.PI*2);
+    ctx.fill();
+  }
+  ctx.globalAlpha=1;
+
+  // Texture grains
+  ctx.globalAlpha=0.18;
+  for(const grain of groundTextureCache.grains){
+    const x=grain.x*W;
+    const y=baseGroundY-10+grain.y*(groundHeight+10);
+    ctx.fillStyle=grain.isDark?`hsla(40,22%,${56*lightMul}%,0.6)`:`hsla(35,28%,${26*lightMul}%,0.5)`;
+    ctx.beginPath();
+    ctx.arc(x,y,grain.size,0,Math.PI*2);
+    ctx.fill();
+  }
+  ctx.globalAlpha=1;
+
+  // Pebbles
+  for(const pebble of groundTextureCache.pebbles){
+    const x=pebble.x*W;
+    const segIdx=Math.floor((x/W)*segments);
+    const safeIdx=Math.min(Math.max(0,segIdx),segments);
+    const closestWavePoint=wavePoints[safeIdx];
+    if(!closestWavePoint)continue; // Skip if undefined
+    const pebbleY=closestWavePoint.y+pebble.yOffset*groundHeight;
+
+    const pebbleGrad=ctx.createRadialGradient(x-pebble.size*0.35,pebbleY-pebble.size*0.35,0,x,pebbleY,pebble.size);
+    pebbleGrad.addColorStop(0,`hsla(${pebble.hue},28%,${58*lightMul}%,0.75)`);
+    pebbleGrad.addColorStop(1,`hsla(${pebble.hue},32%,${32*lightMul}%,0.75)`);
+    ctx.fillStyle=pebbleGrad;
+    ctx.beginPath();
+    ctx.ellipse(x,pebbleY,pebble.size,pebble.size*0.75,pebble.rotation,0,Math.PI*2);
+    ctx.fill();
+
+    ctx.fillStyle=`hsla(${pebble.hue},20%,${70*lightMul}%,0.3)`;
+    ctx.beginPath();
+    ctx.arc(x-pebble.size*0.25,pebbleY-pebble.size*0.25,pebble.size*0.3,0,Math.PI*2);
+    ctx.fill();
+  }
+
 }
 
 function drawDecorations(time){
@@ -1497,10 +1968,11 @@ function regenerateDecor(){
 function init(){document.getElementById('tank').style.background=BG;document.body.classList.add('dark');document.body.classList.remove('light');lightsOn=true;document.getElementById('lightStatus').textContent='Licht: aan';resize();updateCooldown();drawLists();initWebSocket()}
 init();
 
-let t=0;let lastListUpdate=0;let lastCooldownUpdate=0;let lastDecorUpdate=0;
+let t=0;let lastListUpdate=0;let lastCooldownUpdate=0;
 let fadeState='idle';let fadeAlpha=1;let fadeStartTime=0;
 const LIST_UPDATE_INTERVAL=2000;const COOLDOWN_UPDATE_INTERVAL=1000;const DECOR_UPDATE_INTERVAL=3600000; // 1 hour
 const FADE_DURATION=1500; // 1.5 seconds for each fade phase
+let lastDecorUpdate=Date.now(); // Start with current time to prevent immediate fade on load
 
 function loop(){const now=Date.now();const dt=Math.min(0.05,(now-lastT)/1000);lastT=now;t++;
 
@@ -1519,6 +1991,9 @@ ctx.translate(viewportConfig.offsetLeft,viewportConfig.offsetTop);
 ctx.beginPath();
 ctx.rect(0,0,W,H);
 ctx.clip();
+
+// Draw ground first (lowest layer)
+drawGround();
 
 // Background layer
 for(const plant of backPlants){drawPlant(plant,t)}
