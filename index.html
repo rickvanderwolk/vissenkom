@@ -318,43 +318,51 @@ function discoEffects(time){
 }
 
 function makeFish(x=rand(50,W-50),y=rand(50,H-50),name){
-  // Size range - more moderate
-  const base=rand(16,32);
+  // Size range - consistent cute sizes
+  const base=rand(20,28);
 
-  // Color variation
-  let hue=Math.floor(rand(0,360));
+  // Cheerful color palette - avoid muddy/ugly colors
+  const colorPalettes = [
+    { hue: rand(0, 30), name: 'red-orange' },      // Reds/oranges
+    { hue: rand(40, 60), name: 'yellow' },         // Yellows
+    { hue: rand(90, 150), name: 'green-cyan' },    // Greens/cyans
+    { hue: rand(180, 240), name: 'blue' },         // Blues
+    { hue: rand(280, 330), name: 'purple-pink' }   // Purples/pinks
+  ];
+  const chosenPalette = colorPalettes[Math.floor(rand(0, colorPalettes.length))];
+  let hue = Math.floor(chosenPalette.hue);
   if(isNaN(hue))hue=0;
 
-  // Secondary color for gradients - closer to main hue
-  const secondaryHueOffset = rand(25, 55);
+  // Secondary color - very close for harmony
+  const secondaryHueOffset = rand(15, 35);
 
-  // Saturation variation - more moderate
-  const saturation = Math.floor(rand(70, 95));
+  // High saturation for cheerful look
+  const saturation = Math.floor(rand(75, 90));
 
-  // Pattern type: plain, spots, or stripes
+  // Pattern type: mostly plain or subtle spots
   const patternRoll = Math.random();
   let pattern = 'plain';
-  if(patternRoll < 0.3) pattern = 'spots';
-  else if(patternRoll < 0.55) pattern = 'stripes';
+  if(patternRoll < 0.25) pattern = 'spots';
+  else if(patternRoll < 0.35) pattern = 'stripes';
 
-  // Pattern properties - fewer, more subtle patterns
-  const patternCount = pattern === 'spots' ? Math.floor(rand(3, 5)) : Math.floor(rand(2, 4));
-  const patternIntensity = rand(0.4, 0.6);
+  // Pattern properties - very subtle
+  const patternCount = pattern === 'spots' ? Math.floor(rand(3, 4)) : Math.floor(rand(2, 3));
+  const patternIntensity = rand(0.3, 0.45);
 
-  // Body shape variations - more moderate
-  const bodyLengthRatio = rand(0.8, 1.2); // subtle thin to chubby
-  const bodyHeightRatio = rand(0.5, 0.65); // subtle flat to round
+  // Body shape - rounder, cuter proportions
+  const bodyLengthRatio = rand(0.9, 1.1); // mostly round
+  const bodyHeightRatio = rand(0.55, 0.65); // round and chubby
 
-  // Tail shape variations - more moderate
-  const tailSize = rand(1.0, 1.4);
+  // Tail - always cute size
+  const tailSize = rand(1.1, 1.3);
   const tailShape = Math.random() < 0.5 ? 'triangle' : 'fan';
 
-  // Fin variations - more moderate
-  const finSize = rand(0.4, 0.55);
-  const finShape = Math.random() < 0.6 ? 'round' : 'pointed';
+  // Fins - consistent cute size
+  const finSize = rand(0.42, 0.52);
+  const finShape = Math.random() < 0.7 ? 'round' : 'pointed'; // mostly round
 
-  // Eye size variation - more moderate
-  const eyeSize = rand(0.09, 0.13);
+  // Bigger eyes for cuteness!
+  const eyeSize = rand(0.11, 0.14);
 
   const initialVx=rand(-2.5,2.5);
   const initialVy=rand(-.3,.3);
