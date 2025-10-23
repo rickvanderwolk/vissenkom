@@ -39,6 +39,9 @@ const server = http.createServer((req, res) => {
     } else if (pathname.startsWith('/node_modules/')) {
         // Serve npm packages from node_modules
         filePath = path.join(__dirname, pathname);
+    } else if (pathname.startsWith('/css/') || pathname.startsWith('/js/')) {
+        // Serve CSS and JS files
+        filePath = path.join(__dirname, pathname);
     } else {
         res.writeHead(404);
         res.end('File not found');
@@ -58,6 +61,8 @@ const server = http.createServer((req, res) => {
             contentType = 'text/html';
         } else if (ext === '.js') {
             contentType = 'application/javascript';
+        } else if (ext === '.css') {
+            contentType = 'text/css';
         }
 
         res.writeHead(200, { 'Content-Type': contentType });
@@ -339,6 +344,8 @@ function handleFeed() {
     const now = Date.now();
     if (now - appState.lastFed < appState.feedCooldown) {
         console.log('Voeren nog in cooldown');
+        // Send cooldown status to controllers so they know it's not allowed
+        broadcastFeedCooldownUpdate();
         return;
     }
 
