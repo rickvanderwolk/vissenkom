@@ -1187,6 +1187,7 @@ function getBehaviorEmoji(behaviorState) {
     case 'territorial': return '💢';
     case 'floating': return '🎈';
     case 'hunting': return '🎯';
+    case 'scared': return '😱';
     case 'normal':
     default: return '🐟';
   }
@@ -1640,6 +1641,28 @@ function handleHunting(f) {
   }
 }
 
+function handleScared(f) {
+  // Fish swims away rapidly in a panicked manner
+  // Burst away from center of tank
+  if(!f.scaredInitialized) {
+    // Pick a random direction away from center
+    const centerX = W / 2;
+    const centerY = H / 2;
+    const awayAngle = Math.atan2(f.y - centerY, f.x - centerX);
+    const randomOffset = rand(-0.5, 0.5);
+
+    f.targetVx = Math.cos(awayAngle + randomOffset) * f.speed * 2.5;
+    f.targetVy = Math.sin(awayAngle + randomOffset) * f.speed * 2.5;
+    f.scaredInitialized = true;
+  }
+
+  // Quick steering with high speed
+  if(f.targetVx !== undefined && f.targetVy !== undefined) {
+    f.vx += (f.targetVx - f.vx) * 0.15;
+    f.vy += (f.targetVy - f.vy) * 0.15;
+  }
+}
+
 function updateFish(f,dt,now){
   let target=null;let best=1e9;for(const p of foods){const d=(p.x-f.x)**2+(p.y-f.y)**2;if(d<best){best=d;target=p}}
   const hp=healthPct(f,now);
@@ -1817,6 +1840,9 @@ function updateFish(f,dt,now){
         break;
       case 'hunting':
         handleHunting(f);
+        break;
+      case 'scared':
+        handleScared(f);
         break;
       case 'normal':
       default:
@@ -2171,6 +2197,9 @@ function handleRemoteCommand(data) {
                 case 'refreshWater':
                     refreshWater();
                     break;
+                case 'tapGlass':
+                    tapGlass();
+                    break;
                 default:
                     console.log('Onbekend commando:', data.command);
             }
@@ -2316,6 +2345,18 @@ function refreshWater(){
     ws.send(JSON.stringify({ command: 'reportWaterGreenness', waterGreenness: 0 }));
   }
 }
+
+function tapGlass(){
+  console.log('👊 Op het glas getikt! Vissen schrikken!');
+
+  // Make all fish scared for a short duration
+  fishes.forEach(f => {
+    f.behaviorState = 'scared';
+    f.behaviorTimer = Math.floor(rand(120, 240)); // 2-4 seconds of being scared
+    f.scaredInitialized = false; // Reset scared state
+  });
+}
+
 function updateCooldown(){
     const cd=document.getElementById('cooldown');
     const left=Math.max(0,FEED_CD-(Date.now()-lastFed));

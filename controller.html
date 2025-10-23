@@ -405,6 +405,10 @@
             <button id="refreshWaterBtn" class="control-button" disabled>
                 💧 Water verversen
             </button>
+
+            <button id="tapGlassBtn" class="control-button" disabled>
+                👊 Tik op glas
+            </button>
         </div>
 
         <div class="add-fish-container">
@@ -461,6 +465,7 @@
         const pumpBtn = document.getElementById('pumpBtn');
         const cleanBtn = document.getElementById('cleanBtn');
         const refreshWaterBtn = document.getElementById('refreshWaterBtn');
+        const tapGlassBtn = document.getElementById('tapGlassBtn');
         const addFishBtn = document.getElementById('addFishBtn');
         const fishNameInput = document.getElementById('fishNameInput');
 
@@ -601,7 +606,7 @@
             }
 
             // Enable/disable controls based on connection
-            const controls = [feedBtn, lightBtn, discoBtn, pumpBtn, cleanBtn, refreshWaterBtn, addFishBtn, fishNameInput];
+            const controls = [feedBtn, lightBtn, discoBtn, pumpBtn, cleanBtn, refreshWaterBtn, tapGlassBtn, addFishBtn, fishNameInput];
             controls.forEach(control => {
                 if (control) {
                     control.disabled = !connected;
@@ -775,6 +780,7 @@
         pumpBtn.addEventListener('click', () => sendCommand('togglePump'));
         cleanBtn.addEventListener('click', () => sendCommand('cleanTank'));
         refreshWaterBtn.addEventListener('click', () => sendCommand('refreshWater'));
+        tapGlassBtn.addEventListener('click', () => sendCommand('tapGlass'));
 
         addFishBtn.addEventListener('click', () => {
             const name = fishNameInput.value.trim();

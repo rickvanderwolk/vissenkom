@@ -296,6 +296,9 @@ function handleCommand(data, fromClient) {
         case 'refreshWater':
             handleRefreshWater();
             break;
+        case 'tapGlass':
+            handleTapGlass();
+            break;
         case 'reportPoop':
             handleReportPoop(data.poopCount);
             break;
@@ -431,6 +434,18 @@ function handleRefreshWater() {
     broadcastToMainApp({ command: 'refreshWater' });
     broadcastStatusUpdate(); // Update controllers with new water status
     saveState(); // Save state immediately
+}
+
+function handleTapGlass() {
+    console.log('👊 Er wordt op het glas getikt - vissen schrikken!');
+
+    // Log event
+    logEvent('glass_tapped', {
+        timestamp: Date.now()
+    });
+
+    // Broadcast to main app to scare all fish
+    broadcastToMainApp({ command: 'tapGlass' });
 }
 
 function handleReportPoop(poopCount) {
