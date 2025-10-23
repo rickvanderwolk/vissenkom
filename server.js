@@ -89,7 +89,9 @@ let appState = {
     currentAccessCode: '',
     accessCodeExpiry: 0,
     poopCount: 0, // Track amount of poop in tank
-    waterGreenness: 0 // Track water algae level (0-100)
+    waterGreenness: 0, // Track water algae level (0-100)
+    lastMedicine: 0, // Last time medicine was added
+    medicineCooldown: 24 * 60 * 60 * 1000 // 24 hours in milliseconds
 };
 
 // Load existing state from file
@@ -313,9 +315,13 @@ function handleCommand(data, fromClient) {
         case 'addFish':
             handleAddFish(data.name);
             break;
+        case 'addMedicine':
+            handleAddMedicine();
+            break;
         case 'getStatus':
             sendStatusUpdate(fromClient);
             sendFeedCooldownUpdate(fromClient);
+            sendMedicineCooldownUpdate(fromClient);
             break;
         case 'getGameState':
             sendGameState(fromClient);
@@ -455,6 +461,45 @@ function handleTapGlass() {
     broadcastToMainApp({ command: 'tapGlass' });
 }
 
+function handleAddMedicine() {
+    const now = Date.now();
+    if (now - appState.lastMedicine < appState.medicineCooldown) {
+        console.log('Medicine nog in cooldown');
+        // Send cooldown status to controllers
+        broadcastMedicineCooldownUpdate();
+        return;
+    }
+
+    appState.lastMedicine = now;
+    console.log('💊 Medicine toegevoegd aan tank!');
+
+    // Medicate all sick fish
+    let medicatedCount = 0;
+    appState.fishes.forEach(fish => {
+        if (fish.sick) {
+            fish.medicated = true;
+            fish.medicatedAt = now;
+            medicatedCount++;
+        }
+    });
+
+    // Log event
+    logEvent('medicine_added', {
+        timestamp: now,
+        fishMedicated: medicatedCount,
+        cooldownHours: appState.medicineCooldown / (60 * 60 * 1000)
+    });
+
+    // Broadcast to main app to update visuals
+    broadcastToMainApp({ command: 'addMedicine' });
+
+    // Update cooldown status for controllers
+    broadcastMedicineCooldownUpdate();
+
+    // Save state
+    saveState();
+}
+
 function handleReportPoop(poopCount) {
     if (typeof poopCount === 'number' && poopCount >= 0) {
         appState.poopCount = Math.max(0, poopCount);
@@ -499,7 +544,13 @@ function handleAddFish(name) {
         hue: Math.floor(Math.random() * 360), // 0-360
         speed: Math.random() * (1.2 - 0.7) + 0.7, // 0.7-1.2
         sickTop: Math.random() < 0.5,
-        hungerWindow: (2 * 24 * 60 * 60 * 1000) * (Math.random() * (1.1 - 0.9) + 0.9) // DAY * rand(0.9, 1.1)
+        hungerWindow: (2 * 24 * 60 * 60 * 1000) * (Math.random() * (1.1 - 0.9) + 0.9), // DAY * rand(0.9, 1.1)
+        // Disease properties
+        sick: false,
+        sickStartedAt: null,
+        medicated: false,
+        medicatedAt: null,
+        health: 100
     };
 
     appState.fishes.push(fishData);
@@ -542,6 +593,8 @@ function broadcastToMainApp(command) {
 }
 
 function broadcastStatusUpdate() {
+    const sickCount = appState.fishes.filter(f => f.sick).length;
+
     const statusMessage = {
         type: 'status',
         data: {
@@ -549,7 +602,8 @@ function broadcastStatusUpdate() {
             discoOn: appState.discoOn,
             pumpOn: appState.pumpOn,
             poopCount: appState.poopCount,
-            waterGreenness: appState.waterGreenness
+            waterGreenness: appState.waterGreenness,
+            sickFishCount: sickCount
         }
     };
 
@@ -565,6 +619,8 @@ function broadcastStatusUpdate() {
 }
 
 function sendStatusUpdate(client) {
+    const sickCount = appState.fishes.filter(f => f.sick).length;
+
     const statusMessage = {
         type: 'status',
         data: {
@@ -572,7 +628,8 @@ function sendStatusUpdate(client) {
             discoOn: appState.discoOn,
             pumpOn: appState.pumpOn,
             poopCount: appState.poopCount,
-            waterGreenness: appState.waterGreenness
+            waterGreenness: appState.waterGreenness,
+            sickFishCount: sickCount
         }
     };
 
@@ -596,6 +653,29 @@ function sendFeedCooldownUpdate(client) {
             canFeed,
             timeLeft,
             lastFed: appState.lastFed
+        }
+    };
+
+    sendToClient(client, cooldownMessage);
+}
+
+function broadcastMedicineCooldownUpdate() {
+    controllers.forEach(client => {
+        sendMedicineCooldownUpdate(client);
+    });
+}
+
+function sendMedicineCooldownUpdate(client) {
+    const now = Date.now();
+    const timeLeft = Math.max(0, appState.medicineCooldown - (now - appState.lastMedicine));
+    const canAddMedicine = timeLeft <= 0;
+
+    const cooldownMessage = {
+        type: 'medicineCooldown',
+        data: {
+            canAddMedicine,
+            timeLeft,
+            lastMedicine: appState.lastMedicine
         }
     };
 
@@ -680,6 +760,11 @@ setInterval(() => {
     broadcastFeedCooldownUpdate();
 }, 1000);
 
+// Update medicine cooldown every second
+setInterval(() => {
+    broadcastMedicineCooldownUpdate();
+}, 1000);
+
 // Broadcast status updates every 5 seconds to keep controllers in sync
 setInterval(() => {
     if (controllers.size > 0) {
@@ -714,6 +799,115 @@ setInterval(() => {
         }
     }
 }, 5 * 60 * 1000); // Every 5 minutes
+
+// Disease health loss - sick fish lose 0.5% health every 10 minutes
+setInterval(() => {
+    const now = Date.now();
+    let healthChanged = false;
+
+    appState.fishes.forEach(fish => {
+        if (!fish.health) fish.health = 100; // Initialize health if missing
+
+        if (fish.sick && !fish.medicated) {
+            // Sick fish lose health
+            fish.health = Math.max(0, fish.health - 0.5);
+            healthChanged = true;
+
+            // Log critical health
+            if (fish.health <= 30 && fish.health > 29.5) {
+                logEvent('fish_critical_health', {
+                    name: fish.name,
+                    health: fish.health
+                });
+                console.log(`⚠️ ${fish.name} is in critical condition (${fish.health.toFixed(1)}% health)`);
+            }
+
+            // Check if fish died from disease
+            if (fish.health <= 0) {
+                console.log(`💀 ${fish.name} died from disease`);
+                logEvent('fish_died_disease', {
+                    name: fish.name,
+                    sickDuration: now - fish.sickStartedAt
+                });
+                // Will be handled by client's death detection
+            }
+        } else if (fish.medicated) {
+            // Medicated fish recover health slowly
+            fish.health = Math.min(100, fish.health + 2); // +2% per 10 minutes
+            healthChanged = true;
+
+            // Check if fully recovered
+            if (fish.health >= 100 && fish.sick) {
+                fish.sick = false;
+                fish.sickStartedAt = null;
+                fish.medicated = false;
+                fish.medicatedAt = null;
+                console.log(`✅ ${fish.name} fully recovered!`);
+                logEvent('fish_recovered', {
+                    name: fish.name
+                });
+            }
+        }
+    });
+
+    if (healthChanged) {
+        broadcastStatusUpdate();
+    }
+}, 10 * 60 * 1000); // Every 10 minutes
+
+// Disease spread logic - runs every hour
+setInterval(() => {
+    const now = Date.now();
+    let newInfections = 0;
+
+    appState.fishes.forEach(fish => {
+        if (!fish.health) fish.health = 100; // Initialize health if missing
+        if (fish.sick) return; // Already sick
+
+        // Environmental infection (dirty water)
+        if (appState.poopCount > 15 || appState.waterGreenness > 80) {
+            // 1% chance per 12 hours = 0.0833% per hour
+            // But we check every hour, so use 1/12 = ~0.083
+            if (Math.random() < 0.0083) {
+                fish.sick = true;
+                fish.sickStartedAt = now;
+                newInfections++;
+                console.log(`🦠 ${fish.name} got sick from dirty environment`);
+                logEvent('fish_infected_environment', {
+                    name: fish.name,
+                    poopCount: appState.poopCount,
+                    waterGreenness: appState.waterGreenness
+                });
+            }
+        }
+
+        // Contact infection - check distance to sick fish
+        // This is a simplification - client will report actual positions later
+        // For now, just use probability based on number of sick fish
+        const sickFish = appState.fishes.filter(f => f.sick && !f.medicated);
+        if (sickFish.length > 0 && !fish.sick) {
+            // 3% chance per hour per sick fish (proximity assumed)
+            const infectionChance = sickFish.length * 0.03;
+            if (Math.random() < infectionChance) {
+                fish.sick = true;
+                fish.sickStartedAt = now;
+                newInfections++;
+                console.log(`🦠 ${fish.name} got infected by contact with sick fish`);
+                logEvent('fish_infected_contact', {
+                    name: fish.name,
+                    sickFishCount: sickFish.length
+                });
+            }
+        }
+    });
+
+    if (newInfections > 0) {
+        console.log(`🦠 Disease spread: ${newInfections} new infections`);
+        broadcastStatusUpdate();
+        // Broadcast to main app to update visuals
+        broadcastToMainApp({ command: 'diseaseUpdate' });
+    }
+}, 60 * 60 * 1000); // Every hour
 
 // Create WebSocket server on the same HTTP server
 const wss = new WebSocket.Server({ server });

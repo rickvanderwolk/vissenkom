@@ -10,6 +10,7 @@
         const cleanBtn = document.getElementById('cleanBtn');
         const refreshWaterBtn = document.getElementById('refreshWaterBtn');
         const tapGlassBtn = document.getElementById('tapGlassBtn');
+        const medicineBtn = document.getElementById('medicineBtn');
         const addFishBtn = document.getElementById('addFishBtn');
         const fishNameInput = document.getElementById('fishNameInput');
 
@@ -19,6 +20,8 @@
         const pumpStatus = document.getElementById('pumpStatus');
         const feedStatus = document.getElementById('feedStatus');
         const waterStatus = document.getElementById('waterStatus');
+        const sickFishStatus = document.getElementById('sickFishStatus');
+        const medicineStatus = document.getElementById('medicineStatus');
 
         let reconnectAttempts = 0;
         const maxReconnectAttempts = 10;
@@ -150,7 +153,7 @@
             }
 
             // Enable/disable controls based on connection
-            const controls = [feedBtn, lightBtn, discoBtn, pumpBtn, cleanBtn, refreshWaterBtn, tapGlassBtn, addFishBtn, fishNameInput];
+            const controls = [feedBtn, lightBtn, discoBtn, pumpBtn, cleanBtn, refreshWaterBtn, tapGlassBtn, medicineBtn, addFishBtn, fishNameInput];
             controls.forEach(control => {
                 if (control) {
                     control.disabled = !connected;
@@ -187,6 +190,9 @@
                     break;
                 case 'feedCooldown':
                     updateFeedStatus(message.data);
+                    break;
+                case 'medicineCooldown':
+                    updateMedicineStatus(message.data);
                     break;
                 case 'version':
                     document.getElementById('versionNumber').textContent = message.version;
@@ -247,6 +253,19 @@
                 waterStatus.style.color = '#f44336';
             }
 
+            // Update sick fish status
+            const sickCount = status.sickFishCount || 0;
+            if (sickCount === 0) {
+                sickFishStatus.textContent = '✅ Geen';
+                sickFishStatus.style.color = '#4ecdc4';
+            } else if (sickCount === 1) {
+                sickFishStatus.textContent = '🦠 1 vis';
+                sickFishStatus.style.color = '#ff9800';
+            } else {
+                sickFishStatus.textContent = `🦠 ${sickCount} vissen`;
+                sickFishStatus.style.color = '#f44336';
+            }
+
             // Update button texts
             lightBtn.textContent = status.lightsOn ? '🌙 Licht uit' : '☀️ Licht aan';
             discoBtn.textContent = status.discoOn ? '💡🎉 Disco uit' : '💡🎉 Disco aan';
@@ -289,6 +308,20 @@
             }
         }
 
+        function updateMedicineStatus(cooldownData) {
+            if (cooldownData.canAddMedicine) {
+                medicineBtn.disabled = false;
+                medicineStatus.textContent = 'Klaar';
+                medicineStatus.style.color = '#4ecdc4';
+            } else {
+                medicineBtn.disabled = true;
+                // Use better time formatting like the main page
+                const timeText = ageLabelMS(cooldownData.timeLeft);
+                medicineStatus.textContent = timeText;
+                medicineStatus.style.color = '#ff9800';
+            }
+        }
+
         function showAccessDenied(message) {
             // Hide all controls
             document.querySelector('.controller-container').style.display = 'none';
@@ -325,6 +358,7 @@
         cleanBtn.addEventListener('click', () => sendCommand('cleanTank'));
         refreshWaterBtn.addEventListener('click', () => sendCommand('refreshWater'));
         tapGlassBtn.addEventListener('click', () => sendCommand('tapGlass'));
+        medicineBtn.addEventListener('click', () => sendCommand('addMedicine'));
 
         addFishBtn.addEventListener('click', () => {
             const name = fishNameInput.value.trim();

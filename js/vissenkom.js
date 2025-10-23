@@ -1020,6 +1020,21 @@ function drawFish(f,t,now){
   ctx.save();ctx.translate(f.x,f.y);ctx.rotate(a);
   const dimBase=1-(1-healthPct(f,now)/100)*0.4;const lightMul=lightsOn?1:0.6;let dim=dimBase*lightMul;
 
+  // Sick fish appear duller and more transparent
+  if(f.sick && !f.medicated) {
+    const sickHealth = f.health || healthPct(f,now);
+    if(sickHealth <= 30) {
+      ctx.globalAlpha = 0.6; // Critical: very dull
+      dim *= 0.6;
+    } else if(sickHealth <= 60) {
+      ctx.globalAlpha = 0.75; // Sick: moderately dull
+      dim *= 0.75;
+    } else {
+      ctx.globalAlpha = 0.85; // Early stage: slightly dull
+      dim *= 0.9;
+    }
+  }
+
   // Ensure f.hue is a valid number, fallback to 0 if NaN
   let fishHue = isNaN(f.hue) ? 0 : f.hue;
 
@@ -1063,7 +1078,7 @@ function drawFish(f,t,now){
 
   ctx.restore();
   const hp=healthPct(f,now);
-  const behaviorEmoji=appConfig.showBehaviorEmoji ? getBehaviorEmoji(f.behaviorState || 'normal') + ' ' : '';
+  const behaviorEmoji=appConfig.showBehaviorEmoji ? getBehaviorEmoji(f.behaviorState || 'normal', f) + ' ' : '';
   const label1=behaviorEmoji + f.name;
   const label2=ageLabel(f,now);
   const labelAlpha=lightsOn?0.92:0.7;
@@ -1088,7 +1103,15 @@ function drawFish(f,t,now){
 function roundRect(x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath()}
 
 // Behavior emoji mapping
-function getBehaviorEmoji(behaviorState) {
+function getBehaviorEmoji(behaviorState, fish) {
+  // Check if fish is sick - override behavior emoji
+  if (fish && fish.sick) {
+    const health = fish.health || 100;
+    if (health <= 30) return '💀'; // Critical
+    if (health <= 60) return '🤢'; // Sick
+    return '😕'; // Early stage
+  }
+
   switch(behaviorState) {
     case 'bottom_dwelling': return '⬇️';
     case 'wall_following': return '🧱';
@@ -1820,6 +1843,18 @@ function updateFish(f,dt,now){
   }
   if(discoOn) slow *= 1.2; // Disco mode speed boost
 
+  // Sick fish are slower
+  if(f.sick && !f.medicated) {
+    const sickHealth = f.health || hp;
+    if(sickHealth <= 30) {
+      slow *= 0.4; // Critical: very slow
+    } else if(sickHealth <= 60) {
+      slow *= 0.6; // Sick: moderately slow
+    } else {
+      slow *= 0.8; // Early stage: slightly slow
+    }
+  }
+
   // Water greenness affects fish speed (dirty water = slower fish)
   const waterMultiplier = 1 - (waterGreenness * 0.003); // At 100% greenness = 0.7x speed
   slow *= waterMultiplier;
@@ -2117,6 +2152,14 @@ function handleRemoteCommand(data) {
                     break;
                 case 'tapGlass':
                     tapGlass();
+                    break;
+                case 'addMedicine':
+                    console.log('💊 Medicine added - fish will recover');
+                    // No visual action needed, server handles the logic
+                    break;
+                case 'diseaseUpdate':
+                    console.log('🦠 Disease status updated');
+                    // No visual action needed, server handles the logic
                     break;
                 default:
                     console.log('Onbekend commando:', data.command);
