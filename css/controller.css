@@ -84,11 +84,20 @@
             color: #eb5757;
         }
 
+        .category-section {
+            margin-bottom: 30px;
+        }
+
+        .category-section h3 {
+            margin: 0 0 15px 0;
+            font-size: 1.2em;
+            color: #50e3c2;
+        }
+
         .controls-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
             gap: 20px;
-            margin-bottom: 30px;
         }
 
         .control-button {
@@ -164,7 +173,6 @@
         }
 
         .add-fish-container {
-            margin-top: 20px;
             display: flex;
             gap: 6px; /* Reduced from 10px to 6px */
             align-items: stretch; /* Changed from center to stretch */
@@ -237,8 +245,6 @@
             }
 
             .add-fish-container {
-                margin-top: 15px;
-                margin-bottom: 0;
                 flex-direction: column; /* Stack vertically on mobile */
                 align-items: stretch;
             }
@@ -344,9 +350,6 @@
                 font-size: 13px;
             }
 
-            .add-fish-container {
-                margin-top: 12px;
-            }
 
             #fishNameInput {
                 padding: 10px;
