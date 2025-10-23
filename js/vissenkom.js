@@ -2192,6 +2192,19 @@ function loadGameState(state) {
         deadLog.push(deadFish);
     });
 
+    // Regenerate poop objects based on poopCount
+    poops.length = 0;
+    const poopCount = state.poopCount || 0;
+    for (let i = 0; i < poopCount; i++) {
+        poops.push({
+            x: rand(40, W - 40),
+            y: rand(H - 60, H - 20), // On the bottom
+            createdAt: Date.now(),
+            size: rand(3, 6)
+        });
+    }
+    console.log(`Regenerated ${poopCount} poop objects`);
+
     // Update UI
     updateLightUI();
     updateDiscoUI();
@@ -2240,11 +2253,17 @@ function makeFishFromData(serverFish) {
         lastEat: serverFish.lastEat || Date.now(),
         bornAt: serverFish.addedAt || serverFish.bornAt || Date.now(),
         eats: serverFish.eats || 0,
+        lastPoop: serverFish.lastPoop || Date.now(),
+        // Disease properties
+        sick: serverFish.sick || false,
+        sickStartedAt: serverFish.sickStartedAt || null,
+        medicated: serverFish.medicated || false,
+        medicatedAt: serverFish.medicatedAt || null,
+        health: serverFish.health !== undefined ? serverFish.health : 100,
         // Behavior state (new, defaults to normal)
         behaviorState: 'normal',
         behaviorTimer: 0,
-        wallFollowTarget: null,
-        lastPoop: Date.now()
+        wallFollowTarget: null
     };
     return f;
 }
