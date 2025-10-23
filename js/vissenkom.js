@@ -1,60 +1,7 @@
-<!doctype html>
-<html lang="nl">
-<head>
-<meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>Vissenkom Demo</title>
-
-<link rel="stylesheet" href="css/vissenkom.css">
-</head>
-<body class="dark">
-
-<div id="tank">
-<canvas id="c"></canvas>
-
-<div class="side">
-  <div class="panel">
-    <div class="qrbox">
-      <canvas id="qr"></canvas>
-    </div>
-  </div>
-
-  <div id="newestPanel" class="panel">
-    <h4>🌱 Nieuwe Bewoners</h4>
-    <div id="newestList"></div>
-  </div>
-
-  <div id="livingPanel" class="panel">
-    <h4>⭐ Sterren van de Kom</h4>
-    <div id="livingList"></div>
-  </div>
-
-  <div id="oldestPanel" class="panel">
-    <h4>🎖️ Legenden van de Kom</h4>
-    <div id="oldestList"></div>
-  </div>
-
-  <div id="deadPanel" class="panel" style="display: none;">
-    <h4>💙 In Onze Harten</h4>
-    <div id="deadList"></div>
-  </div>
-
-  <div class="panel">
-    <h4>🤓 Versie</h4>
-    <div class="item">
-      <span class="label">v</span><span id="versionNumber">...</span>
-    </div>
-  </div>
-</div>
-
-<div class="statusbar">
-  <div id="lightStatus" class="pill">Licht: aan</div>
-  <div id="discoStatus" class="pill">Disco: uit</div>
-  <div id="pumpStatus" class="pill">Pomp: uit</div>
-  <div id="cooldown" class="pill">Klaar om te voeren</div>
-</div>
-</div>
-
+const cv=document.getElementById('c');const ctx=cv.getContext('2d');
+const rand=(a,b)=>Math.random()*(b-a)+a;const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+let lamps=[];let W=0,H=0;
+let viewportConfig={offsetTop:0,offsetBottom:0,offsetLeft:0,offsetRight:0};
 
 // === ADAPTIVE PERFORMANCE SYSTEM ===
 let performanceProfile={quality:'high',particleCount:1,detailLevel:1,skipFrames:0};
@@ -263,6 +210,7 @@ function setupDecorations(){
     const zIndex=Math.random()<0.7?'back':'front';
     // Variatie in hoogte: van onderkant zand tot wat hoger
     // y is het middenpunt van het kasteel, dus voor een kasteel dat op de bodem staat:
+    // minimaal: H - size/2 (onderkant zit op H)
     // maximaal: H - sandHeight (onderkant zit op zandhoogte)
     const minY=H-size/2; // Helemaal onderaan
     const maxY=H-sandHeight+10; // Bijna bovenop zand
@@ -2505,10 +2453,3 @@ function showVisssenkomAlreadyActiveError(message) {
 
     console.log('🚫 Vissenkom error overlay shown');
 }
-</script>
-
-<!-- QR Code generation library - qrious (browser-native) -->
-<script src="./node_modules/qrious/dist/qrious.min.js" onload="console.log('✅ QRious library loaded successfully'); window.qriousLoaded = true;" onerror="console.error('❌ Failed to load QRious library'); window.qriousLoaded = false;"></script>
-<script src="js/vissenkom.js"></script>
-</body>
-</html>
