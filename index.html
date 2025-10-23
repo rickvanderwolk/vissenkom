@@ -152,9 +152,10 @@ window.addEventListener('resize',resize);
 const DAY_MIN=2*24*60;const DAY=DAY_MIN*60*1000;const FEED_CD=60*60*1000;
 const BG='#083042';const BG_NIGHT='#04121a';
 const fishes=[];const foods=[];const deadLog=[];const bubbles=[];const poops=[];
-const plants=[];const decorations=[];const stars=[];const particles=[];
+const plants=[];const decorations=[];const stars=[];const particles=[];const algenParticles=[];
 let lastFed=0;let fishCounter=1;let lastT=Date.now();let TOP_N=5;
 let lightsOn=true;let discoOn=false;let pumpOn=false;const pumpPos={x:0,y:0};let pumpJustOnUntil=0;
+let waterGreenness=0;let waterGreennessTarget=0;
 
 function setupLamps(){const n=4;const baseWidth=180;const spread=0.12;const hue=48;const margin=W*0.08;const step=(W-2*margin)/Math.max(1,n-1);lamps=[];for(let i=0;i<n;i++){const x=margin+i*step+rand(-step*spread,step*spread);const intensity=rand(0.55,0.8);const width=baseWidth*rand(0.9,1.1);const phase=rand(0,Math.PI*2);const stripePhase=rand(0,Math.PI*2);lamps.push({x,width,intensity,hueBase:hue,phase,stripePhase})}}
 
@@ -202,6 +203,23 @@ function setupParticles(){
     p.speedY=rand(-0.2,0.2);
     p.alpha=rand(0.1,0.3);
     particles.push(p);
+  }
+}
+
+function updateAlgenParticles(){
+  const targetCount=Math.floor(waterGreenness/3.3); // ~30 deeltjes bij 100% greenness
+  while(algenParticles.length<targetCount){
+    algenParticles.push({x:rand(0,W),y:rand(0,H),size:rand(2,6),speedX:rand(-0.1,0.1),speedY:rand(-0.15,0.15),hue:rand(90,120)}); // Bruiniger groen (hue 90-120)
+  }
+  while(algenParticles.length>targetCount){
+    algenParticles.pop();
+  }
+  for(const a of algenParticles){
+    a.x+=a.speedX;a.y+=a.speedY;
+    if(a.x<0)a.x=W;
+    if(a.x>W)a.x=0;
+    if(a.y<0)a.y=H;
+    if(a.y>H)a.y=0;
   }
 }
 
@@ -651,6 +669,23 @@ function drawParticles(){
     if(p.y<0)p.y=H;
     if(p.y>H)p.y=0;
   }
+}
+
+function drawAlgenParticles(){
+  for(const a of algenParticles){
+    const alpha=(waterGreenness/100)*0.8;
+    ctx.fillStyle=`hsla(${a.hue},40%,30%,${alpha})`; // Donkerder, minder verzadigd voor natuurlijker effect
+    ctx.beginPath();
+    ctx.arc(a.x,a.y,a.size,0,Math.PI*2);
+    ctx.fill();
+  }
+}
+
+function drawWaterGreenness(){
+  if(waterGreenness<=0)return;
+  const alpha=(waterGreenness/100)*0.9; // 90% opacity bij 100% greenness
+  ctx.fillStyle=`rgba(45,85,45,${alpha})`; // Donker modderig groen (natuurlijk vervuild water)
+  ctx.fillRect(0,0,W,H);
 }
 
 function clearFrame(time){
@@ -1841,6 +1876,10 @@ function updateFish(f,dt,now){
   }
   if(discoOn) slow *= 1.2; // Disco mode speed boost
 
+  // Water greenness affects fish speed (dirty water = slower fish)
+  const waterMultiplier = 1 - (waterGreenness * 0.003); // At 100% greenness = 0.7x speed
+  slow *= waterMultiplier;
+
   // Apply friction and speed adjustments
   f.vx*=0.99;f.vy*=0.99;f.vx*=slow;f.vy*=slow;
 
@@ -2072,6 +2111,13 @@ function handleRemoteCommand(data) {
         case 'gameState':
             loadGameState(data.data);
             break;
+        case 'status':
+            // Update water greenness target from server (smooth transition)
+            if(data.data && data.data.waterGreenness !== undefined) {
+                waterGreennessTarget = data.data.waterGreenness;
+                console.log('💧 Water greenness target updated from server:', waterGreennessTarget.toFixed(2) + '%');
+            }
+            break;
         case 'accessCode':
             console.log('🔄 Received new access code from server:', data.code);
             updateQRWithCode(data.code);
@@ -2122,6 +2168,9 @@ function handleRemoteCommand(data) {
                 case 'cleanTank':
                     cleanTank();
                     break;
+                case 'refreshWater':
+                    refreshWater();
+                    break;
                 default:
                     console.log('Onbekend commando:', data.command);
             }
@@ -2137,6 +2186,8 @@ function loadGameState(state) {
     lightsOn = state.lightsOn;
     discoOn = state.discoOn;
     pumpOn = state.pumpOn;
+    waterGreenness = state.waterGreenness || 0;
+    waterGreennessTarget = state.waterGreenness || 0;
 
     // Clear current fishes and load from server
     fishes.length = 0;
@@ -2254,6 +2305,17 @@ function cleanTank(){
     ws.send(JSON.stringify({ command: 'reportPoop', poopCount: 0 }));
   }
 }
+function refreshWater(){
+  waterGreenness=0;
+  waterGreennessTarget=0;
+  algenParticles.length=0;
+  console.log('💧 Water ververst! Greenness gereset naar 0%.');
+
+  // Report water greenness to server for controller updates
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({ command: 'reportWaterGreenness', waterGreenness: 0 }));
+  }
+}
 function updateCooldown(){
     const cd=document.getElementById('cooldown');
     const left=Math.max(0,FEED_CD-(Date.now()-lastFed));
@@ -2295,6 +2357,10 @@ if(performanceProfile.skipFrames>0&&t%2===0){
   return;
 }
 
+// Smooth interpolation for waterGreenness (fade effect)
+const lerpSpeed=0.02; // Lower = slower fade, smoother transition
+waterGreenness+=(waterGreennessTarget-waterGreenness)*lerpSpeed;
+
 clearFrame(t/60);
 
 // Draw background elements first (behind fish)
@@ -2325,6 +2391,11 @@ for(const f of fishes){updateFish(f,dt,now);drawFish(f,t,now)}
 // Foreground layer
 for(const plant of frontPlants){drawPlant(plant,t)}
 for(const deco of frontDecorations){drawDecoration(deco,t)}
+
+// Water greenness overlay and algae particles
+updateAlgenParticles();
+drawAlgenParticles();
+drawWaterGreenness();
 
 ctx.restore();
 

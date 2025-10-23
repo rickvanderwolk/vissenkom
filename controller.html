@@ -401,6 +401,10 @@
             <button id="cleanBtn" class="control-button" disabled>
                 🧹 Schoonmaken
             </button>
+
+            <button id="refreshWaterBtn" class="control-button" disabled>
+                💧 Water verversen
+            </button>
         </div>
 
         <div class="add-fish-container">
@@ -429,6 +433,10 @@
                     <div>Voeren</div>
                     <div id="feedStatus">-</div>
                 </div>
+                <div class="status-item">
+                    <div>Water</div>
+                    <div id="waterStatus">-</div>
+                </div>
             </div>
         </div>
 
@@ -452,6 +460,7 @@
         const discoBtn = document.getElementById('discoBtn');
         const pumpBtn = document.getElementById('pumpBtn');
         const cleanBtn = document.getElementById('cleanBtn');
+        const refreshWaterBtn = document.getElementById('refreshWaterBtn');
         const addFishBtn = document.getElementById('addFishBtn');
         const fishNameInput = document.getElementById('fishNameInput');
 
@@ -460,6 +469,7 @@
         const discoStatus = document.getElementById('discoStatus');
         const pumpStatus = document.getElementById('pumpStatus');
         const feedStatus = document.getElementById('feedStatus');
+        const waterStatus = document.getElementById('waterStatus');
 
         let reconnectAttempts = 0;
         const maxReconnectAttempts = 10;
@@ -591,7 +601,7 @@
             }
 
             // Enable/disable controls based on connection
-            const controls = [feedBtn, lightBtn, discoBtn, pumpBtn, cleanBtn, addFishBtn, fishNameInput];
+            const controls = [feedBtn, lightBtn, discoBtn, pumpBtn, cleanBtn, refreshWaterBtn, addFishBtn, fishNameInput];
             controls.forEach(control => {
                 if (control) {
                     control.disabled = !connected;
@@ -672,6 +682,22 @@
             discoStatus.textContent = status.discoOn ? 'Aan' : 'Uit';
             pumpStatus.textContent = status.pumpOn ? 'Aan' : 'Uit';
 
+            // Update water status
+            const greenness = status.waterGreenness || 0;
+            if (greenness < 25) {
+                waterStatus.textContent = '✨ Helder';
+                waterStatus.style.color = '#4ecdc4';
+            } else if (greenness < 50) {
+                waterStatus.textContent = `${Math.round(greenness)}% groen`;
+                waterStatus.style.color = '#ffd700';
+            } else if (greenness < 75) {
+                waterStatus.textContent = `${Math.round(greenness)}% groen`;
+                waterStatus.style.color = '#ff9800';
+            } else {
+                waterStatus.textContent = `${Math.round(greenness)}% groen`;
+                waterStatus.style.color = '#f44336';
+            }
+
             // Update button texts
             lightBtn.textContent = status.lightsOn ? '🌙 Licht uit' : '☀️ Licht aan';
             discoBtn.textContent = status.discoOn ? '💡🎉 Disco uit' : '💡🎉 Disco aan';
@@ -748,6 +774,7 @@
         discoBtn.addEventListener('click', () => sendCommand('toggleDisco'));
         pumpBtn.addEventListener('click', () => sendCommand('togglePump'));
         cleanBtn.addEventListener('click', () => sendCommand('cleanTank'));
+        refreshWaterBtn.addEventListener('click', () => sendCommand('refreshWater'));
 
         addFishBtn.addEventListener('click', () => {
             const name = fishNameInput.value.trim();

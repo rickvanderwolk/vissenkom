@@ -83,7 +83,8 @@ let appState = {
     fishCounter: 1,
     currentAccessCode: '',
     accessCodeExpiry: 0,
-    poopCount: 0 // Track amount of poop in tank
+    poopCount: 0, // Track amount of poop in tank
+    waterGreenness: 0 // Track water algae level (0-100)
 };
 
 // Load existing state from file
@@ -292,8 +293,14 @@ function handleCommand(data, fromClient) {
         case 'cleanTank':
             handleCleanTank();
             break;
+        case 'refreshWater':
+            handleRefreshWater();
+            break;
         case 'reportPoop':
             handleReportPoop(data.poopCount);
+            break;
+        case 'reportWaterGreenness':
+            handleReportWaterGreenness(data.waterGreenness);
             break;
         case 'addFish':
             handleAddFish(data.name);
@@ -407,10 +414,41 @@ function handleCleanTank() {
     saveState(); // Save state immediately
 }
 
+function handleRefreshWater() {
+    const oldGreenness = appState.waterGreenness;
+    console.log(`💧 Water wordt ververst - greenness van ${oldGreenness.toFixed(2)}% naar 0%`);
+
+    // Reset water greenness
+    appState.waterGreenness = 0;
+
+    // Log event
+    logEvent('water_refreshed', {
+        timestamp: Date.now(),
+        oldGreenness: oldGreenness,
+        newGreenness: 0
+    });
+
+    broadcastToMainApp({ command: 'refreshWater' });
+    broadcastStatusUpdate(); // Update controllers with new water status
+    saveState(); // Save state immediately
+}
+
 function handleReportPoop(poopCount) {
     if (typeof poopCount === 'number' && poopCount >= 0) {
         appState.poopCount = Math.max(0, poopCount);
         console.log('Poep count gerapporteerd:', appState.poopCount);
+
+        // Broadcast status update to controllers
+        broadcastStatusUpdate();
+
+        // Auto-save will handle persistence (every 30s)
+    }
+}
+
+function handleReportWaterGreenness(waterGreenness) {
+    if (typeof waterGreenness === 'number' && waterGreenness >= 0 && waterGreenness <= 100) {
+        appState.waterGreenness = waterGreenness;
+        console.log('Water greenness gerapporteerd:', appState.waterGreenness.toFixed(2) + '%');
 
         // Broadcast status update to controllers
         broadcastStatusUpdate();
@@ -488,11 +526,18 @@ function broadcastStatusUpdate() {
             lightsOn: appState.lightsOn,
             discoOn: appState.discoOn,
             pumpOn: appState.pumpOn,
-            poopCount: appState.poopCount
+            poopCount: appState.poopCount,
+            waterGreenness: appState.waterGreenness
         }
     };
 
+    // Broadcast to controllers
     controllers.forEach(client => {
+        sendToClient(client, statusMessage);
+    });
+
+    // Also broadcast to main apps for real-time water greenness updates
+    mainApps.forEach(client => {
         sendToClient(client, statusMessage);
     });
 }
@@ -504,7 +549,8 @@ function sendStatusUpdate(client) {
             lightsOn: appState.lightsOn,
             discoOn: appState.discoOn,
             pumpOn: appState.pumpOn,
-            poopCount: appState.poopCount
+            poopCount: appState.poopCount,
+            waterGreenness: appState.waterGreenness
         }
     };
 
@@ -545,7 +591,8 @@ function sendGameState(client) {
             lightsOn: appState.lightsOn,
             discoOn: appState.discoOn,
             pumpOn: appState.pumpOn,
-            poopCount: appState.poopCount
+            poopCount: appState.poopCount,
+            waterGreenness: appState.waterGreenness
         }
     };
 
@@ -624,6 +671,27 @@ setInterval(() => {
     generateAccessCode();
     broadcastNewAccessCode();
 }, 50 * 60 * 1000); // Every 50 minutes (10 minute buffer before 1 hour expiry)
+
+// Water greenness increases over time (algae growth)
+// +0.07% every 5 minutes = 100% in ~5 days (120 hours)
+setInterval(() => {
+    if (appState.waterGreenness < 100) {
+        appState.waterGreenness = Math.min(100, appState.waterGreenness + 0.07);
+        console.log(`🌿 Water greenness increased to ${appState.waterGreenness.toFixed(2)}%`);
+
+        // Broadcast update to all clients
+        broadcastStatusUpdate();
+
+        // Log significant milestones
+        const rounded = Math.round(appState.waterGreenness);
+        if (rounded === 25 || rounded === 50 || rounded === 75 || rounded === 100) {
+            logEvent('water_greenness_milestone', {
+                greenness: appState.waterGreenness,
+                level: rounded
+            });
+        }
+    }
+}, 5 * 60 * 1000); // Every 5 minutes
 
 // Create WebSocket server on the same HTTP server
 const wss = new WebSocket.Server({ server });
