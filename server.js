@@ -91,7 +91,9 @@ let appState = {
     poopCount: 0, // Track amount of poop in tank
     waterGreenness: 0, // Track water algae level (0-100)
     lastMedicine: 0, // Last time medicine was added
-    medicineCooldown: 24 * 60 * 60 * 1000 // 24 hours in milliseconds
+    medicineCooldown: 24 * 60 * 60 * 1000, // 24 hours in milliseconds
+    temperature: 24, // Current water temperature in °C
+    heatingOn: true // Heating thermostat on/off
 };
 
 // Load existing state from file
@@ -146,6 +148,16 @@ function saveState() {
 setInterval(() => {
     saveState();
 }, 30000);
+
+// Get room temperature based on current season (real calendar)
+function getRoomTemperature() {
+    const month = new Date().getMonth(); // 0-11
+
+    if (month === 11 || month === 0 || month === 1) return 16;  // Winter: dec, jan, feb
+    if (month >= 2 && month <= 4) return 19;                     // Spring: mar, apr, may
+    if (month >= 5 && month <= 7) return 24;                     // Summer: jun, jul, aug
+    return 19;                                                    // Autumn: sep, oct, nov
+}
 
 // Event logging system
 let eventLog = [];
@@ -354,6 +366,9 @@ function handleCommand(data, fromClient) {
         case 'getRecentActivity':
             sendRecentActivity(fromClient);
             break;
+        case 'toggleHeating':
+            handleToggleHeating();
+            break;
         default:
             console.log('Onbekend commando:', data.command);
     }
@@ -424,6 +439,21 @@ function handleTogglePump() {
     broadcastToMainApp({ command: 'togglePump' });
     broadcastStatusUpdate(); // This will update all controllers
     saveState(); // Save state immediately for status changes
+}
+
+function handleToggleHeating() {
+    appState.heatingOn = !appState.heatingOn;
+    console.log('Verwarming omgeschakeld:', appState.heatingOn ? 'aan' : 'uit');
+
+    // Log event
+    logEvent('heating_toggle', {
+        state: appState.heatingOn ? 'aan' : 'uit',
+        currentTemp: appState.temperature,
+        roomTemp: getRoomTemperature()
+    });
+
+    broadcastStatusUpdate();
+    saveState();
 }
 
 function handleCleanTank() {
@@ -616,7 +646,10 @@ function broadcastStatusUpdate() {
             pumpOn: appState.pumpOn,
             poopCount: appState.poopCount,
             waterGreenness: appState.waterGreenness,
-            sickFishCount: sickCount
+            sickFishCount: sickCount,
+            temperature: appState.temperature,
+            heatingOn: appState.heatingOn,
+            roomTemperature: getRoomTemperature()
         }
     };
 
@@ -642,7 +675,10 @@ function sendStatusUpdate(client) {
             pumpOn: appState.pumpOn,
             poopCount: appState.poopCount,
             waterGreenness: appState.waterGreenness,
-            sickFishCount: sickCount
+            sickFishCount: sickCount,
+            temperature: appState.temperature,
+            heatingOn: appState.heatingOn,
+            roomTemperature: getRoomTemperature()
         }
     };
 
@@ -812,12 +848,69 @@ setInterval(() => {
     broadcastNewAccessCode();
 }, 50 * 60 * 1000); // Every 50 minutes (10 minute buffer before 1 hour expiry)
 
+// Temperature regulation with smart thermostat (every 5 minutes)
+setInterval(() => {
+    const roomTemp = getRoomTemperature();
+
+    // Calculate heat from lights (fixed amounts)
+    let heatFromLights = 0;
+    if (appState.lightsOn) heatFromLights += 0.5; // Lights add 0.5°C
+    if (appState.discoOn) heatFromLights += 1.0;  // Disco adds 1.0°C
+
+    const naturalTemp = roomTemp + heatFromLights; // Temp without heating
+    const targetTemp = 24; // Thermostat target
+
+    if (appState.heatingOn) {
+        // Thermostat mode: maintain 24°C
+        if (appState.temperature < targetTemp) {
+            // Too cold: heating works
+            appState.temperature += 0.2;
+        } else if (appState.temperature > targetTemp) {
+            // Too warm: heating off, cools down
+            appState.temperature -= 0.1;
+        }
+        // Don't exceed target temp
+        appState.temperature = Math.min(targetTemp, appState.temperature);
+    } else {
+        // Heating off: move toward natural temp
+        if (appState.temperature < naturalTemp) {
+            appState.temperature += 0.1;
+        } else if (appState.temperature > naturalTemp) {
+            appState.temperature -= 0.1;
+        }
+    }
+
+    // Absolute safety limits
+    appState.temperature = Math.max(15, Math.min(35, appState.temperature));
+
+    // Broadcast update
+    broadcastStatusUpdate();
+}, 5 * 60 * 1000); // Every 5 minutes
+
 // Water greenness increases over time (algae growth)
-// +0.07% every 5 minutes = 100% in ~5 days (120 hours)
+// Base: +0.07% every 5 minutes = 100% in ~5 days (120 hours)
 setInterval(() => {
     if (appState.waterGreenness < 100) {
-        appState.waterGreenness = Math.min(100, appState.waterGreenness + 0.07);
-        console.log(`🌿 Water greenness increased to ${appState.waterGreenness.toFixed(2)}%`);
+        // Base growth rate
+        let growthRate = 0.07;
+
+        // Temperature modifier (primary factor for cold, secondary for warm)
+        const temp = appState.temperature;
+        let tempModifier = 1.0;
+        if (temp < 18) tempModifier = 0.3;      // Very cold = almost no growth
+        else if (temp < 22) tempModifier = 0.7; // Cool = slow growth
+        else tempModifier = 1.0;                // Warm = normal growth
+
+        // Light modifier (primary factor)
+        let lightModifier = 1.0;
+        if (!appState.lightsOn) lightModifier = 0.5;  // Dark = very slow
+        if (appState.discoOn) lightModifier = 2.0;     // Disco = explosive growth
+
+        // Calculate final growth
+        growthRate = growthRate * tempModifier * lightModifier;
+
+        appState.waterGreenness = Math.min(100, appState.waterGreenness + growthRate);
+        console.log(`🌿 Water greenness increased to ${appState.waterGreenness.toFixed(2)}% (temp: ${temp.toFixed(1)}°C, rate: ${growthRate.toFixed(3)})`);
 
         // Broadcast update to all clients
         broadcastStatusUpdate();
@@ -827,19 +920,35 @@ setInterval(() => {
         if (rounded === 25 || rounded === 50 || rounded === 75 || rounded === 100) {
             logEvent('water_greenness_milestone', {
                 greenness: appState.waterGreenness,
-                level: rounded
+                level: rounded,
+                temperature: appState.temperature,
+                tempModifier: tempModifier,
+                lightModifier: lightModifier
             });
         }
     }
 }, 5 * 60 * 1000); // Every 5 minutes
 
-// Disease health loss - sick fish lose 0.5% health every 10 minutes
+// Disease health loss and temperature damage - every 10 minutes
 setInterval(() => {
     const now = Date.now();
+    const temp = appState.temperature;
     let healthChanged = false;
 
     appState.fishes.forEach(fish => {
         if (!fish.health) fish.health = 100; // Initialize health if missing
+
+        // Temperature stress damage
+        let tempDamage = 0;
+        if (temp < 18) tempDamage = -0.5;      // Cold: -0.5%/hour = -0.083%/10min
+        if (temp < 16) tempDamage = -1.0;      // Very cold: -1%/hour = -0.167%/10min
+        if (temp > 30) tempDamage = -1.0;      // Hot: -1%/hour
+        if (temp > 32) tempDamage = -2.0;      // Very hot: -2%/hour
+
+        if (tempDamage < 0) {
+            fish.health = Math.max(0, fish.health + (tempDamage / 6)); // /6 because every 10 min
+            healthChanged = true;
+        }
 
         if (fish.sick && !fish.medicated) {
             // Sick fish lose health
@@ -850,16 +959,18 @@ setInterval(() => {
             if (fish.health <= 30 && fish.health > 29.5) {
                 logEvent('fish_critical_health', {
                     name: fish.name,
-                    health: fish.health
+                    health: fish.health,
+                    temperature: temp
                 });
                 console.log(`⚠️ ${fish.name} is in critical condition (${fish.health.toFixed(1)}% health)`);
             }
 
             // Check if fish died from disease
             if (fish.health <= 0) {
-                console.log(`💀 ${fish.name} died from disease`);
+                console.log(`💀 ${fish.name} died from disease/temperature`);
                 logEvent('fish_died_disease', {
                     name: fish.name,
+                    temperature: temp,
                     sickDuration: now - fish.sickStartedAt
                 });
                 // Will be handled by client's death detection
@@ -891,7 +1002,13 @@ setInterval(() => {
 // Disease spread logic - runs every hour
 setInterval(() => {
     const now = Date.now();
+    const temp = appState.temperature;
     let newInfections = 0;
+
+    // Temperature affects disease spread
+    let tempDiseaseMultiplier = 1.0;
+    if (temp < 20) tempDiseaseMultiplier = 1.5;   // Cold = +50% disease chance
+    if (temp > 28) tempDiseaseMultiplier = 2.0;   // Warm = +100% disease chance
 
     appState.fishes.forEach(fish => {
         if (!fish.health) fish.health = 100; // Initialize health if missing
@@ -899,17 +1016,21 @@ setInterval(() => {
 
         // Environmental infection (dirty water)
         if (appState.poopCount > 15 || appState.waterGreenness > 80) {
-            // 1% chance per 12 hours = 0.0833% per hour
-            // But we check every hour, so use 1/12 = ~0.083
-            if (Math.random() < 0.0083) {
+            // Base: 1% chance per 12 hours = 0.0833% per hour
+            const baseEnvironmentalChance = 0.0083;
+            const environmentalChance = baseEnvironmentalChance * tempDiseaseMultiplier;
+
+            if (Math.random() < environmentalChance) {
                 fish.sick = true;
                 fish.sickStartedAt = now;
                 newInfections++;
-                console.log(`🦠 ${fish.name} got sick from dirty environment`);
+                console.log(`🦠 ${fish.name} got sick from dirty environment (temp: ${temp.toFixed(1)}°C)`);
                 logEvent('fish_infected_environment', {
                     name: fish.name,
                     poopCount: appState.poopCount,
-                    waterGreenness: appState.waterGreenness
+                    waterGreenness: appState.waterGreenness,
+                    temperature: temp,
+                    tempMultiplier: tempDiseaseMultiplier
                 });
             }
         }
@@ -919,16 +1040,20 @@ setInterval(() => {
         // For now, just use probability based on number of sick fish
         const sickFish = appState.fishes.filter(f => f.sick && !f.medicated);
         if (sickFish.length > 0 && !fish.sick) {
-            // 3% chance per hour per sick fish (proximity assumed)
-            const infectionChance = sickFish.length * 0.03;
-            if (Math.random() < infectionChance) {
+            // Base: 3% chance per hour per sick fish (proximity assumed)
+            const baseContactChance = 0.03;
+            const contactChance = (sickFish.length * baseContactChance) * tempDiseaseMultiplier;
+
+            if (Math.random() < contactChance) {
                 fish.sick = true;
                 fish.sickStartedAt = now;
                 newInfections++;
-                console.log(`🦠 ${fish.name} got infected by contact with sick fish`);
+                console.log(`🦠 ${fish.name} got infected by contact with sick fish (temp: ${temp.toFixed(1)}°C)`);
                 logEvent('fish_infected_contact', {
                     name: fish.name,
-                    sickFishCount: sickFish.length
+                    sickFishCount: sickFish.length,
+                    temperature: temp,
+                    tempMultiplier: tempDiseaseMultiplier
                 });
             }
         }

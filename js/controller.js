@@ -13,6 +13,7 @@
         const medicineBtn = document.getElementById('medicineBtn');
         const addFishBtn = document.getElementById('addFishBtn');
         const fishNameInput = document.getElementById('fishNameInput');
+        const heatingBtn = document.getElementById('heatingBtn');
 
         // Status displays
         const lightStatus = document.getElementById('lightStatus');
@@ -23,6 +24,8 @@
         const poopStatus = document.getElementById('poopStatus');
         const sickFishStatus = document.getElementById('sickFishStatus');
         const medicineStatus = document.getElementById('medicineStatus');
+        const temperatureStatus = document.getElementById('temperatureStatus');
+        const heatingStatus = document.getElementById('heatingStatus');
 
         let reconnectAttempts = 0;
         const maxReconnectAttempts = 10;
@@ -154,7 +157,7 @@
             }
 
             // Enable/disable controls based on connection
-            const controls = [feedBtn, lightBtn, discoBtn, pumpBtn, cleanBtn, refreshWaterBtn, tapGlassBtn, medicineBtn, addFishBtn, fishNameInput];
+            const controls = [feedBtn, lightBtn, discoBtn, pumpBtn, cleanBtn, refreshWaterBtn, tapGlassBtn, medicineBtn, addFishBtn, fishNameInput, heatingBtn];
             controls.forEach(control => {
                 if (control) {
                     control.disabled = !connected;
@@ -293,10 +296,30 @@
                 sickFishStatus.style.color = '#f44336';
             }
 
+            // Update temperature status (zonder decimalen)
+            const temp = status.temperature || 24;
+            const tempRounded = Math.round(temp);
+
+            if (temp >= 22 && temp <= 26) {
+                temperatureStatus.textContent = `${tempRounded}°C ✅`;
+                temperatureStatus.style.color = '#4ecdc4';  // green
+            } else if (temp >= 20 && temp <= 28) {
+                temperatureStatus.textContent = `${tempRounded}°C ⚠️`;
+                temperatureStatus.style.color = '#ffd700';  // yellow
+            } else {
+                temperatureStatus.textContent = `${tempRounded}°C ❌`;
+                temperatureStatus.style.color = '#f44336';  // red
+            }
+
+            // Update heating status
+            heatingStatus.textContent = status.heatingOn ? '🔥 Aan' : 'Uit';
+            heatingStatus.style.color = status.heatingOn ? '#e9f1f7' : '#999';
+
             // Update button texts
             lightBtn.textContent = status.lightsOn ? '🌙 Licht uit' : '☀️ Licht aan';
             discoBtn.textContent = status.discoOn ? '💡🎉 Disco uit' : '💡🎉 Disco aan';
             pumpBtn.textContent = status.pumpOn ? '💨 Pomp uit' : '💨 Pomp aan';
+            heatingBtn.textContent = status.heatingOn ? '🔥 Verwarming uit' : '🔥 Verwarming aan';
 
             // Update clean button availability based on poop count
             const hasPoopToClear = status.poopCount && status.poopCount > 0;
@@ -397,6 +420,7 @@
         refreshWaterBtn.addEventListener('click', () => sendCommand('refreshWater'));
         tapGlassBtn.addEventListener('click', () => sendCommand('tapGlass'));
         medicineBtn.addEventListener('click', () => sendCommand('addMedicine'));
+        heatingBtn.addEventListener('click', () => sendCommand('toggleHeating'));
 
         addFishBtn.addEventListener('click', () => {
             const name = fishNameInput.value.trim();

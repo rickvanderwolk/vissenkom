@@ -75,6 +75,7 @@ let recentActivity=[];
 let lastFed=0;let fishCounter=1;let lastT=Date.now();let TOP_N=3;
 let lightsOn=true;let discoOn=false;let pumpOn=false;const pumpPos={x:0,y:0};let pumpJustOnUntil=0;
 let waterGreenness=0;let waterGreennessTarget=0;
+let currentTemperature=24;
 
 function setupLamps(){const n=4;const baseWidth=180;const spread=0.12;const hue=48;const margin=W*0.08;const step=(W-2*margin)/Math.max(1,n-1);lamps=[];for(let i=0;i<n;i++){const x=margin+i*step+rand(-step*spread,step*spread);const intensity=rand(0.55,0.8);const width=baseWidth*rand(0.9,1.1);const phase=rand(0,Math.PI*2);const stripePhase=rand(0,Math.PI*2);lamps.push({x,width,intensity,hueBase:hue,phase,stripePhase})}}
 
@@ -1652,6 +1653,7 @@ function updateFish(f,dt,now){
       // Adjust probabilities based on pump and disco state
       let curiousThreshold = 0.65; // Base: 9% curious (56-65%)
       let dancingThreshold = 0.71; // Base: 6% dancing (65-71%)
+      let restingThreshold = 0.19; // Base: 6% resting (13-19%)
 
       // When pump is on, increase curious behavior chance
       if(pumpOn) {
@@ -1665,6 +1667,11 @@ function updateFish(f,dt,now){
         dancingThreshold = curiousThreshold + 0.06; // Normal 6% dancing
       }
 
+      // Cold temperature: more resting/sleeping behavior
+      if(currentTemperature < 22) {
+        restingThreshold = 0.28; // Increase resting to 15% (13-28%) when cold
+      }
+
       if(randVal < 0.03) { // 3% bottom dwelling (0-3%)
         f.behaviorState = 'bottom_dwelling';
         f.behaviorTimer = Math.floor(rand(300, 900)); // 5-15 seconds at 60fps
@@ -1673,11 +1680,11 @@ function updateFish(f,dt,now){
         f.behaviorState = 'wall_following';
         f.behaviorTimer = Math.floor(rand(480, 1200)); // 8-20 seconds
         f.wallFollowTarget = null;
-      } else if(randVal < 0.19) { // 6% resting (13-19%)
+      } else if(randVal < restingThreshold) { // Dynamic resting threshold (temperature-dependent)
         f.behaviorState = 'resting';
         f.behaviorTimer = Math.floor(rand(180, 600)); // 3-10 seconds
         f.wallFollowTarget = null;
-      } else if(randVal < 0.20) { // 1% surface swimming (19-20%)
+      } else if(randVal < restingThreshold + 0.01) { // 1% surface swimming
         f.behaviorState = 'surface_swimming';
         f.behaviorTimer = Math.floor(rand(240, 720)); // 4-12 seconds
         f.wallFollowTarget = null;
@@ -1859,6 +1866,18 @@ function updateFish(f,dt,now){
   // Water greenness affects fish speed (dirty water = slower fish)
   const waterMultiplier = 1 - (waterGreenness * 0.003); // At 100% greenness = 0.7x speed
   slow *= waterMultiplier;
+
+  // Temperature affects fish speed (cold = very slow, warm = hyperactive)
+  let tempSpeedMultiplier = 1.0;
+  if(currentTemperature < 18) tempSpeedMultiplier = 0.4;
+  else if(currentTemperature < 20) tempSpeedMultiplier = 0.6;
+  else if(currentTemperature < 22) tempSpeedMultiplier = 0.8;
+  else if(currentTemperature <= 26) tempSpeedMultiplier = 1.0; // Ideal temp
+  else if(currentTemperature <= 28) tempSpeedMultiplier = 1.3;
+  else if(currentTemperature <= 30) tempSpeedMultiplier = 1.6;
+  else tempSpeedMultiplier = 2.0; // Panic speed when too hot
+
+  slow *= tempSpeedMultiplier;
 
   // Apply friction and speed adjustments
   f.vx*=0.99;f.vy*=0.99;f.vx*=slow;f.vy*=slow;
@@ -2253,6 +2272,10 @@ function handleRemoteCommand(data) {
             if(data.data && data.data.waterGreenness !== undefined) {
                 waterGreennessTarget = data.data.waterGreenness;
                 console.log('💧 Water greenness target updated from server:', waterGreennessTarget.toFixed(2) + '%');
+            }
+            // Update temperature from server
+            if(data.data && data.data.temperature !== undefined) {
+                currentTemperature = data.data.temperature;
             }
             break;
         case 'accessCode':
