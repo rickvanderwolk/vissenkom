@@ -20,88 +20,130 @@
             Verbinding: Niet verbonden
         </div>
 
-        <div class="category-section">
-            <h3>Verzorging</h3>
-            <div class="controls-grid">
-                <button id="feedBtn" class="control-button" disabled>
-                    🍤 Voeren
-                </button>
-
-                <button id="cleanBtn" class="control-button" disabled>
-                    🧹 Schoonmaken
-                </button>
-
-                <button id="refreshWaterBtn" class="control-button" disabled>
-                    💧 Water verversen
-                </button>
-
-                <button id="medicineBtn" class="control-button" disabled>
-                    💊 Medicijn toedienen
-                </button>
-            </div>
+        <!-- Tab Navigation -->
+        <div class="tab-navigation">
+            <button class="tab-button active" data-tab="care">
+                <span class="tab-icon">🍤</span>
+                <span class="tab-label">Verzorging</span>
+            </button>
+            <button class="tab-button" data-tab="tank">
+                <span class="tab-icon">💡</span>
+                <span class="tab-label">Kom</span>
+            </button>
+            <button class="tab-button" data-tab="maintenance">
+                <span class="tab-icon">🧹</span>
+                <span class="tab-label">Onderhoud</span>
+            </button>
+            <button class="tab-button" data-tab="status">
+                <span class="tab-icon">📊</span>
+                <span class="tab-label">Status</span>
+            </button>
+            <button class="tab-button" data-tab="fish">
+                <span class="tab-icon">🐟</span>
+                <span class="tab-label">Vissen</span>
+            </button>
         </div>
 
-        <div class="category-section">
-            <h3>Kom</h3>
-            <div class="controls-grid">
-                <button id="lightBtn" class="control-button" disabled>
-                    🌙 Licht uit
-                </button>
+        <!-- Tab Panels -->
+        <div class="tab-content">
+            <!-- Care Tab -->
+            <div class="tab-panel active" data-panel="care">
+                <div class="category-section">
+                    <div class="controls-grid">
+                        <button id="feedBtn" class="control-button care-button" disabled>
+                            🍤 Voeren
+                        </button>
 
-                <button id="discoBtn" class="control-button" disabled>
-                    💡🎉 Disco aan
-                </button>
+                        <button id="medicineBtn" class="control-button care-button" disabled>
+                            💊 Medicijn toedienen
+                        </button>
 
-                <button id="pumpBtn" class="control-button" disabled>
-                    💨 Pomp aan
-                </button>
-
-                <button id="tapGlassBtn" class="control-button" disabled>
-                    👊 Tik op glas
-                </button>
+                        <button id="tapGlassBtn" class="control-button care-button" disabled>
+                            👊 Tik op glas
+                        </button>
+                    </div>
+                </div>
             </div>
-        </div>
 
-        <div class="category-section">
-            <h3>Vis toevoegen</h3>
-            <div class="add-fish-container">
-                <input type="text" id="fishNameInput" placeholder="Naam van je visje..." disabled>
-                <button id="addFishBtn" class="control-button add-fish-btn" disabled>
-                    🐟 Toevoegen
-                </button>
+            <!-- Tank Tab -->
+            <div class="tab-panel" data-panel="tank">
+                <div class="category-section">
+                    <div class="controls-grid">
+                        <button id="lightBtn" class="control-button tank-button" disabled>
+                            🌙 Licht uit
+                        </button>
+
+                        <button id="discoBtn" class="control-button tank-button" disabled>
+                            💡🎉 Disco aan
+                        </button>
+
+                        <button id="pumpBtn" class="control-button tank-button" disabled>
+                            💨 Pomp aan
+                        </button>
+                    </div>
+                </div>
             </div>
-        </div>
 
-        <div class="status-display">
-            <h3>Status</h3>
-            <div class="status-grid">
-                <div class="status-item">
-                    <div>Licht</div>
-                    <div id="lightStatus">-</div>
+            <!-- Maintenance Tab -->
+            <div class="tab-panel" data-panel="maintenance">
+                <div class="category-section">
+                    <div class="controls-grid">
+                        <button id="cleanBtn" class="control-button maintenance-button" disabled>
+                            🧹 Schoonmaken
+                        </button>
+
+                        <button id="refreshWaterBtn" class="control-button maintenance-button" disabled>
+                            💧 Water verversen
+                        </button>
+                    </div>
                 </div>
-                <div class="status-item">
-                    <div>Disco</div>
-                    <div id="discoStatus">-</div>
+            </div>
+
+            <!-- Status Tab -->
+            <div class="tab-panel" data-panel="status">
+                <div class="status-display">
+                    <div class="status-grid">
+                        <div class="status-item">
+                            <div>Licht</div>
+                            <div id="lightStatus">-</div>
+                        </div>
+                        <div class="status-item">
+                            <div>Disco</div>
+                            <div id="discoStatus">-</div>
+                        </div>
+                        <div class="status-item">
+                            <div>Pomp</div>
+                            <div id="pumpStatus">-</div>
+                        </div>
+                        <div class="status-item">
+                            <div>Voeren</div>
+                            <div id="feedStatus">-</div>
+                        </div>
+                        <div class="status-item">
+                            <div>Water</div>
+                            <div id="waterStatus">-</div>
+                        </div>
+                        <div class="status-item">
+                            <div>Zieke vissen</div>
+                            <div id="sickFishStatus">-</div>
+                        </div>
+                        <div class="status-item">
+                            <div>Medicijn</div>
+                            <div id="medicineStatus">-</div>
+                        </div>
+                    </div>
                 </div>
-                <div class="status-item">
-                    <div>Pomp</div>
-                    <div id="pumpStatus">-</div>
-                </div>
-                <div class="status-item">
-                    <div>Voeren</div>
-                    <div id="feedStatus">-</div>
-                </div>
-                <div class="status-item">
-                    <div>Water</div>
-                    <div id="waterStatus">-</div>
-                </div>
-                <div class="status-item">
-                    <div>Zieke vissen</div>
-                    <div id="sickFishStatus">-</div>
-                </div>
-                <div class="status-item">
-                    <div>Medicijn</div>
-                    <div id="medicineStatus">-</div>
+            </div>
+
+            <!-- Fish Tab -->
+            <div class="tab-panel" data-panel="fish">
+                <div class="category-section">
+                    <div class="add-fish-container">
+                        <input type="text" id="fishNameInput" placeholder="Naam van je visje..." disabled>
+                        <button id="addFishBtn" class="control-button fish-button add-fish-btn" disabled>
+                            🐟 Toevoegen
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>

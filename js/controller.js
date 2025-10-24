@@ -374,6 +374,45 @@
             }
         });
 
+        // Tab switching functionality
+        function initTabs() {
+            const tabButtons = document.querySelectorAll('.tab-button');
+            const tabPanels = document.querySelectorAll('.tab-panel');
+
+            // Restore last active tab from localStorage or default to 'care'
+            const savedTab = localStorage.getItem('vissenkom_active_tab') || 'care';
+            switchToTab(savedTab);
+
+            // Add click listeners to tab buttons
+            tabButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    const tabName = button.getAttribute('data-tab');
+                    switchToTab(tabName);
+                    localStorage.setItem('vissenkom_active_tab', tabName);
+                });
+            });
+
+            function switchToTab(tabName) {
+                // Update tab buttons
+                tabButtons.forEach(btn => {
+                    if (btn.getAttribute('data-tab') === tabName) {
+                        btn.classList.add('active');
+                    } else {
+                        btn.classList.remove('active');
+                    }
+                });
+
+                // Update tab panels
+                tabPanels.forEach(panel => {
+                    if (panel.getAttribute('data-panel') === tabName) {
+                        panel.classList.add('active');
+                    } else {
+                        panel.classList.remove('active');
+                    }
+                });
+            }
+        }
+
         // Mobile debugging - check DOM elements on startup
         function checkDOMElements() {
             console.log('Mobile Debug: Checking DOM elements...');
@@ -400,11 +439,13 @@
             document.addEventListener('DOMContentLoaded', () => {
                 console.log('Mobile Debug: DOM loaded');
                 checkDOMElements();
+                initTabs();
                 connectWebSocket();
             });
         } else {
             console.log('Mobile Debug: DOM already loaded');
             checkDOMElements();
+            initTabs();
             connectWebSocket();
         }
 

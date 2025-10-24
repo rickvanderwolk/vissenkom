@@ -361,3 +361,184 @@
                 font-size: 14px !important;
             }
         }
+
+        /* Tab Navigation */
+        .tab-navigation {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 25px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 12px;
+            padding: 6px;
+        }
+
+        .tab-button {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 12px 8px;
+            border: none;
+            border-radius: 8px;
+            background: transparent;
+            color: rgba(233, 241, 247, 0.6);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 14px;
+            font-weight: 500;
+            /* Mobile touch optimization */
+            min-height: 60px;
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .tab-icon {
+            font-size: 24px;
+            transition: transform 0.3s ease;
+        }
+
+        .tab-label {
+            font-size: 12px;
+            white-space: nowrap;
+        }
+
+        .tab-button:hover {
+            color: rgba(233, 241, 247, 0.9);
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .tab-button.active {
+            background: rgba(80, 227, 194, 0.15);
+            color: #50e3c2;
+        }
+
+        .tab-button.active .tab-icon {
+            transform: scale(1.1);
+        }
+
+        /* Tab Content */
+        .tab-content {
+            position: relative;
+            min-height: 300px;
+        }
+
+        .tab-panel {
+            display: none;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .tab-panel.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Color Categories for Buttons */
+        .care-button {
+            background: linear-gradient(135deg, #3ecf5c, #2db84b) !important;
+            box-shadow: 0 6px 20px rgba(62, 207, 92, 0.3) !important;
+        }
+
+        .care-button:hover {
+            box-shadow: 0 8px 25px rgba(62, 207, 92, 0.4) !important;
+        }
+
+        .care-button:disabled {
+            box-shadow: 0 6px 20px rgba(62, 207, 92, 0.1) !important;
+        }
+
+        .tank-button {
+            background: linear-gradient(135deg, #4a90e2, #357abd) !important;
+            box-shadow: 0 6px 20px rgba(74, 144, 226, 0.3) !important;
+        }
+
+        .tank-button:hover {
+            box-shadow: 0 8px 25px rgba(74, 144, 226, 0.4) !important;
+        }
+
+        .tank-button:disabled {
+            box-shadow: 0 6px 20px rgba(74, 144, 226, 0.1) !important;
+        }
+
+        .fish-button {
+            background: linear-gradient(135deg, #ff9f43, #ee5a24) !important;
+            box-shadow: 0 6px 20px rgba(255, 159, 67, 0.3) !important;
+        }
+
+        .fish-button:hover {
+            box-shadow: 0 8px 25px rgba(255, 159, 67, 0.4) !important;
+        }
+
+        .fish-button:disabled {
+            box-shadow: 0 6px 20px rgba(255, 159, 67, 0.1) !important;
+        }
+
+        /* Maintenance button colors */
+        .maintenance-button {
+            background: linear-gradient(135deg, #f39c12, #e67e22) !important;
+            box-shadow: 0 6px 20px rgba(243, 156, 18, 0.3) !important;
+        }
+
+        .maintenance-button:hover {
+            box-shadow: 0 8px 25px rgba(243, 156, 18, 0.4) !important;
+        }
+
+        .maintenance-button:disabled {
+            box-shadow: 0 6px 20px rgba(243, 156, 18, 0.1) !important;
+        }
+
+        /* Mobile responsiveness for tabs */
+        @media (max-width: 600px) {
+            .tab-navigation {
+                margin-bottom: 20px;
+                gap: 4px;
+                padding: 4px;
+            }
+
+            .tab-button {
+                padding: 8px 3px;
+                min-height: 50px;
+                gap: 3px;
+            }
+
+            .tab-icon {
+                font-size: 20px;
+            }
+
+            .tab-label {
+                font-size: 9px;
+            }
+        }
+
+        @media (max-width: 400px), (max-height: 600px) {
+            .tab-navigation {
+                gap: 3px;
+                padding: 3px;
+                margin-bottom: 15px;
+            }
+
+            .tab-button {
+                padding: 6px 2px;
+                min-height: 48px;
+                gap: 2px;
+            }
+
+            .tab-icon {
+                font-size: 18px;
+            }
+
+            .tab-label {
+                font-size: 8px;
+            }
+        }
