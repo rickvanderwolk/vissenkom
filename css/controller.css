@@ -21,21 +21,28 @@
         body {
             min-height: 100vh; /* Use viewport height instead of 100% */
             min-height: -webkit-fill-available; /* iOS Safari fix */
-            padding: 20px;
+            padding: 20px 20px; /* Explicitly set left and right padding */
             display: block; /* Change from flex to block for scrolling */
         }
 
         .controller-container {
-            background: rgba(0, 0, 0, 0.3);
+            background: rgba(0, 0, 0, 0.35);
             backdrop-filter: blur(10px);
             -webkit-backdrop-filter: blur(10px); /* Safari support */
-            border-radius: 20px;
-            padding: 40px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+            border-radius: 24px;
+            padding: 32px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.08);
             max-width: 600px;
-            width: calc(100% - 40px); /* Account for body padding */
-            margin: 0 auto; /* Center the container */
-            margin-bottom: 40px; /* Extra space at bottom for scroll */
+            width: 100%; /* Use full width */
+            margin: 0; /* Remove auto margin */
+            margin-bottom: 24px; /* Space before footer */
+            box-sizing: border-box; /* Include padding in width */
+        }
+
+        .version-display {
+            text-align: center;
+            padding: 0 20px 20px 20px;
+            margin-bottom: 20px;
         }
 
         /* Fallback for browsers without backdrop-filter support */
@@ -47,8 +54,10 @@
 
         h1 {
             text-align: center;
-            margin-bottom: 30px;
-            font-size: 2.5em;
+            margin: 0 0 36px 0;
+            padding: 4px 0;
+            font-size: 2.2em;
+            font-weight: 800;
             color: #50e3c2; /* Fallback color for mobile browsers */
             background: linear-gradient(45deg, #50e3c2, #4ecdc4);
             -webkit-background-clip: text;
@@ -56,6 +65,7 @@
             background-clip: text;
             /* Better mobile support */
             -webkit-text-stroke: 0.5px rgba(80, 227, 194, 0.3);
+            letter-spacing: -0.02em;
         }
 
         /* Fallback for browsers that don't support background-clip: text */
@@ -85,7 +95,11 @@
         }
 
         .category-section {
-            margin-bottom: 30px;
+            margin-bottom: 32px;
+        }
+
+        .category-section:last-child {
+            margin-bottom: 0;
         }
 
         .category-section h3 {
@@ -105,27 +119,28 @@
         .controls-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 20px;
+            gap: 16px;
         }
 
         .control-button {
             appearance: none;
             border: none;
-            border-radius: 15px;
-            padding: 20px;
-            font-weight: 600;
-            font-size: 16px;
+            border-radius: 16px;
+            padding: 24px;
+            font-weight: 700;
+            font-size: 17px;
             background: linear-gradient(135deg, #50e3c2, #4ecdc4);
             color: #0b1e2d;
             cursor: pointer;
-            box-shadow: 0 6px 20px rgba(80, 227, 194, 0.3);
+            box-shadow: 0 4px 16px rgba(80, 227, 194, 0.4), 0 2px 8px rgba(0, 0, 0, 0.2);
             transition: all 0.2s ease;
             position: relative;
             overflow: hidden;
             /* Mobile touch optimization */
-            min-height: 44px; /* Minimum touch target size */
+            min-height: 56px; /* Larger minimum touch target */
             touch-action: manipulation; /* Disable double-tap zoom */
             -webkit-tap-highlight-color: transparent; /* Remove iOS tap highlight */
+            border: 2px solid transparent;
         }
 
         .control-button:hover {
@@ -138,10 +153,12 @@
         }
 
         .control-button:disabled {
-            opacity: 0.5;
+            opacity: 0.4;
             cursor: not-allowed;
             transform: none;
-            box-shadow: 0 6px 20px rgba(80, 227, 194, 0.1);
+            box-shadow: 0 2px 8px rgba(80, 227, 194, 0.1);
+            filter: grayscale(40%);
+            border: 2px solid rgba(255, 255, 255, 0.1);
         }
 
         .control-button::before {
@@ -182,32 +199,50 @@
 
         /* Inline status displays per tab */
         .tab-status-display {
-            margin-bottom: 20px;
-            padding-bottom: 20px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            margin-bottom: 28px;
+            padding-bottom: 28px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
-            gap: 12px;
+            grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+            gap: 15px;
         }
 
         .tab-status-display .status-item {
-            background: rgba(255, 255, 255, 0.05);
-            padding: 12px;
-            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.12);
+            padding: 16px 12px;
+            border-radius: 12px;
+            font-size: 1em;
+            font-weight: 600;
+            line-height: 1.5;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .tab-status-display .status-item > div:first-child {
+            opacity: 0.85;
             font-size: 0.9em;
+            margin-bottom: 6px;
+        }
+
+        .tab-status-display .status-item > div:last-child {
+            font-size: 1.1em;
+            font-weight: 700;
         }
 
         @media (max-width: 600px) {
             .tab-status-display {
-                margin-bottom: 15px;
-                padding-bottom: 15px;
-                gap: 8px;
-                grid-template-columns: repeat(auto-fit, minmax(135px, 1fr));
+                margin-bottom: 20px;
+                padding-bottom: 20px;
+                gap: 12px;
+                grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
             }
 
             .tab-status-display .status-item {
-                padding: 10px 8px;
-                font-size: 0.85em;
+                padding: 14px 10px;
+                font-size: 0.95em;
+            }
+
+            .tab-status-display .status-item > div:last-child {
+                font-size: 1.05em;
             }
         }
 
@@ -221,17 +256,27 @@
         #fishNameInput {
             flex: 1;
             min-width: 200px; /* Ensure minimum width */
-            padding: 12px;
-            border: none;
-            border-radius: 10px;
-            background: rgba(255, 255, 255, 0.1);
+            padding: 16px;
+            border: 2px solid rgba(255, 255, 255, 0.15);
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.12);
             color: #e9f1f7;
             font-size: 16px;
+            font-weight: 600;
             box-sizing: border-box; /* Include padding in width calculation */
+            transition: all 0.2s ease;
+        }
+
+        #fishNameInput:focus {
+            outline: none;
+            border-color: rgba(80, 227, 194, 0.5);
+            background: rgba(255, 255, 255, 0.15);
+            box-shadow: 0 0 0 3px rgba(80, 227, 194, 0.1);
         }
 
         #fishNameInput::placeholder {
-            color: rgba(233, 241, 247, 0.6);
+            color: rgba(233, 241, 247, 0.5);
+            font-weight: 500;
         }
 
         .add-fish-btn {
@@ -242,35 +287,47 @@
 
         @media (max-width: 600px) {
             body {
-                padding: 15px;
+                padding: 15px 15px; /* Explicitly set left and right padding */
                 /* Extra space for small screens */
                 padding-top: max(15px, env(safe-area-inset-top, 0));
                 padding-bottom: max(30px, env(safe-area-inset-bottom, 0));
             }
 
             .controller-container {
-                padding: 20px;
-                margin: 0 auto;
-                margin-bottom: 30px;
-                width: calc(100% - 30px); /* Account for reduced body padding */
+                padding: 24px;
+                margin: 0; /* Remove margin */
+                margin-bottom: 20px;
+                width: 100%; /* Full width */
+            }
+
+            .version-display {
+                padding: 0 15px 15px 15px;
             }
 
             .controls-grid {
                 grid-template-columns: 1fr;
-                gap: 15px;
+                gap: 14px;
             }
 
             .control-button {
-                padding: 18px;
-                font-size: 15px;
+                padding: 20px;
+                font-size: 16px;
                 /* Ensure buttons are never too small */
-                min-height: 50px;
+                min-height: 58px;
             }
 
             h1 {
                 font-size: 1.8em; /* Slightly smaller for small screens */
-                margin-bottom: 15px;
-                margin-top: 0;
+                margin: 0 0 24px 0;
+            }
+
+            .category-section {
+                margin-bottom: 24px;
+            }
+
+            .tab-status-display {
+                margin-bottom: 22px;
+                padding-bottom: 22px;
             }
 
             .connection-status {
@@ -350,7 +407,7 @@
         /* Very small screens (older phones) */
         @media (max-width: 400px), (max-height: 600px) {
             body {
-                padding: 10px;
+                padding: 10px 10px; /* Explicitly set left and right padding */
                 padding-top: max(10px, env(safe-area-inset-top, 0));
                 padding-bottom: max(20px, env(safe-area-inset-bottom, 0));
             }
@@ -358,12 +415,26 @@
             .controller-container {
                 padding: 15px;
                 border-radius: 15px;
-                width: calc(100% - 20px);
+                width: 100%; /* Full width */
+                margin-bottom: 16px;
             }
 
             h1 {
                 font-size: 1.5em;
-                margin-bottom: 10px;
+                margin: 0 0 18px 0;
+            }
+
+            .category-section {
+                margin-bottom: 20px;
+            }
+
+            .tab-status-display {
+                margin-bottom: 18px;
+                padding-bottom: 18px;
+            }
+
+            .version-display {
+                padding: 0 10px 15px 10px;
             }
 
             .control-button {
@@ -410,10 +481,10 @@
         .tab-navigation {
             display: flex;
             gap: 8px;
-            margin-bottom: 25px;
-            background: rgba(0, 0, 0, 0.2);
-            border-radius: 12px;
-            padding: 6px;
+            margin-bottom: 32px;
+            background: rgba(0, 0, 0, 0.25);
+            border-radius: 14px;
+            padding: 8px;
         }
 
         .tab-button {
@@ -423,9 +494,9 @@
             align-items: center;
             justify-content: center;
             gap: 6px;
-            padding: 12px 8px;
+            padding: 14px 10px;
             border: none;
-            border-radius: 8px;
+            border-radius: 10px;
             background: transparent;
             color: rgba(233, 241, 247, 0.6);
             cursor: pointer;
@@ -433,7 +504,7 @@
             font-size: 14px;
             font-weight: 500;
             /* Mobile touch optimization */
-            min-height: 60px;
+            min-height: 64px;
             touch-action: manipulation;
             -webkit-tap-highlight-color: transparent;
         }
@@ -466,6 +537,7 @@
         .tab-content {
             position: relative;
             min-height: 300px;
+            padding-top: 4px;
         }
 
         .tab-panel {
@@ -491,69 +563,69 @@
         /* Color Categories for Buttons */
         .care-button {
             background: linear-gradient(135deg, #3ecf5c, #2db84b) !important;
-            box-shadow: 0 6px 20px rgba(62, 207, 92, 0.3) !important;
+            box-shadow: 0 4px 16px rgba(62, 207, 92, 0.4), 0 2px 8px rgba(0, 0, 0, 0.2) !important;
         }
 
         .care-button:hover {
-            box-shadow: 0 8px 25px rgba(62, 207, 92, 0.4) !important;
+            box-shadow: 0 6px 24px rgba(62, 207, 92, 0.5), 0 3px 10px rgba(0, 0, 0, 0.25) !important;
         }
 
         .care-button:disabled {
-            box-shadow: 0 6px 20px rgba(62, 207, 92, 0.1) !important;
+            box-shadow: 0 2px 8px rgba(62, 207, 92, 0.15) !important;
         }
 
         .tank-button {
             background: linear-gradient(135deg, #4a90e2, #357abd) !important;
-            box-shadow: 0 6px 20px rgba(74, 144, 226, 0.3) !important;
+            box-shadow: 0 4px 16px rgba(74, 144, 226, 0.4), 0 2px 8px rgba(0, 0, 0, 0.2) !important;
         }
 
         .tank-button:hover {
-            box-shadow: 0 8px 25px rgba(74, 144, 226, 0.4) !important;
+            box-shadow: 0 6px 24px rgba(74, 144, 226, 0.5), 0 3px 10px rgba(0, 0, 0, 0.25) !important;
         }
 
         .tank-button:disabled {
-            box-shadow: 0 6px 20px rgba(74, 144, 226, 0.1) !important;
+            box-shadow: 0 2px 8px rgba(74, 144, 226, 0.15) !important;
         }
 
         .fish-button {
             background: linear-gradient(135deg, #ff9f43, #ee5a24) !important;
-            box-shadow: 0 6px 20px rgba(255, 159, 67, 0.3) !important;
+            box-shadow: 0 4px 16px rgba(255, 159, 67, 0.4), 0 2px 8px rgba(0, 0, 0, 0.2) !important;
         }
 
         .fish-button:hover {
-            box-shadow: 0 8px 25px rgba(255, 159, 67, 0.4) !important;
+            box-shadow: 0 6px 24px rgba(255, 159, 67, 0.5), 0 3px 10px rgba(0, 0, 0, 0.25) !important;
         }
 
         .fish-button:disabled {
-            box-shadow: 0 6px 20px rgba(255, 159, 67, 0.1) !important;
+            box-shadow: 0 2px 8px rgba(255, 159, 67, 0.15) !important;
         }
 
         /* Maintenance button colors */
         .maintenance-button {
             background: linear-gradient(135deg, #f39c12, #e67e22) !important;
-            box-shadow: 0 6px 20px rgba(243, 156, 18, 0.3) !important;
+            box-shadow: 0 4px 16px rgba(243, 156, 18, 0.4), 0 2px 8px rgba(0, 0, 0, 0.2) !important;
         }
 
         .maintenance-button:hover {
-            box-shadow: 0 8px 25px rgba(243, 156, 18, 0.4) !important;
+            box-shadow: 0 6px 24px rgba(243, 156, 18, 0.5), 0 3px 10px rgba(0, 0, 0, 0.25) !important;
         }
 
         .maintenance-button:disabled {
-            box-shadow: 0 6px 20px rgba(243, 156, 18, 0.1) !important;
+            box-shadow: 0 2px 8px rgba(243, 156, 18, 0.15) !important;
         }
 
         /* Mobile responsiveness for tabs */
         @media (max-width: 600px) {
             .tab-navigation {
-                margin-bottom: 20px;
-                gap: 4px;
-                padding: 4px;
+                margin-bottom: 24px;
+                gap: 6px;
+                padding: 6px;
             }
 
             .tab-button {
-                padding: 10px 4px;
-                min-height: 54px;
-                gap: 4px;
+                padding: 12px 6px;
+                min-height: 58px;
+                gap: 5px;
             }
 
             .tab-icon {
@@ -569,15 +641,15 @@
 
         @media (max-width: 400px), (max-height: 600px) {
             .tab-navigation {
-                gap: 3px;
-                padding: 3px;
-                margin-bottom: 15px;
+                gap: 5px;
+                padding: 5px;
+                margin-bottom: 20px;
             }
 
             .tab-button {
-                padding: 8px 2px;
-                min-height: 50px;
-                gap: 3px;
+                padding: 10px 4px;
+                min-height: 54px;
+                gap: 4px;
             }
 
             .tab-icon {
