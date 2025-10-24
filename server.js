@@ -341,7 +341,7 @@ function handleCommand(data, fromClient) {
             handleReportWaterGreenness(data.waterGreenness);
             break;
         case 'addFish':
-            handleAddFish(data.name);
+            handleAddFish(data.name, fromClient);
             break;
         case 'addMedicine':
             handleAddMedicine();
@@ -574,13 +574,35 @@ function handleReportWaterGreenness(waterGreenness) {
     }
 }
 
-function handleAddFish(name) {
+function handleAddFish(name, fromClient) {
     if (!name || name.trim() === '') {
         console.log('Ongeldige visnaam');
+        if (fromClient) {
+            sendToClient(fromClient, {
+                type: 'error',
+                message: 'Ongeldige visnaam'
+            });
+        }
         return;
     }
 
     const fishName = name.trim();
+
+    // Check if fish name already exists (living or dead)
+    const existingLivingFish = appState.fishes.find(f => f.name.toLowerCase() === fishName.toLowerCase());
+    const existingDeadFish = appState.deadLog.find(f => f.name.toLowerCase() === fishName.toLowerCase());
+
+    if (existingLivingFish || existingDeadFish) {
+        console.log('Visnaam bestaat al:', fishName);
+        if (fromClient) {
+            const status = existingLivingFish ? 'levend' : 'overleden';
+            sendToClient(fromClient, {
+                type: 'error',
+                message: `Visnaam "${fishName}" bestaat al (${status})`
+            });
+        }
+        return;
+    }
 
     // Generate visual properties (same ranges as original client code)
     const fishData = {
@@ -626,6 +648,7 @@ function handleAddFish(name) {
         fishData: fishData,
         fishCounter: appState.fishCounter
     });
+    broadcastStatusUpdate(); // Update controllers with new fish count
     saveState(); // Save state after adding fish
 }
 
@@ -654,6 +677,7 @@ function broadcastStatusUpdate() {
             poopCount: appState.poopCount,
             waterGreenness: appState.waterGreenness,
             sickFishCount: sickCount,
+            fishCount: appState.fishes.length,
             temperature: appState.temperature,
             heatingOn: appState.heatingOn,
             roomTemperature: getRoomTemperature()
@@ -683,6 +707,7 @@ function sendStatusUpdate(client) {
             poopCount: appState.poopCount,
             waterGreenness: appState.waterGreenness,
             sickFishCount: sickCount,
+            fishCount: appState.fishes.length,
             temperature: appState.temperature,
             heatingOn: appState.heatingOn,
             roomTemperature: getRoomTemperature()
@@ -771,6 +796,7 @@ function handleFishDied(deadFish) {
     // Remove fish from active list if it exists
     appState.fishes = appState.fishes.filter(f => f.name !== deadFish.name);
 
+    broadcastStatusUpdate(); // Update controllers with new fish count
     saveState(); // Save state after fish dies
 }
 

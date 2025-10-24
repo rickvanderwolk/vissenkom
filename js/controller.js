@@ -272,6 +272,9 @@
                 case 'config':
                     updateFooter(message.config);
                     break;
+                case 'error':
+                    showError(message.message);
+                    break;
                 default:
                     console.log('Onbekend bericht:', message);
             }
@@ -406,6 +409,12 @@
 
                 console.log('Mobile Debug: Refresh water button', needsWaterRefresh ? 'enabled' : 'disabled', 'greenness:', greenness.toFixed(1) + '%');
             }
+
+            // Update fish count if present in status
+            if (status.fishCount !== undefined) {
+                fishCountStatus.textContent = `🐟 ${status.fishCount}`;
+                fishCountStatus.style.color = '#e9f1f7';
+            }
         }
 
         function ageLabelMS(ms) {
@@ -496,6 +505,37 @@
                 z-index: 9999;
             `;
             document.body.appendChild(deniedDiv);
+        }
+
+        function showError(message) {
+            // Create error toast
+            const errorDiv = document.createElement('div');
+            errorDiv.textContent = message;
+            errorDiv.style.cssText = `
+                position: fixed;
+                top: 20px;
+                left: 50%;
+                transform: translateX(-50%);
+                background: #eb5757;
+                color: white;
+                padding: 15px 25px;
+                border-radius: 8px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+                z-index: 10000;
+                font-size: 16px;
+                font-weight: 500;
+                max-width: 90%;
+                text-align: center;
+                animation: slideDown 0.3s ease-out;
+            `;
+
+            document.body.appendChild(errorDiv);
+
+            // Remove after 4 seconds
+            setTimeout(() => {
+                errorDiv.style.animation = 'slideUp 0.3s ease-out';
+                setTimeout(() => errorDiv.remove(), 300);
+            }, 4000);
         }
 
         // Event listeners
