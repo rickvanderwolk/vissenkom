@@ -653,7 +653,7 @@ function handleAddFish(name, fromClient) {
         // Visual properties
         baseSize: Math.floor(Math.random() * (30 - 18 + 1)) + 18, // 18-30
         hue: Math.floor(Math.random() * 360), // 0-360
-        speed: Math.random() * (1.2 - 0.7) + 0.7, // 0.7-1.2
+        speed: Math.random() * (3.0 - 1.5) + 1.5, // 1.5-3.0 (meer variatie!)
         sickTop: Math.random() < 0.5,
         hungerWindow: (2 * 24 * 60 * 60 * 1000) * (Math.random() * (1.1 - 0.9) + 0.9), // DAY * rand(0.9, 1.1)
         // Disease properties

@@ -260,7 +260,7 @@ function discoEffects(time){
   ctx.globalCompositeOperation='source-over';
 }
 
-function makeFish(x=rand(50,W-50),y=rand(50,H-50),name){const base=rand(18,30);let hue=Math.floor(rand(0,360));if(isNaN(hue))hue=0;const initialVx=rand(-2.5,2.5);const initialVy=rand(-.3,.3);const f={x,y,vx:initialVx,vy:initialVy,speed:rand(1.5,2.5),baseSize:base,hue,dir:Math.random()*Math.PI*2,turnTimer:Math.floor(rand(600,1800)),blink:0,name:name||`Vis ${fishCounter++}`,lastEat:Date.now(),bornAt:Date.now(),eats:0,sickTop:Math.random()<0.5,hungerWindow:DAY*rand(0.9,1.1),behaviorState:'normal',behaviorTimer:0,wallFollowTarget:null,lastPoop:Date.now(),targetVx:initialVx,targetVy:initialVy};fishes.push(f)}
+function makeFish(x=rand(50,W-50),y=rand(50,H-50),name){const base=rand(18,30);let hue=Math.floor(rand(0,360));if(isNaN(hue))hue=0;const initialVx=rand(-2.5,2.5);const initialVy=rand(-.3,.3);const f={x,y,vx:initialVx,vy:initialVy,speed:rand(1.5,3.0),baseSize:base,hue,dir:Math.random()*Math.PI*2,turnTimer:Math.floor(rand(600,1800)),blink:0,name:name||`Vis ${fishCounter++}`,lastEat:Date.now(),bornAt:Date.now(),eats:0,sickTop:Math.random()<0.5,hungerWindow:DAY*rand(0.9,1.1),behaviorState:'normal',behaviorTimer:0,wallFollowTarget:null,lastPoop:Date.now(),targetVx:initialVx,targetVy:initialVy};fishes.push(f)}
 for(let i=0;i<8;i++)makeFish();
 
 function makeFood(){const n=Math.max(8,fishes.length);for(let i=0;i<n;i++){foods.push({x:rand(40,W-40),y:50+rand(0,30),vy:rand(0.7,1.5),r:7,ttl:6000})}}
@@ -1892,8 +1892,19 @@ function handlePlaying(f) {
         }
       }
 
-      // Zwem energiek naar de doelpositie
-      steerTowards(f, targetX, targetY, 0.12);
+      // Zwem ENERGIEK naar de doelpositie - veel hogere steer strength + speed boost
+      const steerStrength = rand(0.18, 0.25); // Veel sterker sturen (was 0.12)
+      steerTowards(f, targetX, targetY, steerStrength);
+
+      // Extra speed boost richting bal - vissen worden enthousiast!
+      const distToBall = Math.sqrt((targetX - f.x) ** 2 + (targetY - f.y) ** 2);
+      if(distToBall > 50) {
+        // Ver weg? Zwem nog sneller!
+        const boostAngle = Math.atan2(targetY - f.y, targetX - f.x);
+        const boostAmount = rand(0.08, 0.15);
+        f.vx += Math.cos(boostAngle) * boostAmount;
+        f.vy += Math.sin(boostAngle) * boostAmount;
+      }
     }
   } else {
     // Geen bal meer - terug naar normaal gedrag
@@ -2807,7 +2818,7 @@ function makeFishFromData(serverFish) {
         vx: rand(-1, 1),
         vy: rand(-0.5, 0.5),
         // Use saved visual properties or fallback to random (for backwards compatibility)
-        speed: serverFish.speed !== undefined ? serverFish.speed : rand(1.5, 2.5),
+        speed: serverFish.speed !== undefined ? serverFish.speed : rand(1.5, 3.0),
         baseSize: serverFish.baseSize !== undefined ? serverFish.baseSize : rand(18, 30),
         hue: hue,
         sickTop: serverFish.sickTop !== undefined ? serverFish.sickTop : (Math.random() < 0.5),
