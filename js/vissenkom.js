@@ -1780,24 +1780,37 @@ function handlePlaying(f) {
   }
 
   if(closestBall) {
-    // Zwem naar de bal
-    steerTowards(f, closestBall.x, closestBall.y, 0.08);
-
-    // Als dichtbij genoeg, "duw" de bal
     const dx = closestBall.x - f.x;
     const dy = closestBall.y - f.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
+    const fishSizeNow = fishSize(f, Date.now());
 
-    if(dist < closestBall.radius + fishSize(f, Date.now())) {
-      // Geef bal een "duw" in de richting van de vis movement
-      const pushStrength = 0.4;
-      closestBall.vx += f.vx * pushStrength;
-      closestBall.vy += f.vy * pushStrength;
+    // Strikte collision radius - alleen als vis ECHT de bal raakt
+    const collisionRadius = closestBall.radius + fishSizeNow * 0.5; // Kleine overlap toegestaan
 
-      // Vis wordt energiek en zwemt snel rond de bal
-      const circleAngle = Math.atan2(dy, dx) + Math.PI / 2;
-      f.vx += Math.cos(circleAngle) * 0.3;
-      f.vy += Math.sin(circleAngle) * 0.3;
+    if(dist < collisionRadius) {
+      // VIS RAAKT DE BAL! Geef een flinke duw
+      const pushStrength = 0.7;
+      const pushAngle = Math.atan2(dy, dx);
+
+      // Duw bal weg van vis met momentum van de vis
+      closestBall.vx += Math.cos(pushAngle) * f.speed * pushStrength;
+      closestBall.vy += Math.sin(pushAngle) * f.speed * pushStrength;
+
+      // Vis zwemt energiek rond de bal (cirkel beweging)
+      const circleAngle = pushAngle + Math.PI / 2;
+      f.vx += Math.cos(circleAngle) * 0.5;
+      f.vy += Math.sin(circleAngle) * 0.5;
+
+      // Als vis te diep in bal zit, duw terug
+      const overlap = collisionRadius - dist;
+      if(overlap > fishSizeNow * 0.3) {
+        f.x -= Math.cos(pushAngle) * overlap * 0.5;
+        f.y -= Math.sin(pushAngle) * overlap * 0.5;
+      }
+    } else {
+      // Zwem energiek naar de bal toe
+      steerTowards(f, closestBall.x, closestBall.y, 0.12);
     }
   } else {
     // Geen bal meer - terug naar normaal gedrag
