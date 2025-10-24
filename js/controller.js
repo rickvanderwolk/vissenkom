@@ -26,6 +26,7 @@
         const medicineStatus = document.getElementById('medicineStatus');
         const temperatureStatus = document.getElementById('temperatureStatus');
         const heatingStatus = document.getElementById('heatingStatus');
+        const fishCountStatus = document.getElementById('fishCountStatus');
 
         let reconnectAttempts = 0;
         const maxReconnectAttempts = 10;
@@ -75,6 +76,7 @@
                     reconnectAttempts = 0; // Reset counter on successful connection
                     setConnectionStatus(true);
                     requestStatus();
+                    requestGameState();
                     requestVersion();
                     requestConfig();
                 };
@@ -179,6 +181,10 @@
             sendCommand('getStatus');
         }
 
+        function requestGameState() {
+            sendCommand('getGameState');
+        }
+
         function requestVersion() {
             sendCommand('getVersion');
         }
@@ -197,6 +203,9 @@
                     break;
                 case 'medicineCooldown':
                     updateMedicineStatus(message.data);
+                    break;
+                case 'gameState':
+                    updateFishCount(message.data);
                     break;
                 case 'version':
                     document.getElementById('versionNumber').textContent = message.version;
@@ -380,6 +389,14 @@
                 const timeText = ageLabelMS(cooldownData.timeLeft);
                 medicineStatus.textContent = `Over ${timeText}`;
                 medicineStatus.style.color = '#ff9800';
+            }
+        }
+
+        function updateFishCount(gameData) {
+            if (gameData && gameData.fishes) {
+                const fishCount = gameData.fishes.length;
+                fishCountStatus.textContent = `${fishCount} 🐟`;
+                fishCountStatus.style.color = '#e9f1f7';
             }
         }
 
