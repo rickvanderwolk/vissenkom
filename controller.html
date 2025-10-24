@@ -34,10 +34,6 @@
                 <span class="tab-icon">🧹</span>
                 <span class="tab-label">Onderhoud</span>
             </button>
-            <button class="tab-button" data-tab="status">
-                <span class="tab-icon">📊</span>
-                <span class="tab-label">Status</span>
-            </button>
             <button class="tab-button" data-tab="fish">
                 <span class="tab-icon">🐟</span>
                 <span class="tab-label">Vissen</span>
@@ -49,6 +45,21 @@
             <!-- Care Tab -->
             <div class="tab-panel active" data-panel="care">
                 <div class="category-section">
+                    <div class="tab-status-display">
+                        <div class="status-item">
+                            <div>Voeren</div>
+                            <div id="feedStatus">-</div>
+                        </div>
+                        <div class="status-item">
+                            <div>Medicijn</div>
+                            <div id="medicineStatus">-</div>
+                        </div>
+                        <div class="status-item">
+                            <div>Zieke vissen</div>
+                            <div id="sickFishStatus">-</div>
+                        </div>
+                    </div>
+
                     <div class="controls-grid">
                         <button id="feedBtn" class="control-button care-button" disabled>
                             🍤 Voeren
@@ -68,6 +79,21 @@
             <!-- Tank Tab -->
             <div class="tab-panel" data-panel="tank">
                 <div class="category-section">
+                    <div class="tab-status-display">
+                        <div class="status-item">
+                            <div>Licht</div>
+                            <div id="lightStatus">-</div>
+                        </div>
+                        <div class="status-item">
+                            <div>Disco</div>
+                            <div id="discoStatus">-</div>
+                        </div>
+                        <div class="status-item">
+                            <div>Pomp</div>
+                            <div id="pumpStatus">-</div>
+                        </div>
+                    </div>
+
                     <div class="controls-grid">
                         <button id="lightBtn" class="control-button tank-button" disabled>
                             🌙 Licht uit
@@ -87,6 +113,13 @@
             <!-- Maintenance Tab -->
             <div class="tab-panel" data-panel="maintenance">
                 <div class="category-section">
+                    <div class="tab-status-display">
+                        <div class="status-item">
+                            <div>Water</div>
+                            <div id="waterStatus">-</div>
+                        </div>
+                    </div>
+
                     <div class="controls-grid">
                         <button id="cleanBtn" class="control-button maintenance-button" disabled>
                             🧹 Schoonmaken
@@ -95,42 +128,6 @@
                         <button id="refreshWaterBtn" class="control-button maintenance-button" disabled>
                             💧 Water verversen
                         </button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Status Tab -->
-            <div class="tab-panel" data-panel="status">
-                <div class="status-display">
-                    <div class="status-grid">
-                        <div class="status-item">
-                            <div>Licht</div>
-                            <div id="lightStatus">-</div>
-                        </div>
-                        <div class="status-item">
-                            <div>Disco</div>
-                            <div id="discoStatus">-</div>
-                        </div>
-                        <div class="status-item">
-                            <div>Pomp</div>
-                            <div id="pumpStatus">-</div>
-                        </div>
-                        <div class="status-item">
-                            <div>Voeren</div>
-                            <div id="feedStatus">-</div>
-                        </div>
-                        <div class="status-item">
-                            <div>Water</div>
-                            <div id="waterStatus">-</div>
-                        </div>
-                        <div class="status-item">
-                            <div>Zieke vissen</div>
-                            <div id="sickFishStatus">-</div>
-                        </div>
-                        <div class="status-item">
-                            <div>Medicijn</div>
-                            <div id="medicineStatus">-</div>
-                        </div>
                     </div>
                 </div>
             </div>
