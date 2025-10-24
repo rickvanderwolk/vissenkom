@@ -93,7 +93,9 @@ let appState = {
     lastMedicine: 0, // Last time medicine was added
     medicineCooldown: 24 * 60 * 60 * 1000, // 24 hours in milliseconds
     temperature: 24, // Current water temperature in °C
-    heatingOn: true // Heating thermostat on/off
+    heatingOn: true, // Heating thermostat on/off
+    lastBallAdded: 0, // Last time a play ball was added
+    ballCooldown: 5 * 60 * 1000 // 5 minuten
 };
 
 // Track last broadcasted waterGreenness to avoid unnecessary updates
@@ -334,6 +336,9 @@ function handleCommand(data, fromClient) {
         case 'tapGlass':
             handleTapGlass();
             break;
+        case 'addPlayBall':
+            handleAddPlayBall();
+            break;
         case 'reportPoop':
             handleReportPoop(data.poopCount);
             break;
@@ -350,6 +355,7 @@ function handleCommand(data, fromClient) {
             sendStatusUpdate(fromClient);
             sendFeedCooldownUpdate(fromClient);
             sendMedicineCooldownUpdate(fromClient);
+            sendBallCooldownUpdate(fromClient);
             break;
         case 'getGameState':
             sendGameState(fromClient);
@@ -509,6 +515,33 @@ function handleTapGlass() {
 
     // Broadcast to main app to scare all fish
     broadcastToMainApp({ command: 'tapGlass' });
+}
+
+function handleAddPlayBall() {
+    const now = Date.now();
+
+    // Check cooldown
+    if (now - appState.lastBallAdded < appState.ballCooldown) {
+        console.log('Speelbal nog in cooldown');
+        // Send cooldown status to controllers so they know it's not allowed
+        broadcastBallCooldownUpdate();
+        return;
+    }
+
+    appState.lastBallAdded = now;
+    console.log('🎾 Speelbal toegevoegd!');
+
+    // Log event
+    logEvent('play_ball_added', {
+        timestamp: now
+    });
+
+    // Broadcast to main app to add play ball
+    broadcastToMainApp({ command: 'addPlayBall' });
+
+    // Broadcast cooldown update to all controllers
+    broadcastBallCooldownUpdate();
+    saveState();
 }
 
 function handleAddMedicine() {
@@ -757,6 +790,29 @@ function sendMedicineCooldownUpdate(client) {
             canAddMedicine,
             timeLeft,
             lastMedicine: appState.lastMedicine
+        }
+    };
+
+    sendToClient(client, cooldownMessage);
+}
+
+function broadcastBallCooldownUpdate() {
+    controllers.forEach(client => {
+        sendBallCooldownUpdate(client);
+    });
+}
+
+function sendBallCooldownUpdate(client) {
+    const now = Date.now();
+    const timeLeft = Math.max(0, appState.ballCooldown - (now - appState.lastBallAdded));
+    const canAddBall = timeLeft <= 0;
+
+    const cooldownMessage = {
+        type: 'ballCooldown',
+        data: {
+            canAddBall,
+            timeLeft,
+            lastBallAdded: appState.lastBallAdded
         }
     };
 

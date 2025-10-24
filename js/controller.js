@@ -5,6 +5,7 @@
         // Client-side cooldown tracking
         let feedCooldownEndTime = 0;
         let medicineCooldownEndTime = 0;
+        let ballCooldownEndTime = 0;
 
         // DOM elements
         const feedBtn = document.getElementById('feedBtn');
@@ -18,6 +19,7 @@
         const addFishBtn = document.getElementById('addFishBtn');
         const fishNameInput = document.getElementById('fishNameInput');
         const heatingBtn = document.getElementById('heatingBtn');
+        const playBallBtn = document.getElementById('playBallBtn');
 
         // Status displays
         const lightStatus = document.getElementById('lightStatus');
@@ -31,6 +33,7 @@
         const temperatureStatus = document.getElementById('temperatureStatus');
         const heatingStatus = document.getElementById('heatingStatus');
         const fishCountStatus = document.getElementById('fishCountStatus');
+        const ballStatus = document.getElementById('ballStatus');
 
 
         function connectWebSocket() {
@@ -160,7 +163,7 @@
             isConnected = connected;
 
             // Enable/disable controls based on connection
-            const controls = [feedBtn, lightBtn, discoBtn, pumpBtn, cleanBtn, refreshWaterBtn, tapGlassBtn, medicineBtn, addFishBtn, fishNameInput, heatingBtn];
+            const controls = [feedBtn, lightBtn, discoBtn, pumpBtn, cleanBtn, refreshWaterBtn, tapGlassBtn, medicineBtn, addFishBtn, fishNameInput, heatingBtn, playBallBtn];
             controls.forEach(control => {
                 if (control) {
                     control.disabled = !connected;
@@ -262,6 +265,9 @@
                     break;
                 case 'medicineCooldown':
                     updateMedicineStatus(message.data);
+                    break;
+                case 'ballCooldown':
+                    updateBallStatus(message.data);
                     break;
                 case 'gameState':
                     updateFishCount(message.data);
@@ -468,6 +474,24 @@
             }
         }
 
+        function updateBallStatus(cooldownData) {
+            // Set the end time for client-side countdown
+            if (cooldownData.canAddBall) {
+                ballCooldownEndTime = 0; // Clear cooldown
+                playBallBtn.disabled = false;
+                ballStatus.textContent = '✅ Beschikbaar';
+                ballStatus.style.color = '#4ecdc4';
+            } else {
+                // Calculate end time based on lastBallAdded + cooldown duration
+                ballCooldownEndTime = cooldownData.lastBallAdded + (5 * 60 * 1000); // 5 minuten
+                // Initial display will be updated by the countdown timer
+                playBallBtn.disabled = true;
+                const timeText = ageLabelMS(cooldownData.timeLeft);
+                ballStatus.textContent = `Kan over ${timeText}`;
+                ballStatus.style.color = '#ff9800';
+            }
+        }
+
         function updateFishCount(gameData) {
             if (gameData && gameData.fishes) {
                 const fishCount = gameData.fishes.length;
@@ -548,6 +572,7 @@
         tapGlassBtn.addEventListener('click', () => sendCommand('tapGlass'));
         medicineBtn.addEventListener('click', () => sendCommand('addMedicine'));
         heatingBtn.addEventListener('click', () => sendCommand('toggleHeating'));
+        playBallBtn.addEventListener('click', () => sendCommand('addPlayBall'));
 
         addFishBtn.addEventListener('click', () => {
             const name = fishNameInput.value.trim();
@@ -681,6 +706,25 @@
                     medicineBtn.disabled = false;
                     medicineStatus.textContent = '✅ Beschikbaar';
                     medicineStatus.style.color = '#4ecdc4';
+                }
+            }
+
+            // Ball cooldown countdown
+            if (ballCooldownEndTime > 0) {
+                const now = Date.now();
+                const timeLeft = Math.max(0, ballCooldownEndTime - now);
+
+                if (timeLeft > 0) {
+                    playBallBtn.disabled = true;
+                    const timeText = ageLabelMS(timeLeft);
+                    ballStatus.textContent = `Kan over ${timeText}`;
+                    ballStatus.style.color = '#ff9800';
+                } else {
+                    // Cooldown ended
+                    ballCooldownEndTime = 0;
+                    playBallBtn.disabled = false;
+                    ballStatus.textContent = '✅ Beschikbaar';
+                    ballStatus.style.color = '#4ecdc4';
                 }
             }
         }, 100); // Update every 100ms for smooth countdown

@@ -75,6 +75,7 @@ const DAY_MIN=2*24*60;const DAY=DAY_MIN*60*1000;const FEED_CD=60*60*1000;
 const BG='#083042';const BG_NIGHT='#04121a';
 const fishes=[];const foods=[];const deadLog=[];const bubbles=[];const poops=[];
 const plants=[];const decorations=[];const stars=[];const particles=[];const algenParticles=[];
+const playBalls=[]; // Speelballen voor vissen
 let recentActivity=[];
 let lastFed=0;let fishCounter=1;let lastT=Date.now();let TOP_N=3;
 let lightsOn=true;let discoOn=false;let pumpOn=false;const pumpPos={x:0,y:0};let pumpJustOnUntil=0;
@@ -687,6 +688,137 @@ function drawPoops(){
   }
 }
 
+// Speelbal functies
+function makePlayBall(){
+  const ball = {
+    x: rand(100, W-100),
+    y: rand(50, H/2), // Start in bovenste helft
+    vx: rand(-1, 1),
+    vy: 0,
+    radius: 50, // Veel groter! (was 15, toen 25, nu 50)
+    ttl: 3600, // 60 seconden bij 60fps
+    bounceDamping: 0.7, // Energie verlies bij bounce
+    gravity: 0.08, // Drijvende bal (lichte gravity)
+    buoyancy: 0.12 // Opwaartse kracht (hoger dan gravity = drijven)
+  };
+  playBalls.push(ball);
+  console.log('🎾 Speelbal toegevoegd! Vissen gaan ermee spelen!');
+
+  // Maak 2-3 random vissen enthousiast om te spelen
+  const numPlayingFish = Math.floor(rand(2, 4)); // 2 of 3 vissen
+  const availableFish = [...fishes]; // Kopieer array
+
+  for(let i = 0; i < numPlayingFish && availableFish.length > 0; i++) {
+    // Kies random vis
+    const randomIndex = Math.floor(Math.random() * availableFish.length);
+    const fish = availableFish[randomIndex];
+
+    // Zet vis in playing mode
+    fish.behaviorState = 'playing';
+    fish.behaviorTimer = Math.floor(rand(600, 1200)); // Speel 10-20 seconden
+
+    // Verwijder uit beschikbare vissen
+    availableFish.splice(randomIndex, 1);
+  }
+}
+
+function updatePlayBalls(){
+  for(let i = playBalls.length - 1; i >= 0; i--){
+    const ball = playBalls[i];
+
+    // Physics: buoyancy (drijven) vs gravity
+    ball.vy += ball.gravity - ball.buoyancy;
+
+    // Update positie
+    ball.x += ball.vx;
+    ball.y += ball.vy;
+
+    // Friction in water
+    ball.vx *= 0.98;
+    ball.vy *= 0.98;
+
+    // Bounce tegen wanden (links/rechts)
+    if(ball.x - ball.radius < 0){
+      ball.x = ball.radius;
+      ball.vx = -ball.vx * ball.bounceDamping;
+    }
+    if(ball.x + ball.radius > W){
+      ball.x = W - ball.radius;
+      ball.vx = -ball.vx * ball.bounceDamping;
+    }
+
+    // Bounce tegen bovenkant
+    if(ball.y - ball.radius < 0){
+      ball.y = ball.radius;
+      ball.vy = -ball.vy * ball.bounceDamping;
+    }
+
+    // Bounce tegen onderkant (bodem)
+    if(ball.y + ball.radius > H - 20){
+      ball.y = H - 20 - ball.radius;
+      ball.vy = -ball.vy * ball.bounceDamping;
+    }
+
+    // TTL countdown
+    ball.ttl--;
+    if(ball.ttl <= 0){
+      playBalls.splice(i, 1);
+      console.log('🎾 Speelbal is verdwenen');
+    }
+  }
+}
+
+function drawPlayBalls(){
+  for(const ball of playBalls){
+    // Schaduw effect
+    ctx.globalAlpha = 0.3;
+    ctx.fillStyle = '#000';
+    ctx.beginPath();
+    ctx.arc(ball.x + 3, ball.y + 3, ball.radius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+
+    // Hoofdbal - gradient voor 3D effect
+    const gradient = ctx.createRadialGradient(
+      ball.x - ball.radius/3,
+      ball.y - ball.radius/3,
+      ball.radius/4,
+      ball.x,
+      ball.y,
+      ball.radius
+    );
+    gradient.addColorStop(0, '#ff6b9d'); // Lichtroze
+    gradient.addColorStop(0.5, '#ff1493'); // Magenta
+    gradient.addColorStop(1, '#c71585'); // Donker magenta
+
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Witte glans voor shiny effect
+    ctx.globalAlpha = lightsOn ? 0.6 : 0.3;
+    ctx.fillStyle = '#fff';
+    ctx.beginPath();
+    ctx.arc(ball.x - ball.radius/3, ball.y - ball.radius/3, ball.radius/3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+
+    // Fade out effect in laatste seconden
+    if(ball.ttl < 120){ // Laatste 2 seconden
+      ctx.globalAlpha = ball.ttl / 120;
+      ctx.strokeStyle = '#ff6b9d';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([5, 5]);
+      ctx.beginPath();
+      ctx.arc(ball.x, ball.y, ball.radius + 5, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.globalAlpha = 1;
+    }
+  }
+}
+
 function drawPlant(plant,time){
   const lightMul=lightsOn?1:0.6;
   // Heel subtiele sway voor meer leven
@@ -1137,6 +1269,7 @@ function getBehaviorEmoji(behaviorState, fish) {
     case 'floating': return '🎈';
     case 'hunting': return '🎯';
     case 'scared': return '😱';
+    case 'playing': return '🎾';
     case 'normal':
     default: return '🐟';
   }
@@ -1617,6 +1750,49 @@ function handleScared(f) {
   }
 }
 
+function handlePlaying(f) {
+  // Vis speelt met de bal - zoekt dichtsbijzijnde bal
+  let closestBall = null;
+  let closestDist = Infinity;
+
+  for(const ball of playBalls) {
+    const dx = ball.x - f.x;
+    const dy = ball.y - f.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+
+    if(dist < closestDist) {
+      closestDist = dist;
+      closestBall = ball;
+    }
+  }
+
+  if(closestBall) {
+    // Zwem naar de bal
+    steerTowards(f, closestBall.x, closestBall.y, 0.08);
+
+    // Als dichtbij genoeg, "duw" de bal
+    const dx = closestBall.x - f.x;
+    const dy = closestBall.y - f.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+
+    if(dist < closestBall.radius + fishSize(f, Date.now())) {
+      // Geef bal een "duw" in de richting van de vis movement
+      const pushStrength = 0.4;
+      closestBall.vx += f.vx * pushStrength;
+      closestBall.vy += f.vy * pushStrength;
+
+      // Vis wordt energiek en zwemt snel rond de bal
+      const circleAngle = Math.atan2(dy, dx) + Math.PI / 2;
+      f.vx += Math.cos(circleAngle) * 0.3;
+      f.vy += Math.sin(circleAngle) * 0.3;
+    }
+  } else {
+    // Geen bal meer - terug naar normaal gedrag
+    f.behaviorState = 'normal';
+    f.behaviorTimer = 0;
+  }
+}
+
 function updateFish(f,dt,now){
   let target=null;let best=1e9;for(const p of foods){const d=(p.x-f.x)**2+(p.y-f.y)**2;if(d<best){best=d;target=p}}
   const hp=healthPct(f,now);
@@ -1642,6 +1818,30 @@ function updateFish(f,dt,now){
       f.behaviorState = 'normal';
       f.behaviorTimer = 0;
       f.wallFollowTarget = null;
+    }
+  }
+  // Medium-High priority: play with ball (if available and fish is interested)
+  else if(playBalls.length > 0 && Math.random() < 0.7) {
+    // 70% chance vis is geïnteresseerd in bal als er een is (was 40%)
+    // Zoek dichtsbijzijnde bal
+    let closestBall = null;
+    let closestDist = Infinity;
+    for(const ball of playBalls) {
+      const dx = ball.x - f.x;
+      const dy = ball.y - f.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if(dist < closestDist) {
+        closestDist = dist;
+        closestBall = ball;
+      }
+    }
+
+    // Als bal dichtbij genoeg, ga spelen
+    if(closestBall && closestDist < 400) { // Binnen 400px (was 200px)
+      if(f.behaviorState !== 'playing') {
+        f.behaviorState = 'playing';
+        f.behaviorTimer = Math.floor(rand(300, 600)); // Speel 5-10 seconden
+      }
     }
   }
   // Medium priority: pump attraction (existing behavior)
@@ -1803,6 +2003,9 @@ function updateFish(f,dt,now){
         break;
       case 'scared':
         handleScared(f);
+        break;
+      case 'playing':
+        handlePlaying(f);
         break;
       case 'normal':
       default:
@@ -2394,6 +2597,9 @@ function handleRemoteCommand(data) {
                 case 'tapGlass':
                     tapGlass();
                     break;
+                case 'addPlayBall':
+                    makePlayBall();
+                    break;
                 case 'addMedicine':
                     console.log('💊 Medicine added - fish will recover');
                     // No visual action needed, server handles the logic
@@ -2681,6 +2887,9 @@ for(let i=0;i<fishes.length;i++){
   }
   drawFish(f,t,now);
 }
+
+// Play balls - update and draw (above fish, below front plants)
+updatePlayBalls();drawPlayBalls();
 
 // Foreground layer
 for(let i=0;i<frontPlants.length;i++){drawPlant(frontPlants[i],t)}
