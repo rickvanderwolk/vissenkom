@@ -690,16 +690,29 @@ function drawPoops(){
 
 // Speelbal functies
 function makePlayBall(){
+  // Random kleur kiezen
+  const ballColors = [
+    { light: '#ff6b9d', mid: '#ff1493', dark: '#c71585' }, // Magenta/Roze
+    { light: '#4ecdc4', mid: '#2eb8b0', dark: '#1a8a85' }, // Turquoise
+    { light: '#ffd93d', mid: '#ffb700', dark: '#e89e00' }, // Geel
+    { light: '#6bcf7f', mid: '#3ecf5c', dark: '#2db84b' }, // Groen
+    { light: '#ff9f6b', mid: '#ff7043', dark: '#e64a19' }, // Oranje
+    { light: '#9d6bff', mid: '#7c4dff', dark: '#5e35b1' }, // Paars
+    { light: '#6bb8ff', mid: '#4a90e2', dark: '#357abd' }  // Blauw
+  ];
+  const randomColor = ballColors[Math.floor(Math.random() * ballColors.length)];
+
   const ball = {
     x: rand(100, W-100),
     y: rand(50, H/2), // Start in bovenste helft
     vx: rand(-1, 1),
     vy: 0,
-    radius: 50, // Veel groter! (was 15, toen 25, nu 50)
+    radius: 100, // NOG VEEL GROTER! (was 50, nu 100 - 2x zo groot!)
     ttl: 3600, // 60 seconden bij 60fps
     bounceDamping: 0.7, // Energie verlies bij bounce
     gravity: 0.08, // Drijvende bal (lichte gravity)
-    buoyancy: 0.12 // Opwaartse kracht (hoger dan gravity = drijven)
+    buoyancy: 0.12, // Opwaartse kracht (hoger dan gravity = drijven)
+    color: randomColor // Random kleur voor deze bal
   };
   playBalls.push(ball);
   console.log('🎾 Speelbal toegevoegd! Vissen gaan ermee spelen!');
@@ -774,11 +787,11 @@ function drawPlayBalls(){
     ctx.globalAlpha = 0.3;
     ctx.fillStyle = '#000';
     ctx.beginPath();
-    ctx.arc(ball.x + 3, ball.y + 3, ball.radius, 0, Math.PI * 2);
+    ctx.arc(ball.x + 5, ball.y + 5, ball.radius, 0, Math.PI * 2);
     ctx.fill();
     ctx.globalAlpha = 1;
 
-    // Hoofdbal - gradient voor 3D effect
+    // Hoofdbal - gradient voor 3D effect met random kleur
     const gradient = ctx.createRadialGradient(
       ball.x - ball.radius/3,
       ball.y - ball.radius/3,
@@ -787,9 +800,9 @@ function drawPlayBalls(){
       ball.y,
       ball.radius
     );
-    gradient.addColorStop(0, '#ff6b9d'); // Lichtroze
-    gradient.addColorStop(0.5, '#ff1493'); // Magenta
-    gradient.addColorStop(1, '#c71585'); // Donker magenta
+    gradient.addColorStop(0, ball.color.light); // Lichte kleur
+    gradient.addColorStop(0.5, ball.color.mid); // Middel kleur
+    gradient.addColorStop(1, ball.color.dark); // Donkere kleur
 
     ctx.fillStyle = gradient;
     ctx.beginPath();
@@ -807,11 +820,11 @@ function drawPlayBalls(){
     // Fade out effect in laatste seconden
     if(ball.ttl < 120){ // Laatste 2 seconden
       ctx.globalAlpha = ball.ttl / 120;
-      ctx.strokeStyle = '#ff6b9d';
-      ctx.lineWidth = 2;
-      ctx.setLineDash([5, 5]);
+      ctx.strokeStyle = ball.color.light;
+      ctx.lineWidth = 3;
+      ctx.setLineDash([8, 8]);
       ctx.beginPath();
-      ctx.arc(ball.x, ball.y, ball.radius + 5, 0, Math.PI * 2);
+      ctx.arc(ball.x, ball.y, ball.radius + 8, 0, Math.PI * 2);
       ctx.stroke();
       ctx.setLineDash([]);
       ctx.globalAlpha = 1;
