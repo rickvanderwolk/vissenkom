@@ -183,13 +183,23 @@ function logEvent(type, data = {}) {
     eventLog.push(event);
     console.log(`Event gelogd: ${type}`, data);
 
-    // Keep only last 1000 events to prevent file from growing too large
-    if (eventLog.length > 1000) {
-        eventLog = eventLog.slice(-1000);
-    }
-
     // Save immediately for important events
     saveEventLog();
+
+    // Broadcast updated activity list to all main apps
+    broadcastRecentActivity();
+}
+
+function broadcastRecentActivity() {
+    const recentEvents = eventLog.slice(-9);
+    const activityMessage = {
+        type: 'recentActivity',
+        events: recentEvents
+    };
+
+    mainApps.forEach(client => {
+        sendToClient(client, activityMessage);
+    });
 }
 
 // Connected clients - separate controllers from main app
@@ -340,6 +350,9 @@ function handleCommand(data, fromClient) {
             break;
         case 'getConfig':
             sendToClient(fromClient, { type: 'config', config: config });
+            break;
+        case 'getRecentActivity':
+            sendRecentActivity(fromClient);
             break;
         default:
             console.log('Onbekend commando:', data.command);
@@ -753,6 +766,16 @@ function broadcastNewAccessCode() {
     mainApps.forEach(client => {
         sendToClient(client, accessCodeMessage);
     });
+}
+
+function sendRecentActivity(client) {
+    const recentEvents = eventLog.slice(-9);
+    const activityMessage = {
+        type: 'recentActivity',
+        events: recentEvents
+    };
+
+    sendToClient(client, activityMessage);
 }
 
 // Update feed cooldown every second

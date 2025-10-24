@@ -71,7 +71,8 @@ const DAY_MIN=2*24*60;const DAY=DAY_MIN*60*1000;const FEED_CD=60*60*1000;
 const BG='#083042';const BG_NIGHT='#04121a';
 const fishes=[];const foods=[];const deadLog=[];const bubbles=[];const poops=[];
 const plants=[];const decorations=[];const stars=[];const particles=[];const algenParticles=[];
-let lastFed=0;let fishCounter=1;let lastT=Date.now();let TOP_N=5;
+let recentActivity=[];
+let lastFed=0;let fishCounter=1;let lastT=Date.now();let TOP_N=3;
 let lightsOn=true;let discoOn=false;let pumpOn=false;const pumpPos={x:0,y:0};let pumpJustOnUntil=0;
 let waterGreenness=0;let waterGreennessTarget=0;
 
@@ -1934,6 +1935,94 @@ function drawLists(){
   newest.forEach((f,i)=>newestListEl.appendChild(fmtItem(i+1,`${f.name} · ${ageLabelMS(now-f.bornAt)} geleden geboren`)));
 }
 
+function drawActivityList(){
+  const now=Date.now();
+  const activityListEl=document.getElementById('activityList');
+  const activityPanelEl=document.getElementById('activityPanel');
+  if(!activityListEl||!activityPanelEl)return;
+
+  function fmtActivityItem(idx,emoji,label){
+    const d=document.createElement('div');
+    d.className='item';
+    const b=document.createElement('span');
+    b.className='label';
+    b.textContent=emoji;
+    d.appendChild(b);
+    d.appendChild(document.createTextNode(' '+label));
+    return d;
+  }
+
+  activityListEl.innerHTML='';
+
+  if(recentActivity.length===0){
+    activityPanelEl.style.display='none';
+    return;
+  }
+
+  activityPanelEl.style.display='block';
+
+  // Process events in reverse order (newest first)
+  const eventsToShow=recentActivity.slice().reverse();
+
+  eventsToShow.forEach((event,i)=>{
+    const ago=now-event.timestamp;
+    const timeStr=ageLabelMS(ago)+' geleden';
+    let emoji='';
+    let label='';
+
+    switch(event.type){
+      case 'feed':
+        emoji='🍤';
+        label=`Gevoerd · ${timeStr}`;
+        break;
+      case 'fish_added':
+        emoji='🐟';
+        label=`${event.data.name} toegevoegd · ${timeStr}`;
+        break;
+      case 'fish_died':
+        emoji='💀';
+        label=`${event.data.name} overleden · ${timeStr}`;
+        break;
+      case 'glass_tapped':
+        emoji='👆';
+        label=`Op kom getikt · ${timeStr}`;
+        break;
+      case 'tank_cleaned':
+        emoji='💩';
+        label=`Kom schoongemaakt · ${timeStr}`;
+        break;
+      case 'water_refreshed':
+        emoji='💧';
+        label=`Water ververst · ${timeStr}`;
+        break;
+      case 'medicine_added':
+        emoji='💊';
+        label=`Medicijn gegeven · ${timeStr}`;
+        break;
+      case 'light_toggle':
+        emoji='💡';
+        const lightState=event.data.state||'aan';
+        label=`Licht ${lightState} · ${timeStr}`;
+        break;
+      case 'disco_toggle':
+        emoji='🎉';
+        const discoState=event.data.state||'aan';
+        label=`Disco ${discoState} · ${timeStr}`;
+        break;
+      case 'pump_toggle':
+        emoji='💨';
+        const pumpState=event.data.state||'aan';
+        label=`Pomp ${pumpState} · ${timeStr}`;
+        break;
+      default:
+        emoji='📝';
+        label=`${event.type} · ${timeStr}`;
+    }
+
+    activityListEl.appendChild(fmtActivityItem(i+1,emoji,label));
+  });
+}
+
 function drawQR(){
   const el=document.getElementById('qr');
 
@@ -2052,6 +2141,8 @@ function initWebSocket() {
             ws.send(JSON.stringify({ command: 'getVersion' }));
             // Request config for viewport settings
             ws.send(JSON.stringify({ command: 'getConfig' }));
+            // Request recent activity for activity list
+            ws.send(JSON.stringify({ command: 'getRecentActivity' }));
         };
 
         ws.onmessage = function(event) {
@@ -2125,6 +2216,11 @@ function handleRemoteCommand(data) {
                 document.getElementById('versionNumber').textContent = data.version;
                 console.log('✅ Huidige versie:', currentVersion);
             }
+            break;
+        case 'recentActivity':
+            console.log('🕐 Received recent activity:', data.events.length, 'events');
+            recentActivity = data.events || [];
+            drawActivityList();
             break;
         default:
             // Handle regular commands
@@ -2211,6 +2307,7 @@ function loadGameState(state) {
     updatePumpUI();
     updateCooldown();
     drawLists();
+    drawActivityList();
 
     console.log(`Geladen: ${fishes.length} vissen, ${deadLog.length} overleden vissen`);
 
@@ -2376,7 +2473,7 @@ function regenerateDecor(){
   console.log('Nieuwe decoratie gegenereerd!');
 }
 
-function init(){document.getElementById('tank').style.background=BG;document.body.classList.add('dark');document.body.classList.remove('light');lightsOn=true;resize();updateCooldown();drawLists();initWebSocket()}
+function init(){document.getElementById('tank').style.background=BG;document.body.classList.add('dark');document.body.classList.remove('light');lightsOn=true;resize();updateCooldown();drawLists();drawActivityList();initWebSocket()}
 init();
 
 let t=0;let lastListUpdate=0;let lastCooldownUpdate=0;let lastDecorUpdate=0;
@@ -2437,7 +2534,7 @@ ctx.restore();
 
 for(let i=fishes.length-1;i>=0;i--){if(fishes[i].dead){const deadFish={name:fishes[i].name,bornAt:fishes[i].bornAt,diedAt:Date.now()};deadLog.push(deadFish);fishes.splice(i,1);if(ws && ws.readyState === WebSocket.OPEN){ws.send(JSON.stringify({command:'fishDied',fish:deadFish}))}}}
 
-if(now-lastListUpdate>LIST_UPDATE_INTERVAL){drawLists();lastListUpdate=now}
+if(now-lastListUpdate>LIST_UPDATE_INTERVAL){drawLists();drawActivityList();lastListUpdate=now}
 if(now-lastCooldownUpdate>COOLDOWN_UPDATE_INTERVAL){updateCooldown();lastCooldownUpdate=now}
 
 // Handle decoratie fade system
