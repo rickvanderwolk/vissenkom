@@ -2001,7 +2001,7 @@ function drawLists(){
 
   // Newest list
   const newest=[...fishes].sort((a,b)=>b.bornAt-a.bornAt).slice(0,TOP_N);
-  const newestItems=newest.map((f,i)=>({idx:i+1,label:`${f.name} · ${ageLabelMS(now-f.bornAt)} geleden geboren`}));
+  const newestItems=newest.map((f,i)=>({idx:i+1,label:`${f.name} · ${ageLabelMS(now-f.bornAt)}`}));
   updateListItems(newestListEl,newestItems);
 }
 

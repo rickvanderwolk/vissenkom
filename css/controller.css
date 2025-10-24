@@ -143,13 +143,18 @@
             border: 2px solid transparent;
         }
 
-        .control-button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(80, 227, 194, 0.4);
+        /* Hover only on devices that support it (not touch screens) */
+        @media (hover: hover) and (pointer: fine) {
+            .control-button:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 8px 25px rgba(80, 227, 194, 0.4);
+            }
         }
 
         .control-button:active {
-            transform: translateY(0);
+            transform: translateY(1px) !important;
+            box-shadow: 0 2px 8px rgba(80, 227, 194, 0.3) !important;
+            transition: all 0.05s ease !important;
         }
 
         .control-button:disabled {
@@ -172,8 +177,11 @@
             transition: left 0.5s;
         }
 
-        .control-button:hover::before {
-            left: 100%;
+        /* Shimmer effect only on hover-capable devices */
+        @media (hover: hover) and (pointer: fine) {
+            .control-button:hover::before {
+                left: 100%;
+            }
         }
 
         .status-display {
@@ -566,8 +574,10 @@
             box-shadow: 0 4px 16px rgba(62, 207, 92, 0.4), 0 2px 8px rgba(0, 0, 0, 0.2) !important;
         }
 
-        .care-button:hover {
-            box-shadow: 0 6px 24px rgba(62, 207, 92, 0.5), 0 3px 10px rgba(0, 0, 0, 0.25) !important;
+        @media (hover: hover) and (pointer: fine) {
+            .care-button:hover {
+                box-shadow: 0 6px 24px rgba(62, 207, 92, 0.5), 0 3px 10px rgba(0, 0, 0, 0.25) !important;
+            }
         }
 
         .care-button:disabled {
@@ -579,8 +589,10 @@
             box-shadow: 0 4px 16px rgba(74, 144, 226, 0.4), 0 2px 8px rgba(0, 0, 0, 0.2) !important;
         }
 
-        .tank-button:hover {
-            box-shadow: 0 6px 24px rgba(74, 144, 226, 0.5), 0 3px 10px rgba(0, 0, 0, 0.25) !important;
+        @media (hover: hover) and (pointer: fine) {
+            .tank-button:hover {
+                box-shadow: 0 6px 24px rgba(74, 144, 226, 0.5), 0 3px 10px rgba(0, 0, 0, 0.25) !important;
+            }
         }
 
         .tank-button:disabled {
@@ -592,8 +604,10 @@
             box-shadow: 0 4px 16px rgba(255, 159, 67, 0.4), 0 2px 8px rgba(0, 0, 0, 0.2) !important;
         }
 
-        .fish-button:hover {
-            box-shadow: 0 6px 24px rgba(255, 159, 67, 0.5), 0 3px 10px rgba(0, 0, 0, 0.25) !important;
+        @media (hover: hover) and (pointer: fine) {
+            .fish-button:hover {
+                box-shadow: 0 6px 24px rgba(255, 159, 67, 0.5), 0 3px 10px rgba(0, 0, 0, 0.25) !important;
+            }
         }
 
         .fish-button:disabled {
@@ -606,8 +620,10 @@
             box-shadow: 0 4px 16px rgba(243, 156, 18, 0.4), 0 2px 8px rgba(0, 0, 0, 0.2) !important;
         }
 
-        .maintenance-button:hover {
-            box-shadow: 0 6px 24px rgba(243, 156, 18, 0.5), 0 3px 10px rgba(0, 0, 0, 0.25) !important;
+        @media (hover: hover) and (pointer: fine) {
+            .maintenance-button:hover {
+                box-shadow: 0 6px 24px rgba(243, 156, 18, 0.5), 0 3px 10px rgba(0, 0, 0, 0.25) !important;
+            }
         }
 
         .maintenance-button:disabled {

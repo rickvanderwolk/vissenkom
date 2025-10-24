@@ -14,6 +14,7 @@ body.light .panel{background:rgba(255,255,255,.7)}
 .panel h4{margin:0 0 6px 0;font-size:12px;letter-spacing:.2px;opacity:.95}
 .item{font-size:12px;display:flex;gap:6px;align-items:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .label{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:999px;background:#ffe066;color:#0b1e2d;font-weight:900;font-size:11px;flex:0 0 auto}
+#activityList .label{width:auto;height:auto;border-radius:0;background:none;color:inherit;font-size:14px}
 .statusbar{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);display:flex;gap:6px;z-index:4;flex-wrap:wrap;align-items:center;justify-content:center;font-size:12px}
 .pill{background:rgba(0,0,0,.35);backdrop-filter:blur(6px);padding:4px 8px;border-radius:999px;font-weight:600}
 body.light .pill{background:rgba(255,255,255,.7);color:#0b1e2d}

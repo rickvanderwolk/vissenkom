@@ -283,7 +283,7 @@
         }
 
         function updateStatus(status) {
-            lightStatus.textContent = status.lightsOn ? '💡 Aan' : '🌙 Uit';
+            lightStatus.textContent = status.lightsOn ? '💡 Aan' : 'Uit';
             lightStatus.style.color = status.lightsOn ? '#e9f1f7' : '#999';
 
             discoStatus.textContent = status.discoOn ? '🎉 Aan' : 'Uit';
@@ -347,13 +347,13 @@
             const tempRounded = Math.round(temp);
 
             if (temp >= 22 && temp <= 26) {
-                temperatureStatus.textContent = `${tempRounded}°C ✅`;
+                temperatureStatus.textContent = `✅ ${tempRounded}°C`;
                 temperatureStatus.style.color = '#4ecdc4';  // green
             } else if (temp >= 20 && temp <= 28) {
-                temperatureStatus.textContent = `${tempRounded}°C ⚠️`;
+                temperatureStatus.textContent = `⚠️ ${tempRounded}°C`;
                 temperatureStatus.style.color = '#ffd700';  // yellow
             } else {
-                temperatureStatus.textContent = `${tempRounded}°C ❌`;
+                temperatureStatus.textContent = `❌ ${tempRounded}°C`;
                 temperatureStatus.style.color = '#f44336';  // red
             }
 
@@ -362,8 +362,8 @@
             heatingStatus.style.color = status.heatingOn ? '#e9f1f7' : '#999';
 
             // Update button texts
-            lightBtn.textContent = status.lightsOn ? '🌙 Licht uit' : '☀️ Licht aan';
-            discoBtn.textContent = status.discoOn ? '💡🎉 Disco uit' : '💡🎉 Disco aan';
+            lightBtn.textContent = status.lightsOn ? '💡 Licht uit' : '💡 Licht aan';
+            discoBtn.textContent = status.discoOn ? '🎉 Disco uit' : '🎉 Disco aan';
             pumpBtn.textContent = status.pumpOn ? '💨 Pomp uit' : '💨 Pomp aan';
             heatingBtn.textContent = status.heatingOn ? '🔥 Verwarming uit' : '🔥 Verwarming aan';
 
@@ -410,7 +410,7 @@
                 feedBtn.disabled = true;
                 // Use better time formatting like the main page
                 const timeText = ageLabelMS(cooldownData.timeLeft);
-                feedStatus.textContent = `Over ${timeText}`;
+                feedStatus.textContent = `Kan over ${timeText}`;
                 feedStatus.style.color = '#ff9800';
             }
         }
@@ -424,7 +424,7 @@
                 medicineBtn.disabled = true;
                 // Use better time formatting like the main page
                 const timeText = ageLabelMS(cooldownData.timeLeft);
-                medicineStatus.textContent = `Over ${timeText}`;
+                medicineStatus.textContent = `Kan over ${timeText}`;
                 medicineStatus.style.color = '#ff9800';
             }
         }
@@ -432,7 +432,7 @@
         function updateFishCount(gameData) {
             if (gameData && gameData.fishes) {
                 const fishCount = gameData.fishes.length;
-                fishCountStatus.textContent = `${fishCount} 🐟`;
+                fishCountStatus.textContent = `🐟 ${fishCount}`;
                 fishCountStatus.style.color = '#e9f1f7';
             }
         }
