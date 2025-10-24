@@ -2,7 +2,6 @@
         let isConnected = false;
 
         // DOM elements
-        const connectionStatus = document.getElementById('connectionStatus');
         const feedBtn = document.getElementById('feedBtn');
         const lightBtn = document.getElementById('lightBtn');
         const discoBtn = document.getElementById('discoBtn');
@@ -28,8 +27,6 @@
         const heatingStatus = document.getElementById('heatingStatus');
         const fishCountStatus = document.getElementById('fishCountStatus');
 
-        let reconnectAttempts = 0;
-        const maxReconnectAttempts = 10;
 
         function connectWebSocket() {
             // Get access code from URL
@@ -73,7 +70,6 @@
                 ws.onopen = function() {
                     clearTimeout(connectionTimeout);
                     console.log('Mobile Debug: WebSocket connected successfully');
-                    reconnectAttempts = 0; // Reset counter on successful connection
                     setConnectionStatus(true);
                     requestStatus();
                     requestGameState();
@@ -131,32 +127,15 @@
         }
 
         function scheduleReconnect() {
-            if (reconnectAttempts >= maxReconnectAttempts) {
-                console.error('Mobile Debug: Max reconnection attempts reached');
-                showAccessDenied('Verbinding mislukt na meerdere pogingen. Refresh de pagina.');
-                return;
-            }
-
-            reconnectAttempts++;
-            const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 30000); // Exponential backoff, max 30s
-            console.log(`Mobile Debug: Scheduling reconnect attempt ${reconnectAttempts} in ${delay}ms`);
-
-            setTimeout(connectWebSocket, delay);
+            // Don't auto-reconnect, just show the error screen
+            console.log('Mobile Debug: Connection lost, showing error screen');
+            showConnectingScreen();
         }
 
         function setConnectionStatus(connected) {
             console.log('Mobile Debug: Setting connection status:', connected);
 
             isConnected = connected;
-
-            // Update UI elements
-            if (connectionStatus) {
-                connectionStatus.className = `connection-status ${connected ? 'connected' : 'disconnected'}`;
-                connectionStatus.textContent = `Verbinding: ${connected ? 'Verbonden' : 'Niet verbonden'}`;
-                console.log('Mobile Debug: Updated connection status display');
-            } else {
-                console.error('Mobile Debug: Connection status element not found!');
-            }
 
             // Enable/disable controls based on connection
             const controls = [feedBtn, lightBtn, discoBtn, pumpBtn, cleanBtn, refreshWaterBtn, tapGlassBtn, medicineBtn, addFishBtn, fishNameInput, heatingBtn];
@@ -169,6 +148,64 @@
             });
 
             console.log('Mobile Debug: Controls', connected ? 'enabled' : 'disabled');
+
+            // Show/hide main UI based on connection
+            const container = document.querySelector('.controller-container');
+            if (container) {
+                if (connected) {
+                    container.style.display = 'block';
+                } else {
+                    // Show connecting screen
+                    showConnectingScreen();
+                }
+            }
+        }
+
+        function showConnectingScreen() {
+            const container = document.querySelector('.controller-container');
+            if (!container) return;
+
+            // Hide normal UI
+            container.style.display = 'none';
+
+            // Check if connecting screen already exists
+            let connectingDiv = document.getElementById('connectingScreen');
+            if (!connectingDiv) {
+                connectingDiv = document.createElement('div');
+                connectingDiv.id = 'connectingScreen';
+                connectingDiv.innerHTML = `
+                    <div style="text-align: center; padding: 40px; color: #eb5757;">
+                        <h1>❌ Geen Verbinding</h1>
+                        <p style="font-size: 18px; margin-bottom: 30px;">Kan geen verbinding maken met de vissenkom.</p>
+                        <p style="opacity: 0.8; margin-bottom: 30px;">Controleer of de server draait en probeer opnieuw.</p>
+                        <button onclick="location.reload()" style="
+                            background: #4ecdc4;
+                            color: #0b1e2d;
+                            border: none;
+                            padding: 15px 30px;
+                            font-size: 16px;
+                            border-radius: 8px;
+                            cursor: pointer;
+                            font-weight: bold;
+                        ">🔄 Opnieuw Proberen</button>
+                    </div>
+                `;
+                connectingDiv.style.cssText = `
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    width: 100%;
+                    height: 100%;
+                    background: linear-gradient(135deg, #0b1e2d 0%, #083042 100%);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    z-index: 9999;
+                `;
+                document.body.appendChild(connectingDiv);
+            } else {
+                connectingDiv.style.display = 'flex';
+            }
         }
 
         function sendCommand(command, data = {}) {
@@ -495,7 +532,6 @@
         // Mobile debugging - check DOM elements on startup
         function checkDOMElements() {
             console.log('Mobile Debug: Checking DOM elements...');
-            console.log('Mobile Debug: connectionStatus element:', !!connectionStatus);
             console.log('Mobile Debug: h1 element:', !!document.querySelector('h1'));
             console.log('Mobile Debug: controller-container:', !!document.querySelector('.controller-container'));
             console.log('Mobile Debug: feedBtn:', !!feedBtn);
