@@ -1,5 +1,6 @@
         let ws = null;
         let isConnected = false;
+        let accessDeniedShown = false; // Track if access denied screen is shown
 
         // Client-side cooldown tracking
         let feedCooldownEndTime = 0;
@@ -33,6 +34,9 @@
 
 
         function connectWebSocket() {
+            // Reset access denied flag on new connection attempt
+            accessDeniedShown = false;
+
             // Get access code from URL
             const urlParams = new URLSearchParams(window.location.search);
             const accessCode = urlParams.get('code');
@@ -66,8 +70,11 @@
                     console.error('Mobile Debug: Connection timeout');
                     if (ws.readyState === WebSocket.CONNECTING) {
                         ws.close();
-                        setConnectionStatus(false);
-                        scheduleReconnect();
+                        // Only show connection error if access wasn't denied
+                        if (!accessDeniedShown) {
+                            setConnectionStatus(false);
+                            scheduleReconnect();
+                        }
                     }
                 }, 10000); // 10 second timeout
 
@@ -109,24 +116,35 @@
                 ws.onclose = function(event) {
                     clearTimeout(connectionTimeout);
                     console.log('Mobile Debug: WebSocket closed. Code:', event.code, 'Reason:', event.reason);
-                    setConnectionStatus(false);
 
-                    // Don't reconnect if it was a normal close or access denied
-                    if (event.code !== 1000 && event.code !== 1008) {
-                        scheduleReconnect();
+                    // Don't show connection error if access was denied (that screen takes priority)
+                    if (!accessDeniedShown) {
+                        setConnectionStatus(false);
+
+                        // Don't reconnect if it was a normal close or access denied
+                        if (event.code !== 1000 && event.code !== 1008) {
+                            scheduleReconnect();
+                        }
                     }
                 };
 
                 ws.onerror = function(error) {
                     clearTimeout(connectionTimeout);
                     console.error('Mobile Debug: WebSocket error:', error);
-                    setConnectionStatus(false);
+
+                    // Don't show connection error if access was denied (that screen takes priority)
+                    if (!accessDeniedShown) {
+                        setConnectionStatus(false);
+                    }
                 };
 
             } catch (error) {
                 console.error('Mobile Debug: Exception creating WebSocket:', error);
-                setConnectionStatus(false);
-                scheduleReconnect();
+                // Only show connection error if access wasn't denied
+                if (!accessDeniedShown) {
+                    setConnectionStatus(false);
+                    scheduleReconnect();
+                }
             }
         }
 
@@ -450,6 +468,9 @@
         }
 
         function showAccessDenied(message) {
+            // Set flag to prevent connection error screens from overriding this
+            accessDeniedShown = true;
+
             // Hide all controls
             document.querySelector('.controller-container').style.display = 'none';
 
