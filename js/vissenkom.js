@@ -2086,6 +2086,50 @@ function drawActivityList(){
         const pumpState=event.data.state||'aan';
         label=`Pomp ${pumpState} · ${timeStr}`;
         break;
+      case 'heating_toggle':
+        emoji='🔥';
+        const heatingState=event.data.state||'aan';
+        label=`Verwarming ${heatingState} · ${timeStr}`;
+        break;
+      case 'controller_access':
+        emoji='🎮';
+        label=`Controller verbonden · ${timeStr}`;
+        break;
+      case 'access_code_generated':
+        emoji='🔑';
+        label=`Nieuwe toegangscode · ${timeStr}`;
+        break;
+      case 'water_greenness_milestone':
+        emoji='✨';
+        const percentage=event.data.percentage||0;
+        label=`Water ${percentage}% schoon · ${timeStr}`;
+        break;
+      case 'fish_critical_health':
+        emoji='⚠️';
+        const criticalFishName=event.data.name||'Vis';
+        label=`${criticalFishName} kritieke gezondheid · ${timeStr}`;
+        break;
+      case 'fish_died_disease':
+        emoji='☠️';
+        const diedFishName=event.data.name||'Vis';
+        const cause=event.data.cause==='temperature'?'temperatuur':'ziekte';
+        label=`${diedFishName} overleden (${cause}) · ${timeStr}`;
+        break;
+      case 'fish_recovered':
+        emoji='💚';
+        const recoveredFishName=event.data.name||'Vis';
+        label=`${recoveredFishName} hersteld · ${timeStr}`;
+        break;
+      case 'fish_infected_environment':
+        emoji='🦠';
+        const infectedFishName=event.data.name||'Vis';
+        label=`${infectedFishName} geïnfecteerd (vuil water) · ${timeStr}`;
+        break;
+      case 'fish_infected_contact':
+        emoji='🦠';
+        const contactFishName=event.data.name||'Vis';
+        label=`${contactFishName} geïnfecteerd (contact) · ${timeStr}`;
+        break;
       default:
         emoji='📝';
         label=`${event.type} · ${timeStr}`;
