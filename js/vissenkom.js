@@ -1822,18 +1822,38 @@ function handlePlaying(f) {
     const collisionRadius = closestBall.radius + fishSizeNow * 0.8; // Beetje meer ruimte
 
     if(dist < collisionRadius) {
-      // VIS RAAKT DE BAL! Geef een flinke duw
-      const pushStrength = 0.7;
+      // VIS RAAKT DE BAL!
+      const pushStrength = rand(0.5, 0.9); // Variabele kracht
       const pushAngle = Math.atan2(dy, dx);
 
-      // Duw bal weg van vis met momentum van de vis
-      closestBall.vx += Math.cos(pushAngle) * f.speed * pushStrength;
-      closestBall.vy += Math.sin(pushAngle) * f.speed * pushStrength;
+      // Voeg random afwijking toe aan de hoek (tot 30 graden in elke richting)
+      const angleDeviation = rand(-Math.PI/6, Math.PI/6); // -30° tot +30°
+      const actualPushAngle = pushAngle + angleDeviation;
 
-      // Vis zwemt energiek rond de bal (cirkel beweging)
-      const circleAngle = pushAngle + Math.PI / 2;
-      f.vx += Math.cos(circleAngle) * 0.5;
-      f.vy += Math.sin(circleAngle) * 0.5;
+      // Duw bal weg van vis met momentum van de vis
+      closestBall.vx += Math.cos(actualPushAngle) * f.speed * pushStrength;
+      closestBall.vy += Math.sin(actualPushAngle) * f.speed * pushStrength;
+
+      // Bepaal of vis bal naar BENEDEN of BOVEN wil duwen (1 op 5 kans voor boven)
+      if(!f.ballPushDirection || Math.random() < 0.05) {
+        // Wissel af en toe van richting (5% kans per frame tijdens contact)
+        f.ballPushDirection = Math.random() < 0.2 ? 'up' : 'down'; // 20% wil omhoog, 80% omlaag
+      }
+
+      if(f.ballPushDirection === 'up') {
+        // Rebel vis! Probeert bal naar BOVEN te krijgen
+        const upwardForce = rand(0.3, 0.6);
+        closestBall.vy -= upwardForce; // Negatief = omhoog
+      } else {
+        // Normale vis: probeert bal naar beneden te krijgen
+        const downwardForce = rand(0.4, 0.7);
+        closestBall.vy += downwardForce;
+      }
+
+      // Vis zwemt energiek rond de bal (cirkel beweging met variatie)
+      const circleAngle = pushAngle + rand(Math.PI/3, Math.PI*2/3); // Random tussen 60° en 120°
+      f.vx += Math.cos(circleAngle) * rand(0.3, 0.7);
+      f.vy += Math.sin(circleAngle) * rand(0.3, 0.7);
 
       // Voorkom dat vis te diep in bal komt
       const minDist = closestBall.radius + fishSizeNow * 0.6;
@@ -1843,13 +1863,43 @@ function handlePlaying(f) {
         f.y -= Math.sin(pushAngle) * pushOut;
       }
     } else {
-      // Zwem energiek naar de bal toe
-      steerTowards(f, closestBall.x, closestBall.y, 0.12);
+      // Initialiseer ballPushDirection als die nog niet bestaat
+      if(!f.ballPushDirection) {
+        f.ballPushDirection = Math.random() < 0.2 ? 'up' : 'down';
+      }
+
+      // Bereken doelpositie op basis van voorkeur
+      let targetX, targetY;
+
+      if(f.ballPushDirection === 'up') {
+        // Rebel vis positioneert zich ONDER de bal om naar boven te duwen
+        targetX = closestBall.x + rand(-40, 40); // Wat variatie in x
+        targetY = closestBall.y + closestBall.radius + rand(30, 70); // Onder de bal
+      } else {
+        // Normale vis positioneert zich BOVEN de bal
+        // Voeg random offset toe aan positie (niet allemaal op hetzelfde punt)
+        const xOffset = rand(-60, 60); // Random offset links/rechts
+        const yOffset = rand(-70, -30); // Random hoogte boven bal (tussen 30-70 pixels)
+
+        targetX = closestBall.x + xOffset;
+        targetY = closestBall.y + yOffset;
+
+        // Als bal al diep is, probeer van de zijkant met variatie
+        if(closestBall.y > H - 150) {
+          const side = Math.random() > 0.5 ? 1 : -1;
+          targetX = closestBall.x + side * rand(80, 120);
+          targetY = closestBall.y + rand(-30, 30);
+        }
+      }
+
+      // Zwem energiek naar de doelpositie
+      steerTowards(f, targetX, targetY, 0.12);
     }
   } else {
     // Geen bal meer - terug naar normaal gedrag
     f.behaviorState = 'normal';
     f.behaviorTimer = 0;
+    f.ballPushDirection = undefined; // Reset voorkeur
   }
 }
 
@@ -2551,6 +2601,12 @@ function initWebSocket() {
             ws.send(JSON.stringify({ command: 'getConfig' }));
             // Request recent activity for activity list
             ws.send(JSON.stringify({ command: 'getRecentActivity' }));
+
+            // Sync ball state: report if there is NO ball (to reset server state after refresh)
+            if (playBalls.length === 0) {
+                console.log('🔄 Syncing ball state: no balls present, resetting server state');
+                ws.send(JSON.stringify({ command: 'ballGone' }));
+            }
         };
 
         ws.onmessage = function(event) {
@@ -2889,9 +2945,9 @@ function regenerateDecor(){
   console.log('Nieuwe decoratie gegenereerd!');
 }
 
-let t=0;let lastListUpdate=0;let lastCooldownUpdate=0;let lastDecorUpdate=0;
+let t=0;let lastListUpdate=0;let lastCooldownUpdate=0;let lastDecorUpdate=0;let lastBallStateSync=0;
 let fadeState='idle';let fadeAlpha=1;let fadeStartTime=0;
-const LIST_UPDATE_INTERVAL=5000;const COOLDOWN_UPDATE_INTERVAL=1000;const DECOR_UPDATE_INTERVAL=3600000; // 1 hour
+const LIST_UPDATE_INTERVAL=5000;const COOLDOWN_UPDATE_INTERVAL=1000;const DECOR_UPDATE_INTERVAL=3600000;const BALL_STATE_SYNC_INTERVAL=10000; // Sync ball state every 10 seconds
 const FADE_DURATION=1500; // 1.5 seconds for each fade phase
 
 // Cache for layer filtering - avoid recreating arrays every frame
@@ -2970,6 +3026,17 @@ for(let i=fishes.length-1;i>=0;i--){if(fishes[i].dead){const deadFish={name:fish
 
 if(now-lastListUpdate>LIST_UPDATE_INTERVAL){drawLists();drawActivityList();lastListUpdate=now}
 if(now-lastCooldownUpdate>COOLDOWN_UPDATE_INTERVAL){updateCooldown();lastCooldownUpdate=now}
+
+// Periodieke ball state sync met server (elke 10 seconden)
+if(now-lastBallStateSync>BALL_STATE_SYNC_INTERVAL){
+  if(ws && ws.readyState === WebSocket.OPEN){
+    // Sync: als er geen bal is, zorg dat server dat ook weet
+    if(playBalls.length === 0){
+      ws.send(JSON.stringify({ command: 'ballGone' }));
+    }
+  }
+  lastBallStateSync=now;
+}
 
 // Handle decoratie fade system
 if(fadeState==='idle'&&now-lastDecorUpdate>DECOR_UPDATE_INTERVAL){
