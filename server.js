@@ -778,14 +778,24 @@ function sendRecentActivity(client) {
     sendToClient(client, activityMessage);
 }
 
-// Update feed cooldown every second
+// Update feed cooldown every second - but only when cooldown is active
 setInterval(() => {
-    broadcastFeedCooldownUpdate();
+    const now = Date.now();
+    const timeLeft = now - appState.lastFed;
+    // Only broadcast if cooldown is active (within cooldown period + 5 second buffer)
+    if (timeLeft < appState.feedCooldown + 5000 && controllers.size > 0) {
+        broadcastFeedCooldownUpdate();
+    }
 }, 1000);
 
-// Update medicine cooldown every second
+// Update medicine cooldown every second - but only when cooldown is active
 setInterval(() => {
-    broadcastMedicineCooldownUpdate();
+    const now = Date.now();
+    const timeLeft = now - appState.lastMedicine;
+    // Only broadcast if cooldown is active (within cooldown period + 5 second buffer)
+    if (timeLeft < appState.medicineCooldown + 5000 && controllers.size > 0) {
+        broadcastMedicineCooldownUpdate();
+    }
 }, 1000);
 
 // Broadcast status updates every 5 seconds to keep controllers in sync

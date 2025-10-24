@@ -1913,6 +1913,35 @@ function updateFish(f,dt,now){
   if(Date.now()-f.lastEat>=f.hungerWindow) f.dead=true;
 }
 
+function updateListItems(listEl,items){
+  const existingItems=listEl.children;
+  items.forEach((item,i)=>{
+    if(i<existingItems.length){
+      const el=existingItems[i];
+      const labelSpan=el.querySelector('.label');
+      const textNode=el.childNodes[1];
+      if(labelSpan&&labelSpan.textContent!==item.idx){
+        labelSpan.textContent=item.idx;
+      }
+      if(textNode&&textNode.textContent!==' '+item.label){
+        textNode.textContent=' '+item.label;
+      }
+    }else{
+      const d=document.createElement('div');
+      d.className='item';
+      const b=document.createElement('span');
+      b.className='label';
+      b.textContent=item.idx;
+      d.appendChild(b);
+      d.appendChild(document.createTextNode(' '+item.label));
+      listEl.appendChild(d);
+    }
+  });
+  while(listEl.children.length>items.length){
+    listEl.removeChild(listEl.lastChild);
+  }
+}
+
 function drawLists(){
   const now=Date.now();
   const deadListEl=document.getElementById('deadList');
@@ -1920,19 +1949,41 @@ function drawLists(){
   const oldestListEl=document.getElementById('oldestList');
   const livingListEl=document.getElementById('livingList');
   const newestListEl=document.getElementById('newestList');
-  function fmtItem(idx,label){const d=document.createElement('div');d.className='item';const b=document.createElement('span');b.className='label';b.textContent=idx;d.appendChild(b);d.appendChild(document.createTextNode(' '+label));return d}
-  deadListEl.innerHTML='';
+
+  // Dead list
   const recent=deadLog.slice(-TOP_N).reverse();
-  if(deadLog.length>0){deadPanelEl.style.display='block';for(let i=0;i<recent.length;i++){const it=recent[i];const ago=now-it.diedAt;const age=it.diedAt-it.bornAt;deadListEl.appendChild(fmtItem(i+1,`${it.name} · ${ageLabelMS(age)} oud · ${ageLabelMS(ago)} geleden`))}}else{deadPanelEl.style.display='none'}
-  oldestListEl.innerHTML='';
-  const combined=[];for(const f of fishes){combined.push({name:f.name,age:now-f.bornAt,type:'live'})}for(const d of deadLog){combined.push({name:d.name,age:(d.diedAt-d.bornAt),type:'dead'})}
-  combined.sort((a,b)=>b.age-a.age);combined.slice(0,TOP_N).forEach((x,i)=>{oldestListEl.appendChild(fmtItem(i+1,`${x.name} · ${ageLabelMS(x.age)} ${x.type==='live'?'levend':'†'}`))});
-  livingListEl.innerHTML='';
+  if(deadLog.length>0){
+    deadPanelEl.style.display='block';
+    const items=recent.map((it,i)=>{
+      const ago=now-it.diedAt;
+      const age=it.diedAt-it.bornAt;
+      return{idx:i+1,label:`${it.name} · ${ageLabelMS(age)} oud · ${ageLabelMS(ago)} geleden`};
+    });
+    updateListItems(deadListEl,items);
+  }else{
+    deadPanelEl.style.display='none';
+  }
+
+  // Oldest list (combined live + dead)
+  const combined=[];
+  for(const f of fishes){combined.push({name:f.name,age:now-f.bornAt,type:'live'})}
+  for(const d of deadLog){combined.push({name:d.name,age:(d.diedAt-d.bornAt),type:'dead'})}
+  combined.sort((a,b)=>b.age-a.age);
+  const oldestItems=combined.slice(0,TOP_N).map((x,i)=>({
+    idx:i+1,
+    label:`${x.name} · ${ageLabelMS(x.age)} ${x.type==='live'?'levend':'†'}`
+  }));
+  updateListItems(oldestListEl,oldestItems);
+
+  // Living list
   const livingAges=[...fishes].map(f=>({name:f.name,age:now-f.bornAt})).sort((a,b)=>b.age-a.age).slice(0,TOP_N);
-  livingAges.forEach((x,i)=>livingListEl.appendChild(fmtItem(i+1,`${x.name} · ${ageLabelMS(x.age)}`)));
-  newestListEl.innerHTML='';
+  const livingItems=livingAges.map((x,i)=>({idx:i+1,label:`${x.name} · ${ageLabelMS(x.age)}`}));
+  updateListItems(livingListEl,livingItems);
+
+  // Newest list
   const newest=[...fishes].sort((a,b)=>b.bornAt-a.bornAt).slice(0,TOP_N);
-  newest.forEach((f,i)=>newestListEl.appendChild(fmtItem(i+1,`${f.name} · ${ageLabelMS(now-f.bornAt)} geleden geboren`)));
+  const newestItems=newest.map((f,i)=>({idx:i+1,label:`${f.name} · ${ageLabelMS(now-f.bornAt)} geleden geboren`}));
+  updateListItems(newestListEl,newestItems);
 }
 
 function drawActivityList(){
@@ -1940,19 +1991,6 @@ function drawActivityList(){
   const activityListEl=document.getElementById('activityList');
   const activityPanelEl=document.getElementById('activityPanel');
   if(!activityListEl||!activityPanelEl)return;
-
-  function fmtActivityItem(idx,emoji,label){
-    const d=document.createElement('div');
-    d.className='item';
-    const b=document.createElement('span');
-    b.className='label';
-    b.textContent=emoji;
-    d.appendChild(b);
-    d.appendChild(document.createTextNode(' '+label));
-    return d;
-  }
-
-  activityListEl.innerHTML='';
 
   if(recentActivity.length===0){
     activityPanelEl.style.display='none';
@@ -1964,6 +2002,10 @@ function drawActivityList(){
   // Process events in reverse order (newest first)
   const eventsToShow=recentActivity.slice().reverse();
 
+  // Get existing items
+  const existingItems=activityListEl.children;
+
+  // Update existing items and add new ones if needed
   eventsToShow.forEach((event,i)=>{
     const ago=now-event.timestamp;
     const timeStr=ageLabelMS(ago)+' geleden';
@@ -2019,8 +2061,33 @@ function drawActivityList(){
         label=`${event.type} · ${timeStr}`;
     }
 
-    activityListEl.appendChild(fmtActivityItem(i+1,emoji,label));
+    // Update existing item or create new one
+    if(i<existingItems.length){
+      const item=existingItems[i];
+      const labelSpan=item.querySelector('.label');
+      const textNode=item.childNodes[1];
+      if(labelSpan&&labelSpan.textContent!==emoji){
+        labelSpan.textContent=emoji;
+      }
+      if(textNode&&textNode.textContent!==' '+label){
+        textNode.textContent=' '+label;
+      }
+    }else{
+      const d=document.createElement('div');
+      d.className='item';
+      const b=document.createElement('span');
+      b.className='label';
+      b.textContent=emoji;
+      d.appendChild(b);
+      d.appendChild(document.createTextNode(' '+label));
+      activityListEl.appendChild(d);
+    }
   });
+
+  // Remove extra items if list got shorter
+  while(activityListEl.children.length>eventsToShow.length){
+    activityListEl.removeChild(activityListEl.lastChild);
+  }
 }
 
 function drawQR(){
@@ -2478,7 +2545,7 @@ init();
 
 let t=0;let lastListUpdate=0;let lastCooldownUpdate=0;let lastDecorUpdate=0;
 let fadeState='idle';let fadeAlpha=1;let fadeStartTime=0;
-const LIST_UPDATE_INTERVAL=2000;const COOLDOWN_UPDATE_INTERVAL=1000;const DECOR_UPDATE_INTERVAL=3600000; // 1 hour
+const LIST_UPDATE_INTERVAL=5000;const COOLDOWN_UPDATE_INTERVAL=1000;const DECOR_UPDATE_INTERVAL=3600000; // 1 hour
 const FADE_DURATION=1500; // 1.5 seconds for each fade phase
 
 function loop(){const now=Date.now();const dt=Math.min(0.05,(now-lastT)/1000);lastT=now;t++;
