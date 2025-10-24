@@ -186,7 +186,7 @@
             padding-bottom: 20px;
             border-bottom: 1px solid rgba(255, 255, 255, 0.1);
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
             gap: 12px;
         }
 
@@ -201,11 +201,12 @@
             .tab-status-display {
                 margin-bottom: 15px;
                 padding-bottom: 15px;
-                gap: 10px;
+                gap: 8px;
+                grid-template-columns: repeat(auto-fit, minmax(135px, 1fr));
             }
 
             .tab-status-display .status-item {
-                padding: 10px;
+                padding: 10px 8px;
                 font-size: 0.85em;
             }
         }
@@ -550,17 +551,19 @@
             }
 
             .tab-button {
-                padding: 8px 3px;
-                min-height: 50px;
-                gap: 3px;
+                padding: 10px 4px;
+                min-height: 54px;
+                gap: 4px;
             }
 
             .tab-icon {
-                font-size: 20px;
+                font-size: 22px;
             }
 
             .tab-label {
-                font-size: 9px;
+                font-size: 11px;
+                font-weight: 600;
+                letter-spacing: 0.01em;
             }
         }
 
@@ -572,16 +575,18 @@
             }
 
             .tab-button {
-                padding: 6px 2px;
-                min-height: 48px;
-                gap: 2px;
+                padding: 8px 2px;
+                min-height: 50px;
+                gap: 3px;
             }
 
             .tab-icon {
-                font-size: 18px;
+                font-size: 20px;
             }
 
             .tab-label {
-                font-size: 8px;
+                font-size: 10px;
+                font-weight: 600;
+                letter-spacing: 0.01em;
             }
         }

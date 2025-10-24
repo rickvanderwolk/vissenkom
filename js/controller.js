@@ -20,6 +20,7 @@
         const pumpStatus = document.getElementById('pumpStatus');
         const feedStatus = document.getElementById('feedStatus');
         const waterStatus = document.getElementById('waterStatus');
+        const poopStatus = document.getElementById('poopStatus');
         const sickFishStatus = document.getElementById('sickFishStatus');
         const medicineStatus = document.getElementById('medicineStatus');
 
@@ -244,18 +245,39 @@
 
             // Update water status
             const greenness = status.waterGreenness || 0;
-            if (greenness < 25) {
+            const greennessRounded = Math.round(greenness);
+
+            if (greenness < 10) {
                 waterStatus.textContent = '✨ Helder';
                 waterStatus.style.color = '#4ecdc4';
+            } else if (greenness < 25) {
+                waterStatus.textContent = `${greennessRounded}% groen`;
+                waterStatus.style.color = '#4ecdc4';
             } else if (greenness < 50) {
-                waterStatus.textContent = `${Math.round(greenness)}% groen`;
+                waterStatus.textContent = `${greennessRounded}% groen`;
                 waterStatus.style.color = '#ffd700';
             } else if (greenness < 75) {
-                waterStatus.textContent = `${Math.round(greenness)}% groen`;
+                waterStatus.textContent = `${greennessRounded}% groen`;
                 waterStatus.style.color = '#ff9800';
             } else {
-                waterStatus.textContent = `${Math.round(greenness)}% groen`;
+                waterStatus.textContent = `${greennessRounded}% groen`;
                 waterStatus.style.color = '#f44336';
+            }
+
+            // Update poop status
+            const poopCount = status.poopCount || 0;
+            if (poopCount === 0) {
+                poopStatus.textContent = '✨ Schoon';
+                poopStatus.style.color = '#4ecdc4';
+            } else if (poopCount <= 5) {
+                poopStatus.textContent = `${poopCount} 💩`;
+                poopStatus.style.color = '#ffd700';
+            } else if (poopCount <= 15) {
+                poopStatus.textContent = `${poopCount} 💩`;
+                poopStatus.style.color = '#ff9800';
+            } else {
+                poopStatus.textContent = `${poopCount} 💩`;
+                poopStatus.style.color = '#f44336';
             }
 
             // Update sick fish status
@@ -283,6 +305,15 @@
                 cleanBtn.style.opacity = hasPoopToClear ? '1' : '0.5';
 
                 console.log('Mobile Debug: Clean button', hasPoopToClear ? 'enabled' : 'disabled', 'poop count:', status.poopCount);
+            }
+
+            // Update refresh water button availability based on water greenness
+            const needsWaterRefresh = greenness > 10;
+            if (isConnected) {
+                refreshWaterBtn.disabled = !needsWaterRefresh;
+                refreshWaterBtn.style.opacity = needsWaterRefresh ? '1' : '0.5';
+
+                console.log('Mobile Debug: Refresh water button', needsWaterRefresh ? 'enabled' : 'disabled', 'greenness:', greenness.toFixed(1) + '%');
             }
         }
 

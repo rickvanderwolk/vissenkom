@@ -2345,7 +2345,7 @@ function updateCooldown(){
     } else {
         // Better time formatting like ageLabelMS
         const timeText = ageLabelMS(left);
-        cd.textContent=`Over ${timeText}`;
+        cd.textContent=`Voeren kan over ${timeText}`;
         cd.classList.remove('ready');
     }
 }
