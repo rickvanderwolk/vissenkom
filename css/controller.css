@@ -544,7 +544,6 @@
         /* Tab Content */
         .tab-content {
             position: relative;
-            min-height: 300px;
             padding-top: 4px;
         }
 
