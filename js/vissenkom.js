@@ -4,7 +4,7 @@ let lamps=[];let W=0,H=0;
 let viewportConfig={offsetTop:0,offsetBottom:0,offsetLeft:0,offsetRight:0};
 
 // === ADAPTIVE PERFORMANCE SYSTEM ===
-let performanceProfile={quality:'high',particleCount:1,detailLevel:1,skipFrames:0};
+let performanceProfile={quality:'high',particleCount:1,detailLevel:1,skipFrames:0,fishUpdateRate:1};
 let fpsHistory=[];let frameCount=0;let lastFPSCheck=Date.now();
 function measureFPS(){
   frameCount++;
@@ -21,12 +21,14 @@ function measureFPS(){
 function updatePerformanceProfile(){
   if(fpsHistory.length<3)return;
   const avgFPS=fpsHistory.reduce((a,b)=>a+b,0)/fpsHistory.length;
-  if(avgFPS>=50){
-    performanceProfile={quality:'high',particleCount:1,detailLevel:1,skipFrames:0};
-  }else if(avgFPS>=30){
-    performanceProfile={quality:'medium',particleCount:0.6,detailLevel:0.8,skipFrames:0};
+  if(avgFPS>=55){
+    performanceProfile={quality:'high',particleCount:1,detailLevel:1,skipFrames:0,fishUpdateRate:1};
+  }else if(avgFPS>=40){
+    performanceProfile={quality:'medium',particleCount:0.7,detailLevel:0.85,skipFrames:0,fishUpdateRate:1};
+  }else if(avgFPS>=25){
+    performanceProfile={quality:'low',particleCount:0.4,detailLevel:0.7,skipFrames:0,fishUpdateRate:2};
   }else{
-    performanceProfile={quality:'low',particleCount:0.3,detailLevel:0.6,skipFrames:1};
+    performanceProfile={quality:'verylow',particleCount:0.2,detailLevel:0.5,skipFrames:1,fishUpdateRate:3};
   }
 }
 
@@ -53,7 +55,9 @@ function resize(){
   W=fullW-(viewportConfig.offsetLeft+viewportConfig.offsetRight);
   H=fullH-(viewportConfig.offsetTop+viewportConfig.offsetBottom);
   updateUIPositions();
-  setupLamps();setupPlants();setupDecorations();setupStars();setupParticles();drawQR();
+  setupLamps();setupPlants();setupDecorations();setupStars();setupParticles();
+  updateLayerCache();
+  drawQR();
 }
 function updateUIPositions(){
   const side=document.querySelector('.side');
@@ -289,11 +293,12 @@ function steerTowards(f,tx,ty,str){
 
   const dx=tx-f.x;
   const dy=ty-f.y;
-  const d=Math.hypot(dx,dy);
+  const dSq=dx*dx+dy*dy; // Use squared distance to avoid sqrt
 
   // Prevent division by zero and limit maximum steering force
-  if(d < 0.1 || d > 1000) return;
+  if(dSq < 0.01 || dSq > 1000000) return;
 
+  const d=Math.sqrt(dSq); // Only calculate sqrt once when needed
   const maxSteer = f.speed * 0.1; // Limit steering force
   const steerX = Math.max(-maxSteer, Math.min(maxSteer, dx/d*str));
   const steerY = Math.max(-maxSteer, Math.min(maxSteer, dy/d*str));
@@ -1008,15 +1013,14 @@ function ageLabel(f,now){return ageLabelMS(now-f.bornAt)}
 function drawFish(f,t,now){
   const s=fishSize(f,now);const a=Math.atan2(f.vy,f.vx);
 
-  // Subtiele schaduw onder de vis voor diepte-effect
-  if(lightsOn){
-    ctx.save();
+  // Subtiele schaduw onder de vis voor diepte-effect (skip on low performance)
+  if(lightsOn&&performanceProfile.quality!=='verylow'){
     ctx.globalAlpha=0.15;
     ctx.fillStyle='#000';
     ctx.beginPath();
     ctx.ellipse(f.x+2,f.y+s*1.3,s*0.7,s*0.3,a,0,Math.PI*2);
     ctx.fill();
-    ctx.restore();
+    ctx.globalAlpha=1;
   }
 
   ctx.save();ctx.translate(f.x,f.y);ctx.rotate(a);
@@ -1040,7 +1044,7 @@ function drawFish(f,t,now){
   // Ensure f.hue is a valid number, fallback to 0 if NaN
   let fishHue = isNaN(f.hue) ? 0 : f.hue;
 
-  if(discoOn){
+  if(discoOn&&performanceProfile.quality!=='verylow'){
     // Ensure all inputs are valid numbers before calculating
     const timeInput = isNaN(t) ? 0 : t;
     const xInput = isNaN(f.x) ? 0 : f.x;
@@ -1064,18 +1068,20 @@ function drawFish(f,t,now){
   ctx.save();ctx.translate(-s*0.35,0);ctx.rotate((finWave-0.5)*(discoOn?1.2:0.6));ctx.fillStyle=`hsla(${Math.round((fishHue+70)%360)},85%,${65*dim}%,1)`;ctx.beginPath();ctx.ellipse(0,0,finW,finH,0,0,Math.PI*2);ctx.fill();ctx.restore();
   ctx.fillStyle=lightsOn?'#fff':'#d8e1e8';ctx.beginPath();ctx.arc(s*0.35,-s*0.08,s*0.11,0,Math.PI*2);ctx.fill();ctx.fillStyle=lightsOn?'#000':'#24323c';ctx.beginPath();ctx.arc(s*0.37,-s*0.08,s*0.05,0,Math.PI*2);ctx.fill();
 
-  // Af en toe een glinsterend sterretje op de vis (alleen als gezond en licht aan)
-  if(lightsOn && healthPct(f,now)>50 && Math.sin(t*0.1+f.x*0.05)>0.85){
+  // Af en toe een glinsterend sterretje op de vis (alleen als gezond en licht aan) - skip on low performance
+  if(lightsOn && performanceProfile.quality!=='low' && performanceProfile.quality!=='verylow' && healthPct(f,now)>50 && Math.sin(t*0.1+f.x*0.05)>0.85){
     ctx.fillStyle='rgba(255,255,255,0.9)';
     const sparkX=s*0.2;
     const sparkY=-s*0.15;
     ctx.beginPath();
     ctx.arc(sparkX,sparkY,s*0.06,0,Math.PI*2);
     ctx.fill();
-    // Extra klein glinstertje
-    ctx.beginPath();
-    ctx.arc(sparkX+s*0.12,sparkY+s*0.08,s*0.03,0,Math.PI*2);
-    ctx.fill();
+    // Extra klein glinstertje (only on high quality)
+    if(performanceProfile.quality==='high'){
+      ctx.beginPath();
+      ctx.arc(sparkX+s*0.12,sparkY+s*0.08,s*0.03,0,Math.PI*2);
+      ctx.fill();
+    }
   }
 
   ctx.restore();
@@ -1201,15 +1207,19 @@ function handleSurfaceSwimming(f) {
 
 function handleSchooling(f) {
   const schoolRadius = 80;
+  const schoolRadiusSq = schoolRadius * schoolRadius; // Use squared distance
   const separationRadius = 25;
+  const separationRadiusSq = separationRadius * separationRadius;
   let nearby = [];
 
-  // Find nearby fish
+  // Find nearby fish using squared distance
   for(const other of fishes) {
     if(other === f) continue;
-    const dist = Math.hypot(other.x - f.x, other.y - f.y);
-    if(dist < schoolRadius) {
-      nearby.push({fish: other, distance: dist});
+    const dx = other.x - f.x;
+    const dy = other.y - f.y;
+    const distSq = dx*dx + dy*dy;
+    if(distSq < schoolRadiusSq) {
+      nearby.push({fish: other, distanceSq: distSq, dx: dx, dy: dy});
     }
   }
 
@@ -1218,9 +1228,10 @@ function handleSchooling(f) {
     let sepX = 0, sepY = 0;
     let tooClose = 0;
     for(const n of nearby) {
-      if(n.distance < separationRadius) {
-        sepX += (f.x - n.fish.x) / n.distance;
-        sepY += (f.y - n.fish.y) / n.distance;
+      if(n.distanceSq < separationRadiusSq) {
+        const dist = Math.sqrt(n.distanceSq); // Only calculate sqrt when needed
+        sepX += (f.x - n.fish.x) / dist;
+        sepY += (f.y - n.fish.y) / dist;
         tooClose++;
       }
     }
@@ -2560,16 +2571,26 @@ function updateSickFishStatus(){
 function regenerateDecor(){
   setupPlants();
   setupDecorations();
+  updateLayerCache();
   console.log('Nieuwe decoratie gegenereerd!');
 }
-
-function init(){document.getElementById('tank').style.background=BG;document.body.classList.add('dark');document.body.classList.remove('light');lightsOn=true;resize();updateCooldown();drawLists();drawActivityList();initWebSocket()}
-init();
 
 let t=0;let lastListUpdate=0;let lastCooldownUpdate=0;let lastDecorUpdate=0;
 let fadeState='idle';let fadeAlpha=1;let fadeStartTime=0;
 const LIST_UPDATE_INTERVAL=5000;const COOLDOWN_UPDATE_INTERVAL=1000;const DECOR_UPDATE_INTERVAL=3600000; // 1 hour
 const FADE_DURATION=1500; // 1.5 seconds for each fade phase
+
+// Cache for layer filtering - avoid recreating arrays every frame
+let backPlants=[],frontPlants=[],backDecorations=[],frontDecorations=[];
+function updateLayerCache(){
+  backPlants=plants.filter(p=>p.zIndex==='back');
+  frontPlants=plants.filter(p=>p.zIndex==='front');
+  backDecorations=decorations.filter(d=>d.zIndex==='back');
+  frontDecorations=decorations.filter(d=>d.zIndex==='front');
+}
+
+function init(){document.getElementById('tank').style.background=BG;document.body.classList.add('dark');document.body.classList.remove('light');lightsOn=true;resize();updateCooldown();drawLists();drawActivityList();initWebSocket()}
+init();
 
 function loop(){const now=Date.now();const dt=Math.min(0.05,(now-lastT)/1000);lastT=now;t++;
 measureFPS(); // Measure FPS for adaptive performance
@@ -2586,12 +2607,6 @@ waterGreenness+=(waterGreennessTarget-waterGreenness)*lerpSpeed;
 
 clearFrame(t/60);
 
-// Draw background elements first (behind fish)
-const backPlants=plants.filter(p=>p.zIndex==='back');
-const frontPlants=plants.filter(p=>p.zIndex==='front');
-const backDecorations=decorations.filter(d=>d.zIndex==='back');
-const frontDecorations=decorations.filter(d=>d.zIndex==='front');
-
 // Apply viewport transform for all drawing
 ctx.save();
 ctx.translate(viewportConfig.offsetLeft,viewportConfig.offsetTop);
@@ -2602,18 +2617,30 @@ ctx.clip();
 
 // Background layer
 drawSandBottom(t/60);
-for(const plant of backPlants){drawPlant(plant,t)}
-for(const deco of backDecorations){drawDecoration(deco,t)}
+for(let i=0;i<backPlants.length;i++){drawPlant(backPlants[i],t)}
+for(let i=0;i<backDecorations.length;i++){drawDecoration(backDecorations[i],t)}
 
 if(pumpOn&&Math.random()<0.6*performanceProfile.particleCount){for(let i=0;i<2;i++)makeBubble()}
 drawBubbles();drawFood();drawPoops();
 
-// Fish layer
-for(const f of fishes){updateFish(f,dt,now);drawFish(f,t,now)}
+// Fish layer - update and draw with adaptive rate
+const updateRate=performanceProfile.fishUpdateRate;
+for(let i=0;i<fishes.length;i++){
+  const f=fishes[i];
+  // Update fish logic at reduced rate on low performance
+  if(t%updateRate===i%updateRate){
+    updateFish(f,dt*updateRate,now);
+  }else{
+    // Still move fish smoothly even when logic updates are skipped
+    f.x+=f.vx;f.y+=f.vy;
+    bounceOffWalls(f);
+  }
+  drawFish(f,t,now);
+}
 
 // Foreground layer
-for(const plant of frontPlants){drawPlant(plant,t)}
-for(const deco of frontDecorations){drawDecoration(deco,t)}
+for(let i=0;i<frontPlants.length;i++){drawPlant(frontPlants[i],t)}
+for(let i=0;i<frontDecorations.length;i++){drawDecoration(frontDecorations[i],t)}
 
 // Water greenness overlay and algae particles
 updateAlgenParticles();

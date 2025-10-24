@@ -1,6 +1,10 @@
         let ws = null;
         let isConnected = false;
 
+        // Client-side cooldown tracking
+        let feedCooldownEndTime = 0;
+        let medicineCooldownEndTime = 0;
+
         // DOM elements
         const feedBtn = document.getElementById('feedBtn');
         const lightBtn = document.getElementById('lightBtn');
@@ -402,13 +406,17 @@
         }
 
         function updateFeedStatus(cooldownData) {
+            // Set the end time for client-side countdown
             if (cooldownData.canFeed) {
+                feedCooldownEndTime = 0; // Clear cooldown
                 feedBtn.disabled = false;
                 feedStatus.textContent = '✅ Beschikbaar';
                 feedStatus.style.color = '#4ecdc4';
             } else {
+                // Calculate end time based on lastFed + cooldown duration
+                feedCooldownEndTime = cooldownData.lastFed + (60 * 60 * 1000); // 1 hour
+                // Initial display will be updated by the countdown timer
                 feedBtn.disabled = true;
-                // Use better time formatting like the main page
                 const timeText = ageLabelMS(cooldownData.timeLeft);
                 feedStatus.textContent = `Kan over ${timeText}`;
                 feedStatus.style.color = '#ff9800';
@@ -416,13 +424,17 @@
         }
 
         function updateMedicineStatus(cooldownData) {
+            // Set the end time for client-side countdown
             if (cooldownData.canAddMedicine) {
+                medicineCooldownEndTime = 0; // Clear cooldown
                 medicineBtn.disabled = false;
                 medicineStatus.textContent = '✅ Beschikbaar';
                 medicineStatus.style.color = '#4ecdc4';
             } else {
+                // Calculate end time based on lastMedicine + cooldown duration
+                medicineCooldownEndTime = cooldownData.lastMedicine + (24 * 60 * 60 * 1000); // 24 hours
+                // Initial display will be updated by the countdown timer
                 medicineBtn.disabled = true;
-                // Use better time formatting like the main page
                 const timeText = ageLabelMS(cooldownData.timeLeft);
                 medicineStatus.textContent = `Kan over ${timeText}`;
                 medicineStatus.style.color = '#ff9800';
@@ -570,6 +582,47 @@
                 requestStatus();
             }
         }, 5000);
+
+        // Client-side countdown timers for smooth UI (100ms updates)
+        setInterval(() => {
+            // Feed cooldown countdown
+            if (feedCooldownEndTime > 0) {
+                const now = Date.now();
+                const timeLeft = Math.max(0, feedCooldownEndTime - now);
+
+                if (timeLeft > 0) {
+                    feedBtn.disabled = true;
+                    const timeText = ageLabelMS(timeLeft);
+                    feedStatus.textContent = `Kan over ${timeText}`;
+                    feedStatus.style.color = '#ff9800';
+                } else {
+                    // Cooldown ended
+                    feedCooldownEndTime = 0;
+                    feedBtn.disabled = false;
+                    feedStatus.textContent = '✅ Beschikbaar';
+                    feedStatus.style.color = '#4ecdc4';
+                }
+            }
+
+            // Medicine cooldown countdown
+            if (medicineCooldownEndTime > 0) {
+                const now = Date.now();
+                const timeLeft = Math.max(0, medicineCooldownEndTime - now);
+
+                if (timeLeft > 0) {
+                    medicineBtn.disabled = true;
+                    const timeText = ageLabelMS(timeLeft);
+                    medicineStatus.textContent = `Kan over ${timeText}`;
+                    medicineStatus.style.color = '#ff9800';
+                } else {
+                    // Cooldown ended
+                    medicineCooldownEndTime = 0;
+                    medicineBtn.disabled = false;
+                    medicineStatus.textContent = '✅ Beschikbaar';
+                    medicineStatus.style.color = '#4ecdc4';
+                }
+            }
+        }, 100); // Update every 100ms for smooth countdown
 
         // Add visibility change listener for mobile app switching
         document.addEventListener('visibilitychange', () => {

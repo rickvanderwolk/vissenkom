@@ -96,6 +96,9 @@ let appState = {
     heatingOn: true // Heating thermostat on/off
 };
 
+// Track last broadcasted waterGreenness to avoid unnecessary updates
+let lastBroadcastedGreenness = 0;
+
 // Load existing state from file
 function loadState() {
     try {
@@ -105,6 +108,9 @@ function loadState() {
 
             // Merge saved state with default state
             appState = { ...appState, ...savedState };
+
+            // Initialize lastBroadcastedGreenness with loaded value
+            lastBroadcastedGreenness = appState.waterGreenness || 0;
 
             // Load access code if it exists and is still valid
             if (appState.currentAccessCode && appState.accessCodeExpiry) {
@@ -479,6 +485,7 @@ function handleRefreshWater() {
 
     // Reset water greenness
     appState.waterGreenness = 0;
+    lastBroadcastedGreenness = 0; // Reset tracking variable
 
     // Log event
     logEvent('water_refreshed', {
@@ -488,7 +495,7 @@ function handleRefreshWater() {
     });
 
     broadcastToMainApp({ command: 'refreshWater' });
-    broadcastStatusUpdate(); // Update controllers with new water status
+    broadcastStatusUpdate(); // Update controllers with new water status (always needed here)
     saveState(); // Save state immediately
 }
 
@@ -814,25 +821,9 @@ function sendRecentActivity(client) {
     sendToClient(client, activityMessage);
 }
 
-// Update feed cooldown every second - but only when cooldown is active
-setInterval(() => {
-    const now = Date.now();
-    const timeLeft = now - appState.lastFed;
-    // Only broadcast if cooldown is active (within cooldown period + 5 second buffer)
-    if (timeLeft < appState.feedCooldown + 5000 && controllers.size > 0) {
-        broadcastFeedCooldownUpdate();
-    }
-}, 1000);
-
-// Update medicine cooldown every second - but only when cooldown is active
-setInterval(() => {
-    const now = Date.now();
-    const timeLeft = now - appState.lastMedicine;
-    // Only broadcast if cooldown is active (within cooldown period + 5 second buffer)
-    if (timeLeft < appState.medicineCooldown + 5000 && controllers.size > 0) {
-        broadcastMedicineCooldownUpdate();
-    }
-}, 1000);
+// Note: Feed and medicine cooldown updates are now only sent when actions occur.
+// Controllers handle their own countdown timers for smooth UX.
+// Status updates every 5 seconds act as sync check to correct any drift.
 
 // Broadcast status updates every 5 seconds to keep controllers in sync
 setInterval(() => {
@@ -912,8 +903,11 @@ setInterval(() => {
         appState.waterGreenness = Math.min(100, appState.waterGreenness + growthRate);
         console.log(`🌿 Water greenness increased to ${appState.waterGreenness.toFixed(2)}% (temp: ${temp.toFixed(1)}°C, rate: ${growthRate.toFixed(3)})`);
 
-        // Broadcast update to all clients
-        broadcastStatusUpdate();
+        // Only broadcast if greenness changed significantly (>= 0.5%)
+        if (Math.abs(appState.waterGreenness - lastBroadcastedGreenness) >= 0.5) {
+            broadcastStatusUpdate();
+            lastBroadcastedGreenness = appState.waterGreenness;
+        }
 
         // Log significant milestones
         const rounded = Math.round(appState.waterGreenness);
