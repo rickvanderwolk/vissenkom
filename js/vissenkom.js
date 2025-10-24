@@ -690,6 +690,12 @@ function drawPoops(){
 
 // Speelbal functies
 function makePlayBall(){
+  // Check of er al een bal is
+  if(playBalls.length > 0) {
+    console.log('🎾 Er is al een bal! Wacht tot deze verdwijnt.');
+    return;
+  }
+
   // Random kleur kiezen
   const ballColors = [
     { light: '#ff6b9d', mid: '#ff1493', dark: '#c71585' }, // Magenta/Roze
@@ -708,7 +714,7 @@ function makePlayBall(){
     vx: rand(-1, 1),
     vy: 0,
     radius: 100, // NOG VEEL GROTER! (was 50, nu 100 - 2x zo groot!)
-    ttl: 3600, // 60 seconden bij 60fps
+    ttl: 7200, // 120 seconden = 2 minuten bij 60fps (was 3600 = 60 sec)
     bounceDamping: 0.7, // Energie verlies bij bounce
     gravity: 0.08, // Drijvende bal (lichte gravity)
     buoyancy: 0.12, // Opwaartse kracht (hoger dan gravity = drijven)
@@ -717,8 +723,8 @@ function makePlayBall(){
   playBalls.push(ball);
   console.log('🎾 Speelbal toegevoegd! Vissen gaan ermee spelen!');
 
-  // Maak 2-3 random vissen enthousiast om te spelen
-  const numPlayingFish = Math.floor(rand(2, 4)); // 2 of 3 vissen
+  // Zorg dat ALTIJD minimaal 2-3 vissen spelen (meer zekerheid)
+  const numPlayingFish = Math.max(2, Math.floor(rand(2, 4))); // Minimaal 2, max 3 vissen
   const availableFish = [...fishes]; // Kopieer array
 
   for(let i = 0; i < numPlayingFish && availableFish.length > 0; i++) {
@@ -738,6 +744,28 @@ function makePlayBall(){
 function updatePlayBalls(){
   for(let i = playBalls.length - 1; i >= 0; i--){
     const ball = playBalls[i];
+
+    // Zorg ervoor dat er altijd minimaal 2 vissen met de bal spelen
+    // Check elke 2 seconden (120 frames)
+    if(!ball.lastPlayingCheck || Date.now() - ball.lastPlayingCheck > 2000) {
+      ball.lastPlayingCheck = Date.now();
+
+      const playingFish = fishes.filter(f => f.behaviorState === 'playing').length;
+
+      if(playingFish < 2) {
+        // Niet genoeg vissen spelen, voeg er 1-2 toe
+        const needed = 2 - playingFish;
+        const availableFish = fishes.filter(f => f.behaviorState !== 'playing');
+
+        for(let j = 0; j < needed && j < availableFish.length; j++) {
+          const randomIndex = Math.floor(Math.random() * availableFish.length);
+          const fish = availableFish[randomIndex];
+          fish.behaviorState = 'playing';
+          fish.behaviorTimer = Math.floor(rand(600, 1200));
+          availableFish.splice(randomIndex, 1);
+        }
+      }
+    }
 
     // Physics: buoyancy (drijven) vs gravity
     ball.vy += ball.gravity - ball.buoyancy;
@@ -777,6 +805,11 @@ function updatePlayBalls(){
     if(ball.ttl <= 0){
       playBalls.splice(i, 1);
       console.log('🎾 Speelbal is verdwenen');
+
+      // Notify server that ball is gone (so button can be enabled again)
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ command: 'ballGone' }));
+      }
     }
   }
 }
@@ -1785,8 +1818,8 @@ function handlePlaying(f) {
     const dist = Math.sqrt(dx * dx + dy * dy);
     const fishSizeNow = fishSize(f, Date.now());
 
-    // Strikte collision radius - alleen als vis ECHT de bal raakt
-    const collisionRadius = closestBall.radius + fishSizeNow * 0.5; // Kleine overlap toegestaan
+    // Iets ruimere collision - vis raakt bal net voordat ze overlapten
+    const collisionRadius = closestBall.radius + fishSizeNow * 0.8; // Beetje meer ruimte
 
     if(dist < collisionRadius) {
       // VIS RAAKT DE BAL! Geef een flinke duw
@@ -1802,11 +1835,12 @@ function handlePlaying(f) {
       f.vx += Math.cos(circleAngle) * 0.5;
       f.vy += Math.sin(circleAngle) * 0.5;
 
-      // Als vis te diep in bal zit, duw terug
-      const overlap = collisionRadius - dist;
-      if(overlap > fishSizeNow * 0.3) {
-        f.x -= Math.cos(pushAngle) * overlap * 0.5;
-        f.y -= Math.sin(pushAngle) * overlap * 0.5;
+      // Voorkom dat vis te diep in bal komt
+      const minDist = closestBall.radius + fishSizeNow * 0.6;
+      if(dist < minDist) {
+        const pushOut = minDist - dist;
+        f.x -= Math.cos(pushAngle) * pushOut;
+        f.y -= Math.sin(pushAngle) * pushOut;
       }
     } else {
       // Zwem energiek naar de bal toe
@@ -2287,6 +2321,10 @@ function drawActivityList(){
       case 'glass_tapped':
         emoji='👆';
         label=`Op kom getikt · ${timeStr}`;
+        break;
+      case 'play_ball_added':
+        emoji='🎾';
+        label=`Speelbal gegooid · ${timeStr}`;
         break;
       case 'tank_cleaned':
         emoji='💩';

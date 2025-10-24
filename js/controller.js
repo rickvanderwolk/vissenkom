@@ -5,7 +5,6 @@
         // Client-side cooldown tracking
         let feedCooldownEndTime = 0;
         let medicineCooldownEndTime = 0;
-        let ballCooldownEndTime = 0;
 
         // DOM elements
         const feedBtn = document.getElementById('feedBtn');
@@ -266,7 +265,7 @@
                 case 'medicineCooldown':
                     updateMedicineStatus(message.data);
                     break;
-                case 'ballCooldown':
+                case 'ballStatus':
                     updateBallStatus(message.data);
                     break;
                 case 'gameState':
@@ -474,21 +473,17 @@
             }
         }
 
-        function updateBallStatus(cooldownData) {
-            // Set the end time for client-side countdown
-            if (cooldownData.canAddBall) {
-                ballCooldownEndTime = 0; // Clear cooldown
+        function updateBallStatus(statusData) {
+            if (statusData.hasBall) {
+                // Er is al een bal
+                playBallBtn.disabled = true;
+                ballStatus.textContent = '🎾 Bal aanwezig';
+                ballStatus.style.color = '#ff9800';
+            } else {
+                // Geen bal, button beschikbaar
                 playBallBtn.disabled = false;
                 ballStatus.textContent = '✅ Beschikbaar';
                 ballStatus.style.color = '#4ecdc4';
-            } else {
-                // Calculate end time based on lastBallAdded + cooldown duration
-                ballCooldownEndTime = cooldownData.lastBallAdded + (5 * 60 * 1000); // 5 minuten
-                // Initial display will be updated by the countdown timer
-                playBallBtn.disabled = true;
-                const timeText = ageLabelMS(cooldownData.timeLeft);
-                ballStatus.textContent = `Kan over ${timeText}`;
-                ballStatus.style.color = '#ff9800';
             }
         }
 
@@ -706,25 +701,6 @@
                     medicineBtn.disabled = false;
                     medicineStatus.textContent = '✅ Beschikbaar';
                     medicineStatus.style.color = '#4ecdc4';
-                }
-            }
-
-            // Ball cooldown countdown
-            if (ballCooldownEndTime > 0) {
-                const now = Date.now();
-                const timeLeft = Math.max(0, ballCooldownEndTime - now);
-
-                if (timeLeft > 0) {
-                    playBallBtn.disabled = true;
-                    const timeText = ageLabelMS(timeLeft);
-                    ballStatus.textContent = `Kan over ${timeText}`;
-                    ballStatus.style.color = '#ff9800';
-                } else {
-                    // Cooldown ended
-                    ballCooldownEndTime = 0;
-                    playBallBtn.disabled = false;
-                    ballStatus.textContent = '✅ Beschikbaar';
-                    ballStatus.style.color = '#4ecdc4';
                 }
             }
         }, 100); // Update every 100ms for smooth countdown

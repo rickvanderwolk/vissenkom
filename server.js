@@ -94,8 +94,7 @@ let appState = {
     medicineCooldown: 24 * 60 * 60 * 1000, // 24 hours in milliseconds
     temperature: 24, // Current water temperature in °C
     heatingOn: true, // Heating thermostat on/off
-    lastBallAdded: 0, // Last time a play ball was added
-    ballCooldown: 5 * 60 * 1000 // 5 minuten
+    hasBall: false // Is there currently a ball in the tank?
 };
 
 // Track last broadcasted waterGreenness to avoid unnecessary updates
@@ -339,6 +338,9 @@ function handleCommand(data, fromClient) {
         case 'addPlayBall':
             handleAddPlayBall();
             break;
+        case 'ballGone':
+            handleBallGone();
+            break;
         case 'reportPoop':
             handleReportPoop(data.poopCount);
             break;
@@ -355,7 +357,7 @@ function handleCommand(data, fromClient) {
             sendStatusUpdate(fromClient);
             sendFeedCooldownUpdate(fromClient);
             sendMedicineCooldownUpdate(fromClient);
-            sendBallCooldownUpdate(fromClient);
+            sendBallStatusUpdate(fromClient);
             break;
         case 'getGameState':
             sendGameState(fromClient);
@@ -518,29 +520,33 @@ function handleTapGlass() {
 }
 
 function handleAddPlayBall() {
-    const now = Date.now();
-
-    // Check cooldown
-    if (now - appState.lastBallAdded < appState.ballCooldown) {
-        console.log('Speelbal nog in cooldown');
-        // Send cooldown status to controllers so they know it's not allowed
-        broadcastBallCooldownUpdate();
+    // Check if there's already a ball
+    if (appState.hasBall) {
+        console.log('🎾 Er is al een bal in de kom!');
+        broadcastBallStatusUpdate();
         return;
     }
 
-    appState.lastBallAdded = now;
+    appState.hasBall = true;
     console.log('🎾 Speelbal toegevoegd!');
 
     // Log event
     logEvent('play_ball_added', {
-        timestamp: now
+        timestamp: Date.now()
     });
 
     // Broadcast to main app to add play ball
     broadcastToMainApp({ command: 'addPlayBall' });
 
-    // Broadcast cooldown update to all controllers
-    broadcastBallCooldownUpdate();
+    // Update controllers
+    broadcastBallStatusUpdate();
+    saveState();
+}
+
+function handleBallGone() {
+    appState.hasBall = false;
+    console.log('🎾 Bal is verdwenen, button wordt weer beschikbaar');
+    broadcastBallStatusUpdate();
     saveState();
 }
 
@@ -796,27 +802,21 @@ function sendMedicineCooldownUpdate(client) {
     sendToClient(client, cooldownMessage);
 }
 
-function broadcastBallCooldownUpdate() {
+function broadcastBallStatusUpdate() {
     controllers.forEach(client => {
-        sendBallCooldownUpdate(client);
+        sendBallStatusUpdate(client);
     });
 }
 
-function sendBallCooldownUpdate(client) {
-    const now = Date.now();
-    const timeLeft = Math.max(0, appState.ballCooldown - (now - appState.lastBallAdded));
-    const canAddBall = timeLeft <= 0;
-
-    const cooldownMessage = {
-        type: 'ballCooldown',
+function sendBallStatusUpdate(client) {
+    const statusMessage = {
+        type: 'ballStatus',
         data: {
-            canAddBall,
-            timeLeft,
-            lastBallAdded: appState.lastBallAdded
+            hasBall: appState.hasBall
         }
     };
 
-    sendToClient(client, cooldownMessage);
+    sendToClient(client, statusMessage);
 }
 
 function sendGameState(client) {
