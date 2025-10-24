@@ -94,6 +94,14 @@
             color: #50e3c2;
         }
 
+        /* Tab headers for specific tabs */
+        .tab-header {
+            margin: 0 0 20px 0 !important;
+            font-size: 1.1em !important;
+            color: #50e3c2 !important;
+            text-align: center;
+        }
+
         .controls-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -272,6 +280,11 @@
 
             .status-display {
                 margin-bottom: 20px;
+            }
+
+            .tab-header {
+                font-size: 1em !important;
+                margin-bottom: 15px !important;
             }
 
             .add-fish-container {

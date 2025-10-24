@@ -2270,17 +2270,15 @@ function makeFishFromData(serverFish) {
 
 function updateLightUI() {
     document.getElementById('tank').style.background = lightsOn ? BG : BG_NIGHT;
-    document.getElementById('lightStatus').textContent = 'Licht: ' + (lightsOn ? 'aan' : 'uit');
     document.body.classList.toggle('light', lightsOn);
     document.body.classList.toggle('dark', !lightsOn);
 }
 
 function updateDiscoUI() {
-    document.getElementById('discoStatus').textContent = 'Disco: ' + (discoOn ? 'aan' : 'uit');
+    // No statusbar update needed - status only visible on controller
 }
 
 function updatePumpUI() {
-    document.getElementById('pumpStatus').textContent = 'Pomp: ' + (pumpOn ? 'aan' : 'uit');
     if (pumpOn) {
         pumpPos.x = W - 70;
         pumpJustOnUntil = Date.now() + 3000;
@@ -2302,9 +2300,9 @@ function addFish(nameOrData, newCounter){
         makeFish(undefined,undefined,fishName);
     }
 }
-function toggleLight(){lightsOn=!lightsOn;document.getElementById('tank').style.background=lightsOn?BG:BG_NIGHT;document.getElementById('lightStatus').textContent='Licht: '+(lightsOn?'aan':'uit');document.body.classList.toggle('light',lightsOn);document.body.classList.toggle('dark',!lightsOn)}
-function toggleDisco(){discoOn=!discoOn;document.getElementById('discoStatus').textContent='Disco: '+(discoOn?'aan':'uit')}
-function togglePump(){pumpOn=!pumpOn;document.getElementById('pumpStatus').textContent='Pomp: '+(pumpOn?'aan':'uit');if(pumpOn){pumpPos.x=W-70;pumpJustOnUntil=Date.now()+3000}}
+function toggleLight(){lightsOn=!lightsOn;updateLightUI()}
+function toggleDisco(){discoOn=!discoOn;updateDiscoUI()}
+function togglePump(){pumpOn=!pumpOn;updatePumpUI()}
 function cleanTank(){
   poops.length=0;
   console.log('Tank opgeruimd! Alle poep weggehaald.');
@@ -2342,14 +2340,31 @@ function updateCooldown(){
     const left=Math.max(0,FEED_CD-(Date.now()-lastFed));
 
     if(left<=0){
-        const mins=Math.round(FEED_CD/60000);
-        cd.textContent=`Klaar om te voeren (1×/${mins}min)`;
+        cd.textContent='✅ Beschikbaar';
         cd.classList.add('ready');
     } else {
         // Better time formatting like ageLabelMS
         const timeText = ageLabelMS(left);
-        cd.textContent=`Voeren kan over ${timeText}`;
+        cd.textContent=`Over ${timeText}`;
         cd.classList.remove('ready');
+    }
+}
+
+function updateSickFishStatus(){
+    const sickFishEl = document.getElementById('sickFishStatus');
+    if (!sickFishEl) return;
+
+    const sickCount = fishes.filter(f => f.sick && !f.medicated).length;
+
+    if (sickCount === 0) {
+        sickFishEl.textContent = '✅ Geen';
+        sickFishEl.style.color = '#4ecdc4';
+    } else if (sickCount === 1) {
+        sickFishEl.textContent = '🦠 1 vis';
+        sickFishEl.style.color = '#ff9800';
+    } else {
+        sickFishEl.textContent = `🦠 ${sickCount} vissen`;
+        sickFishEl.style.color = '#f44336';
     }
 }
 
@@ -2361,7 +2376,7 @@ function regenerateDecor(){
   console.log('Nieuwe decoratie gegenereerd!');
 }
 
-function init(){document.getElementById('tank').style.background=BG;document.body.classList.add('dark');document.body.classList.remove('light');lightsOn=true;document.getElementById('lightStatus').textContent='Licht: aan';resize();updateCooldown();drawLists();initWebSocket()}
+function init(){document.getElementById('tank').style.background=BG;document.body.classList.add('dark');document.body.classList.remove('light');lightsOn=true;resize();updateCooldown();drawLists();initWebSocket()}
 init();
 
 let t=0;let lastListUpdate=0;let lastCooldownUpdate=0;let lastDecorUpdate=0;

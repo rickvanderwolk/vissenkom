@@ -233,9 +233,14 @@
         }
 
         function updateStatus(status) {
-            lightStatus.textContent = status.lightsOn ? 'Aan' : 'Uit';
-            discoStatus.textContent = status.discoOn ? 'Aan' : 'Uit';
-            pumpStatus.textContent = status.pumpOn ? 'Aan' : 'Uit';
+            lightStatus.textContent = status.lightsOn ? '💡 Aan' : '🌙 Uit';
+            lightStatus.style.color = status.lightsOn ? '#e9f1f7' : '#999';
+
+            discoStatus.textContent = status.discoOn ? '🎉 Aan' : 'Uit';
+            discoStatus.style.color = status.discoOn ? '#e9f1f7' : '#999';
+
+            pumpStatus.textContent = status.pumpOn ? '💨 Aan' : 'Uit';
+            pumpStatus.style.color = status.pumpOn ? '#e9f1f7' : '#999';
 
             // Update water status
             const greenness = status.waterGreenness || 0;
@@ -299,25 +304,27 @@
         function updateFeedStatus(cooldownData) {
             if (cooldownData.canFeed) {
                 feedBtn.disabled = false;
-                feedStatus.textContent = 'Klaar';
+                feedStatus.textContent = '✅ Beschikbaar';
+                feedStatus.style.color = '#4ecdc4';
             } else {
                 feedBtn.disabled = true;
                 // Use better time formatting like the main page
                 const timeText = ageLabelMS(cooldownData.timeLeft);
-                feedStatus.textContent = timeText;
+                feedStatus.textContent = `Over ${timeText}`;
+                feedStatus.style.color = '#ff9800';
             }
         }
 
         function updateMedicineStatus(cooldownData) {
             if (cooldownData.canAddMedicine) {
                 medicineBtn.disabled = false;
-                medicineStatus.textContent = 'Klaar';
+                medicineStatus.textContent = '✅ Beschikbaar';
                 medicineStatus.style.color = '#4ecdc4';
             } else {
                 medicineBtn.disabled = true;
                 // Use better time formatting like the main page
                 const timeText = ageLabelMS(cooldownData.timeLeft);
-                medicineStatus.textContent = timeText;
+                medicineStatus.textContent = `Over ${timeText}`;
                 medicineStatus.style.color = '#ff9800';
             }
         }
