@@ -231,6 +231,18 @@ function setupDecorations(){
       decorations.push({type:'castle',x,y,size,hue:rand(200,220),bobPhase,zIndex});
     }
   }
+
+  // Halloween: extra schedel decoratie (50% kans)
+  if(halloweenTheme&&Math.random()<0.5){
+    const x=rand(80,W-80);
+    const size=rand(40,80); // Kleiner dan pompoen
+    const bobPhase=rand(0,Math.PI*2);
+    const zIndex=Math.random()<0.7?'back':'front';
+    const minY=H-size/2;
+    const maxY=H-sandHeight+10;
+    const y=rand(minY,maxY);
+    decorations.push({type:'skull',x,y,size,bobPhase,zIndex});
+  }
 }
 function lampHueFor(L,time){if(!discoOn)return L.hueBase;const speed=2.5;const range=340;const wave=(Math.sin(time*speed+L.phase)+1)/2;return (L.hueBase+wave*range)%360}
 function strobeAlpha(time){if(!discoOn)return 1;const hz=1.5;const duty=0.8;const cycle=(time*hz)%1;return cycle<duty?1:0.75}
@@ -1303,6 +1315,57 @@ function drawDecoration(deco,time){
     ctx.lineWidth=3;
     ctx.strokeStyle=eyeGlow;
     ctx.stroke();
+  }
+  else if(deco.type==='skull'){
+    const x=deco.x;
+    const y=deco.y+bobAmount;
+    const skullWidth=deco.size*0.8;
+    const skullHeight=deco.size*0.9;
+
+    // Schedel (wit/beige met schaduw)
+    const skullGrad=ctx.createRadialGradient(x-skullWidth*0.2,y-skullHeight*0.2,0,x,y,skullWidth*0.5);
+    skullGrad.addColorStop(0,`hsla(40,20%,${85*lightMul}%,${fadeAlpha})`); // Licht beige
+    skullGrad.addColorStop(1,`hsla(40,25%,${65*lightMul}%,${fadeAlpha})`); // Donkerder beige
+    ctx.fillStyle=skullGrad;
+
+    // Hoofd (ovaal)
+    ctx.beginPath();
+    ctx.ellipse(x,y-skullHeight*0.15,skullWidth*0.45,skullHeight*0.4,0,0,Math.PI*2);
+    ctx.fill();
+
+    // Kaak (smaller, onderaan)
+    ctx.beginPath();
+    ctx.ellipse(x,y+skullHeight*0.25,skullWidth*0.35,skullHeight*0.15,0,0,Math.PI*2);
+    ctx.fill();
+
+    // Donkere oogkassen (groot en griezelig)
+    ctx.fillStyle=`hsla(0,0%,${10*lightMul}%,${fadeAlpha*0.9})`;
+
+    // Linker oogkas
+    ctx.beginPath();
+    ctx.ellipse(x-skullWidth*0.2,y-skullHeight*0.2,skullWidth*0.12,skullHeight*0.15,0,0,Math.PI*2);
+    ctx.fill();
+
+    // Rechter oogkas
+    ctx.beginPath();
+    ctx.ellipse(x+skullWidth*0.2,y-skullHeight*0.2,skullWidth*0.12,skullHeight*0.15,0,0,Math.PI*2);
+    ctx.fill();
+
+    // Neus (driehoek)
+    ctx.beginPath();
+    ctx.moveTo(x,y-skullHeight*0.05);
+    ctx.lineTo(x-skullWidth*0.08,y+skullHeight*0.08);
+    ctx.lineTo(x+skullWidth*0.08,y+skullHeight*0.08);
+    ctx.fill();
+
+    // Tanden (kleine rechthoekjes)
+    const teethCount=4;
+    const teethWidth=skullWidth*0.5/teethCount;
+    ctx.fillStyle=`hsla(0,0%,${10*lightMul}%,${fadeAlpha*0.6})`;
+    for(let i=0;i<teethCount;i++){
+      const teethX=x-skullWidth*0.25+(i*teethWidth);
+      ctx.fillRect(teethX,y+skullHeight*0.2,teethWidth*0.8,skullHeight*0.12);
+    }
   }
   else if(deco.type==='chest'){
     const x=deco.x;
