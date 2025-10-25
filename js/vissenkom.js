@@ -2425,7 +2425,7 @@ function drawActivityList(){
         break;
       case 'access_code_generated':
         emoji='🔑';
-        label=`Nieuwe toegangscode · ${timeStr}`;
+        label=`Nieuwe QR-code · ${timeStr}`;
         break;
       case 'water_greenness_milestone':
         emoji='✨';
