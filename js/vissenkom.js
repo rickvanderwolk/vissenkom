@@ -281,7 +281,7 @@ function discoEffects(time){
 }
 
 function makeFish(x=rand(50,W-50),y=rand(50,H-50),name){const base=rand(18,30);let hue=Math.floor(rand(0,360));if(isNaN(hue))hue=0;const initialVx=rand(-2.5,2.5);const initialVy=rand(-.3,.3);const f={x,y,vx:initialVx,vy:initialVy,speed:rand(1.5,3.0),baseSize:base,hue,dir:Math.random()*Math.PI*2,turnTimer:Math.floor(rand(600,1800)),blink:0,name:name||`Vis ${fishCounter++}`,lastEat:Date.now(),bornAt:Date.now(),eats:0,sickTop:Math.random()<0.5,hungerWindow:DAY*rand(0.9,1.1),behaviorState:'normal',behaviorTimer:0,wallFollowTarget:null,lastPoop:Date.now(),targetVx:initialVx,targetVy:initialVy,ballApproachSide:Math.random()<0.5?-1:1};fishes.push(f)}
-for(let i=0;i<8;i++)makeFish();
+// Dummy vissen verwijderd - vissen komen nu alleen van server na gameState
 
 function makeFood(){const n=Math.max(8,fishes.length);const candyColors=['#ff1744','#ff6f00','#9c27b0','#ff4081','#00e676'];for(let i=0;i<n;i++){const color=halloweenTheme?candyColors[Math.floor(Math.random()*candyColors.length)]:'#ffb37a';foods.push({x:rand(40,W-40),y:50+rand(0,30),vy:rand(0.7,1.5),r:7,ttl:6000,color})}}
 function makeBubble(){
@@ -2927,6 +2927,7 @@ function fallbackToExternalQR(canvas, controllerUrl, accessCode) {
 let ws = null;
 let currentVersion = null; // Store current version to detect changes
 let appConfig = { showBehaviorEmoji: false }; // Store config from server
+let gameLoopStarted = false; // Track if game loop has been started
 
 function initWebSocket() {
     try {
@@ -2989,6 +2990,13 @@ function handleRemoteCommand(data) {
     switch (data.type) {
         case 'gameState':
             loadGameState(data.data);
+            // Start game loop after successfully loading game state
+            if (!gameLoopStarted) {
+                console.log('🎮 Starting game loop after receiving game state');
+                gameLoopStarted = true;
+                hideLoadingIndicator();
+                loop();
+            }
             break;
         case 'status':
             // Update water greenness target from server (smooth transition)
@@ -3329,10 +3337,44 @@ function updateLayerCache(){
   frontDecorations=decorations.filter(d=>d.zIndex==='front');
 }
 
-function init(){document.getElementById('tank').style.background=BG;document.body.classList.add('dark');document.body.classList.remove('light');lightsOn=true;resize();updateCooldown();drawLists();drawActivityList();initWebSocket()}
+function showLoadingIndicator() {
+    const indicator = document.createElement('div');
+    indicator.id = 'loading-indicator';
+    indicator.style.cssText = `
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        text-align: center;
+        color: #50e3c2;
+        font-family: system-ui, sans-serif;
+        font-size: 18px;
+        z-index: 1000;
+    `;
+    indicator.innerHTML = `
+        <div style="font-size: 48px; margin-bottom: 15px;">🐟</div>
+        <div>Vissenkom laden...</div>
+    `;
+    document.body.appendChild(indicator);
+}
+
+function hideLoadingIndicator() {
+    const indicator = document.getElementById('loading-indicator');
+    if (indicator) {
+        indicator.remove();
+    }
+}
+
+function init(){document.getElementById('tank').style.background=BG;document.body.classList.add('dark');document.body.classList.remove('light');lightsOn=true;resize();updateCooldown();drawLists();drawActivityList();showLoadingIndicator();initWebSocket()}
 init();
 
-function loop(){const now=Date.now();const dt=Math.min(0.05,(now-lastT)/1000);lastT=now;t++;
+function loop(){
+// Stop loop if game is not active (e.g., vissenkom already active elsewhere)
+if(!gameLoopStarted){
+  return;
+}
+
+const now=Date.now();const dt=Math.min(0.05,(now-lastT)/1000);lastT=now;t++;
 measureFPS(); // Measure FPS for adaptive performance
 
 // Skip frame if performance is low
@@ -3435,10 +3477,18 @@ if(fadeState==='idle'&&now-lastDecorUpdate>DECOR_UPDATE_INTERVAL){
   }
 }
 
-requestAnimationFrame(loop)}loop();
+requestAnimationFrame(loop)}
+// loop() is now started after gameState is received (see handleRemoteCommand)
 
 // Show error when vissenkom is already active elsewhere
 function showVisssenkomAlreadyActiveError(message) {
+    // Stop game loop to prevent resource waste
+    gameLoopStarted = false;
+    console.log('🛑 Game loop stopped due to already active error');
+
+    // Hide loading indicator if it's still showing
+    hideLoadingIndicator();
+
     // Create error overlay
     const overlay = document.createElement('div');
     overlay.id = 'vissenkom-error-overlay';
@@ -3448,7 +3498,7 @@ function showVisssenkomAlreadyActiveError(message) {
         left: 0;
         width: 100%;
         height: 100%;
-        background: rgba(0, 0, 0, 0.85);
+        background: rgba(0, 0, 0, 0.95);
         display: flex;
         align-items: center;
         justify-content: center;
