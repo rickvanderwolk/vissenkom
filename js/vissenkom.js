@@ -235,7 +235,7 @@ function setupDecorations(){
   // Halloween: extra schedel decoratie (50% kans)
   if(halloweenTheme&&Math.random()<0.5){
     const x=rand(80,W-80);
-    const size=rand(40,80); // Kleiner dan pompoen
+    const size=rand(70,250); // Vergelijkbaar met pompoen maar iets kleiner
     const bobPhase=rand(0,Math.PI*2);
     const zIndex=Math.random()<0.7?'back':'front';
     const minY=H-size/2;
@@ -283,7 +283,7 @@ function discoEffects(time){
 function makeFish(x=rand(50,W-50),y=rand(50,H-50),name){const base=rand(18,30);let hue=Math.floor(rand(0,360));if(isNaN(hue))hue=0;const initialVx=rand(-2.5,2.5);const initialVy=rand(-.3,.3);const f={x,y,vx:initialVx,vy:initialVy,speed:rand(1.5,3.0),baseSize:base,hue,dir:Math.random()*Math.PI*2,turnTimer:Math.floor(rand(600,1800)),blink:0,name:name||`Vis ${fishCounter++}`,lastEat:Date.now(),bornAt:Date.now(),eats:0,sickTop:Math.random()<0.5,hungerWindow:DAY*rand(0.9,1.1),behaviorState:'normal',behaviorTimer:0,wallFollowTarget:null,lastPoop:Date.now(),targetVx:initialVx,targetVy:initialVy};fishes.push(f)}
 for(let i=0;i<8;i++)makeFish();
 
-function makeFood(){const n=Math.max(8,fishes.length);for(let i=0;i<n;i++){foods.push({x:rand(40,W-40),y:50+rand(0,30),vy:rand(0.7,1.5),r:7,ttl:6000})}}
+function makeFood(){const n=Math.max(8,fishes.length);const candyColors=['#ff1744','#ff6f00','#9c27b0','#ff4081','#00e676'];for(let i=0;i<n;i++){const color=halloweenTheme?candyColors[Math.floor(Math.random()*candyColors.length)]:'#ffb37a';foods.push({x:rand(40,W-40),y:50+rand(0,30),vy:rand(0.7,1.5),r:7,ttl:6000,color})}}
 function makeBubble(){
   const b=getBubble();
   b.x=pumpPos.x+rand(-6,6);
@@ -505,6 +505,47 @@ function drawStars(time){
       ctx.fill();
     }
   }
+}
+
+function drawHalloweenMoon(){
+  if(!halloweenTheme||lightsOn)return;
+
+  // Grote volle maan rechtsboven
+  const moonX=W*0.85;
+  const moonY=H*0.15;
+  const moonRadius=60;
+
+  // Maan glow (zachte gloed rondom)
+  const moonGlow=ctx.createRadialGradient(moonX,moonY,moonRadius*0.5,moonX,moonY,moonRadius*2);
+  moonGlow.addColorStop(0,'rgba(255,255,200,0.3)');
+  moonGlow.addColorStop(0.5,'rgba(255,255,200,0.1)');
+  moonGlow.addColorStop(1,'rgba(255,255,200,0)');
+  ctx.fillStyle=moonGlow;
+  ctx.beginPath();
+  ctx.arc(moonX,moonY,moonRadius*2,0,Math.PI*2);
+  ctx.fill();
+
+  // Maan zelf (gradient voor 3D effect)
+  const moonGrad=ctx.createRadialGradient(moonX-moonRadius*0.3,moonY-moonRadius*0.3,0,moonX,moonY,moonRadius);
+  moonGrad.addColorStop(0,'#fffef0'); // Licht geel-wit
+  moonGrad.addColorStop(0.7,'#f0e68c'); // Khaki geel
+  moonGrad.addColorStop(1,'#d4c589'); // Donkerder aan de rand
+  ctx.fillStyle=moonGrad;
+  ctx.beginPath();
+  ctx.arc(moonX,moonY,moonRadius,0,Math.PI*2);
+  ctx.fill();
+
+  // Kraters (donkere vlekken)
+  ctx.fillStyle='rgba(180,170,140,0.3)';
+  ctx.beginPath();
+  ctx.arc(moonX+moonRadius*0.2,moonY-moonRadius*0.3,moonRadius*0.15,0,Math.PI*2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(moonX-moonRadius*0.3,moonY+moonRadius*0.1,moonRadius*0.2,0,Math.PI*2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(moonX+moonRadius*0.1,moonY+moonRadius*0.35,moonRadius*0.12,0,Math.PI*2);
+  ctx.fill();
 }
 
 function setupSpiderWebs(){
@@ -749,6 +790,7 @@ function clearFrame(time){
   ctx.fillRect(0,0,W,H);
 
   drawStars(time);
+  drawHalloweenMoon();
   drawAmbientGlow(time);
   drawLamps(time);
   drawSpiderWebs();
@@ -765,10 +807,10 @@ function drawFood(){for(let i=foods.length-1;i>=0;i--){const p=foods[i];
     p.y+=p.vy;    // Blijf vallen als nog niet op bodem
   }
   p.ttl--;
-  ctx.fillStyle='#ffb37a';ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle=p.color||'#ffb37a';ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fill();
   // Verwijder alleen als ttl verloopt (niet meer als het de bodem raakt)
   if(p.ttl<=0){foods.splice(i,1)}}}
-function drawBubbles(){for(let i=bubbles.length-1;i>=0;i--){const b=bubbles[i];b.y-=b.vy;b.x+=b.vx;b.ttl--;ctx.globalAlpha=lightsOn?0.7:0.5;ctx.fillStyle='#bfeaf5';ctx.beginPath();ctx.arc(b.x,b.y,b.r,0,Math.PI*2);ctx.fill();ctx.globalAlpha=1;if(b.y<-10||b.ttl<=0){releaseBubble(b);bubbles.splice(i,1)}}}
+function drawBubbles(){for(let i=bubbles.length-1;i>=0;i--){const b=bubbles[i];b.y-=b.vy;b.x+=b.vx;b.ttl--;ctx.globalAlpha=lightsOn?0.7:0.5;ctx.fillStyle=halloweenTheme?'#9d4edd':'#bfeaf5';ctx.beginPath();ctx.arc(b.x,b.y,b.r,0,Math.PI*2);ctx.fill();ctx.globalAlpha=1;if(b.y<-10||b.ttl<=0){releaseBubble(b);bubbles.splice(i,1)}}}
 
 function drawPoops(){
   for(const p of poops) {
@@ -922,36 +964,109 @@ function drawPlayBalls(){
     ctx.fill();
     ctx.globalAlpha = 1;
 
-    // Hoofdbal - gradient voor 3D effect met random kleur
-    const gradient = ctx.createRadialGradient(
-      ball.x - ball.radius/3,
-      ball.y - ball.radius/3,
-      ball.radius/4,
-      ball.x,
-      ball.y,
-      ball.radius
-    );
-    gradient.addColorStop(0, ball.color.light); // Lichte kleur
-    gradient.addColorStop(0.5, ball.color.mid); // Middel kleur
-    gradient.addColorStop(1, ball.color.dark); // Donkere kleur
+    if(halloweenTheme){
+      // Halloween: pompoen stijl bal (zelfde stijl als decoratie)
+      const lightMul = lightsOn ? 1 : 0.6;
+      const hue = 30; // Oranje hue (zoals pompoen decoratie)
 
-    ctx.fillStyle = gradient;
-    ctx.beginPath();
-    ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
-    ctx.fill();
+      // Pompoen lichaam (oranje met gradient - exact zoals decoratie)
+      const pumpkinGrad = ctx.createRadialGradient(
+        ball.x - ball.radius * 0.2,
+        ball.y - ball.radius * 0.2,
+        0,
+        ball.x,
+        ball.y,
+        ball.radius * 0.6
+      );
+      pumpkinGrad.addColorStop(0, `hsla(${hue},85%,${58*lightMul}%,1)`);
+      pumpkinGrad.addColorStop(1, `hsla(${hue},75%,${40*lightMul}%,1)`);
+      ctx.fillStyle = pumpkinGrad;
+      ctx.beginPath();
+      ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+      ctx.fill();
 
-    // Witte glans voor shiny effect
-    ctx.globalAlpha = lightsOn ? 0.6 : 0.3;
-    ctx.fillStyle = '#fff';
-    ctx.beginPath();
-    ctx.arc(ball.x - ball.radius/3, ball.y - ball.radius/3, ball.radius/3, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.globalAlpha = 1;
+      // Pompoen segmenten (donkere lijnen - exact zoals decoratie)
+      ctx.strokeStyle = `hsla(${hue},70%,${25*lightMul}%,0.6)`;
+      ctx.lineWidth = 2;
+      for(let i = -2; i <= 2; i++){
+        const segX = ball.x + i * ball.radius * 0.3;
+        // Gebruik ellipse formule voor ronde bal
+        const xOffset = Math.abs(i * ball.radius * 0.3);
+        const maxY = ball.radius * Math.sqrt(1 - Math.pow(xOffset / ball.radius, 2));
+        const lineHeight = maxY * 0.96;
+
+        ctx.beginPath();
+        ctx.moveTo(segX, ball.y - lineHeight);
+        ctx.quadraticCurveTo(segX + (i * 3), ball.y, segX, ball.y + lineHeight);
+        ctx.stroke();
+      }
+
+      // Steeltje (groen - exact zoals decoratie)
+      const stemWidth = ball.radius * 0.24;
+      const stemHeight = ball.radius * 0.4;
+      ctx.fillStyle = `hsla(120,45%,${30*lightMul}%,1)`;
+      ctx.fillRect(ball.x - stemWidth/2, ball.y - ball.radius - stemHeight, stemWidth, stemHeight);
+
+      // Jack-o'-lantern gezicht (exact zoals decoratie)
+      const eyeGlow = `hsla(45,100%,${65*lightMul}%,1)`;
+
+      // Linker oog (driehoek)
+      ctx.fillStyle = eyeGlow;
+      ctx.beginPath();
+      ctx.moveTo(ball.x - ball.radius * 0.5, ball.y - ball.radius * 0.3);
+      ctx.lineTo(ball.x - ball.radius * 0.3, ball.y - ball.radius * 0.3);
+      ctx.lineTo(ball.x - ball.radius * 0.4, ball.y - ball.radius * 0.1);
+      ctx.fill();
+
+      // Rechter oog (driehoek)
+      ctx.beginPath();
+      ctx.moveTo(ball.x + ball.radius * 0.3, ball.y - ball.radius * 0.3);
+      ctx.lineTo(ball.x + ball.radius * 0.5, ball.y - ball.radius * 0.3);
+      ctx.lineTo(ball.x + ball.radius * 0.4, ball.y - ball.radius * 0.1);
+      ctx.fill();
+
+      // Mond (grillig - exact zoals decoratie)
+      ctx.beginPath();
+      ctx.moveTo(ball.x - ball.radius * 0.5, ball.y + ball.radius * 0.2);
+      ctx.quadraticCurveTo(ball.x - ball.radius * 0.3, ball.y + ball.radius * 0.4, ball.x - ball.radius * 0.1, ball.y + ball.radius * 0.2);
+      ctx.quadraticCurveTo(ball.x, ball.y + ball.radius * 0.4, ball.x + ball.radius * 0.1, ball.y + ball.radius * 0.2);
+      ctx.quadraticCurveTo(ball.x + ball.radius * 0.3, ball.y + ball.radius * 0.4, ball.x + ball.radius * 0.5, ball.y + ball.radius * 0.2);
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = eyeGlow;
+      ctx.stroke();
+
+    } else {
+      // Normaal: gekleurde bal
+      const gradient = ctx.createRadialGradient(
+        ball.x - ball.radius/3,
+        ball.y - ball.radius/3,
+        ball.radius/4,
+        ball.x,
+        ball.y,
+        ball.radius
+      );
+      gradient.addColorStop(0, ball.color.light); // Lichte kleur
+      gradient.addColorStop(0.5, ball.color.mid); // Middel kleur
+      gradient.addColorStop(1, ball.color.dark); // Donkere kleur
+
+      ctx.fillStyle = gradient;
+      ctx.beginPath();
+      ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Witte glans voor shiny effect
+      ctx.globalAlpha = lightsOn ? 0.6 : 0.3;
+      ctx.fillStyle = '#fff';
+      ctx.beginPath();
+      ctx.arc(ball.x - ball.radius/3, ball.y - ball.radius/3, ball.radius/3, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    }
 
     // Fade out effect in laatste seconden
     if(ball.ttl < 120){ // Laatste 2 seconden
       ctx.globalAlpha = ball.ttl / 120;
-      ctx.strokeStyle = ball.color.light;
+      ctx.strokeStyle = halloweenTheme ? '#ff8c42' : ball.color.light;
       ctx.lineWidth = 3;
       ctx.setLineDash([8, 8]);
       ctx.beginPath();
