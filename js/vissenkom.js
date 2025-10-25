@@ -55,7 +55,7 @@ function resize(){
   W=fullW-(viewportConfig.offsetLeft+viewportConfig.offsetRight);
   H=fullH-(viewportConfig.offsetTop+viewportConfig.offsetBottom);
   updateUIPositions();
-  setupLamps();setupPlants();setupDecorations();setupStars();setupParticles();
+  setupLamps();setupPlants();setupDecorations();setupStars();setupParticles();setupSpiderWebs();
   updateLayerCache();
   drawQR();
 }
@@ -72,15 +72,17 @@ function updateUIPositions(){
 }
 window.addEventListener('resize',resize);
 const DAY_MIN=2*24*60;const DAY=DAY_MIN*60*1000;const FEED_CD=60*60*1000;
-const BG='#083042';const BG_NIGHT='#04121a';
+const BG='#083042';const BG_NIGHT='#04121a';const BG_HALLOWEEN='#020d12'; // Veel donkerder, griezeliger voor Halloween
 const fishes=[];const foods=[];const deadLog=[];const bubbles=[];const poops=[];
 const plants=[];const decorations=[];const stars=[];const particles=[];const algenParticles=[];
 const playBalls=[]; // Speelballen voor vissen
+const spiderWebs=[]; // Halloween spinnenwebben (statisch)
 let recentActivity=[];
 let lastFed=0;let fishCounter=1;let lastT=Date.now();let TOP_N=3;
 let lightsOn=true;let discoOn=false;let pumpOn=false;const pumpPos={x:0,y:0};let pumpJustOnUntil=0;
 let waterGreenness=0;let waterGreennessTarget=0;
 let currentTemperature=24;
+let halloweenTheme=true; // Halloween theme toggle (later with date range)
 
 function setupLamps(){const n=4;const baseWidth=180;const spread=0.12;const hue=48;const margin=W*0.08;const step=(W-2*margin)/Math.max(1,n-1);lamps=[];for(let i=0;i<n;i++){const x=margin+i*step+rand(-step*spread,step*spread);const intensity=rand(0.55,0.8);const width=baseWidth*rand(0.9,1.1);const phase=rand(0,Math.PI*2);const stripePhase=rand(0,Math.PI*2);lamps.push({x,width,intensity,hueBase:hue,phase,stripePhase})}}
 
@@ -209,24 +211,30 @@ function setupDecorations(){
   decorations.length=0;
   const sandHeight=70;
 
-  // Af en toe een kasteeltje
-  if(Math.random()<0.3){
+  // Halloween pompoen of normaal kasteeltje
+  // In Halloween mode: altijd minimaal 1 pompoen, anders 30% kans
+  const shouldAddDecoration=halloweenTheme||Math.random()<0.3;
+
+  if(shouldAddDecoration){
     const x=rand(80,W-80);
-    const size=rand(80,140);
+    // Pompoen kan groter zijn dan kasteel: 80-280 (soms 2x zo groot)
+    const size=halloweenTheme?rand(80,280):rand(80,140);
     const bobPhase=rand(0,Math.PI*2);
     const zIndex=Math.random()<0.7?'back':'front';
-    // Variatie in hoogte: van onderkant zand tot wat hoger
-    // y is het middenpunt van het kasteel, dus voor een kasteel dat op de bodem staat:
-    // minimaal: H - size/2 (onderkant zit op H)
-    // maximaal: H - sandHeight (onderkant zit op zandhoogte)
-    const minY=H-size/2; // Helemaal onderaan
-    const maxY=H-sandHeight+10; // Bijna bovenop zand
+    const minY=H-size/2;
+    const maxY=H-sandHeight+10;
     const y=rand(minY,maxY);
-    decorations.push({type:'castle',x,y,size,hue:rand(200,220),bobPhase,zIndex});
+
+    if(halloweenTheme){
+      decorations.push({type:'pumpkin',x,y,size,hue:rand(25,35),bobPhase,zIndex});
+    }else{
+      decorations.push({type:'castle',x,y,size,hue:rand(200,220),bobPhase,zIndex});
+    }
   }
 }
 function lampHueFor(L,time){if(!discoOn)return L.hueBase;const speed=2.5;const range=340;const wave=(Math.sin(time*speed+L.phase)+1)/2;return (L.hueBase+wave*range)%360}
 function strobeAlpha(time){if(!discoOn)return 1;const hz=1.5;const duty=0.8;const cycle=(time*hz)%1;return cycle<duty?1:0.75}
+function flickerEffect(L,time){if(!halloweenTheme)return 1;const baseFlicker=Math.sin(time*8+L.phase)*0.5+0.5;const stutter=Math.random()<0.05?Math.random()*0.3:0;const shortFlash=Math.random()<0.02?0:1;return Math.max(0.3,baseFlicker-stutter)*shortFlash}
 let discoCache={};let lastDiscoTime=0;
 function discoEffects(time){
   if(!discoOn)return;
@@ -418,8 +426,9 @@ function drawLamps(time){
   const stro=strobeAlpha(time);
   const discoMultiplier=discoOn?1.5:1; // Reduced from 1.8 to 1.5
   for(const L of lamps){
+    const flicker=flickerEffect(L,time);
     const hue=lampHueFor(L,time);
-    const intensity=L.intensity*(discoOn?1.2:1); // Reduced from 1.4 to 1.2
+    const intensity=L.intensity*(discoOn?1.2:1)*flicker; // Reduced from 1.4 to 1.2, added flicker
     const topGlow=ctx.createRadialGradient(L.x,0,2,L.x,0,Math.max(40,L.width*0.6*discoMultiplier));
     topGlow.addColorStop(0,`hsla(${hue},95%,90%,${0.4*intensity*stro})`); // Reduced intensity
     topGlow.addColorStop(1,'rgba(0,0,0,0)');
@@ -482,6 +491,76 @@ function drawStars(time){
       ctx.beginPath();
       ctx.arc(star.x,star.y,star.size*1.8,0,Math.PI*2);
       ctx.fill();
+    }
+  }
+}
+
+function setupSpiderWebs(){
+  spiderWebs.length=0;
+  if(!halloweenTheme)return;
+
+  // Alleen 2 webben: linksboven en rechtsboven (altijd in de hoeken)
+  const corners=[
+    {x:0,y:0,anchor:'left'},        // Linksboven
+    {x:W,y:0,anchor:'right'}        // Rechtsboven
+  ];
+
+  for(const corner of corners){
+    const webSize=rand(300,500); // Veel groter: 300-500 (huidige 300 is nu het kleinste)
+    const strands=5;
+    const radialLines=[];
+    const concentricLines=[];
+
+    // Genereer radiaal strands vanuit de hoek (statisch)
+    for(let i=0;i<strands;i++){
+      const angle=corner.anchor==='left'?i*(Math.PI/2)/(strands-1):Math.PI/2+i*(Math.PI/2)/(strands-1);
+      const endX=corner.x+Math.cos(angle)*webSize;
+      const endY=corner.y+Math.sin(angle)*webSize;
+      radialLines.push({startX:corner.x,startY:corner.y,endX,endY});
+    }
+
+    // Genereer spiraal/concentrische lijnen (statisch)
+    for(let r=1;r<=3;r++){
+      const radius=webSize*(r/3)*0.7;
+      const points=[];
+
+      for(let i=0;i<strands;i++){
+        const angle=corner.anchor==='left'?i*(Math.PI/2)/(strands-1):Math.PI/2+i*(Math.PI/2)/(strands-1);
+        const x=corner.x+Math.cos(angle)*radius;
+        const y=corner.y+Math.sin(angle)*radius;
+        points.push({x,y});
+      }
+      concentricLines.push(points);
+    }
+
+    spiderWebs.push({radialLines,concentricLines});
+  }
+}
+
+function drawSpiderWebs(){
+  if(!halloweenTheme||spiderWebs.length===0)return;
+
+  // In Halloween mode: spinnenwebben altijd zichtbaar (ook bij licht uit)
+  ctx.strokeStyle='rgba(200,200,200,0.15)';
+  ctx.lineWidth=1;
+
+  for(const web of spiderWebs){
+    // Teken radiaal strands
+    for(const line of web.radialLines){
+      ctx.beginPath();
+      ctx.moveTo(line.startX,line.startY);
+      ctx.lineTo(line.endX,line.endY);
+      ctx.stroke();
+    }
+
+    // Teken concentrische lijnen
+    for(const points of web.concentricLines){
+      ctx.beginPath();
+      for(let i=0;i<points.length;i++){
+        if(i===0)ctx.moveTo(points[i].x,points[i].y);
+        else ctx.lineTo(points[i].x,points[i].y);
+      }
+      ctx.stroke();
     }
   }
 }
@@ -630,7 +709,13 @@ function clearFrame(time){
 
   // Fill viewport area with gradient background for depth - meer variatie
   const bgGrad=ctx.createLinearGradient(0,0,0,H);
-  if(lightsOn){
+  if(halloweenTheme){
+    // Halloween: altijd donker/griezelig (ongeacht lampen)
+    bgGrad.addColorStop(0,'#0a1418'); // Zeer donker met hint van blauw
+    bgGrad.addColorStop(0.3,'#050c10'); // Bijna zwart
+    bgGrad.addColorStop(0.7,'#020608'); // Zeer donker
+    bgGrad.addColorStop(1,'#000000'); // Zwart onderaan
+  } else if(lightsOn){
     bgGrad.addColorStop(0,'#0d5168'); // Lichter blauw bovenaan
     bgGrad.addColorStop(0.3,'#094050'); // Midden
     bgGrad.addColorStop(0.7,'#073342'); // Dieper
@@ -647,13 +732,14 @@ function clearFrame(time){
   // Extra subtiele radiale gradient voor meer diepte (donkerder in hoeken)
   const vignetteGrad=ctx.createRadialGradient(W/2,H/2,Math.min(W,H)*0.3,W/2,H/2,Math.max(W,H)*0.8);
   vignetteGrad.addColorStop(0,'rgba(0,0,0,0)');
-  vignetteGrad.addColorStop(1,'rgba(0,0,0,0.15)');
+  vignetteGrad.addColorStop(1,halloweenTheme?'rgba(0,0,0,0.4)':'rgba(0,0,0,0.15)'); // Donkerdere vignette in Halloween
   ctx.fillStyle=vignetteGrad;
   ctx.fillRect(0,0,W,H);
 
   drawStars(time);
   drawAmbientGlow(time);
   drawLamps(time);
+  drawSpiderWebs();
   discoEffects(time);
   drawParticles();
   ctx.restore();
@@ -1148,6 +1234,75 @@ function drawDecoration(deco,time){
     ctx.lineTo(x+flagHeight+flagWave,y-baseHeight/2-towerHeight-flagHeight*0.7);
     ctx.lineTo(x+2,y-baseHeight/2-towerHeight-flagHeight*0.4);
     ctx.fill();
+  }
+  else if(deco.type==='pumpkin'){
+    const x=deco.x;
+    const y=deco.y+bobAmount;
+    const pumpkinWidth=deco.size*0.8;
+    const pumpkinHeight=deco.size*0.7;
+
+    // Pompoen lichaam (oranje met segmenten)
+    const pumpkinGrad=ctx.createRadialGradient(x-pumpkinWidth*0.2,y-pumpkinHeight*0.2,0,x,y,pumpkinWidth*0.6);
+    pumpkinGrad.addColorStop(0,`hsla(${deco.hue},85%,${58*lightMul}%,${fadeAlpha})`);
+    pumpkinGrad.addColorStop(1,`hsla(${deco.hue},75%,${40*lightMul}%,${fadeAlpha})`);
+    ctx.fillStyle=pumpkinGrad;
+    ctx.beginPath();
+    ctx.ellipse(x,y,pumpkinWidth*0.5,pumpkinHeight*0.45,0,0,Math.PI*2);
+    ctx.fill();
+
+    // Pompoen segmenten (donkere lijnen)
+    ctx.strokeStyle=`hsla(${deco.hue},70%,${25*lightMul}%,${fadeAlpha*0.6})`;
+    ctx.lineWidth=2;
+    for(let i=-2;i<=2;i++){
+      const segX=x+i*pumpkinWidth*0.15;
+      // Bereken de hoogte van de lijn zodat deze binnen de ellips blijft
+      // De ellips heeft straal pumpkinWidth*0.5 en pumpkinHeight*0.45
+      const xOffset=Math.abs(i*pumpkinWidth*0.15); // Horizontale afstand van centrum
+      const radiusX=pumpkinWidth*0.5;
+      const radiusY=pumpkinHeight*0.45;
+      // Ellips formule: (x/a)² + (y/b)² = 1, dus y = b * sqrt(1 - (x/a)²)
+      const maxY=radiusY*Math.sqrt(1-Math.pow(xOffset/radiusX,2));
+      const lineHeight=maxY*0.96; // 96% van max hoogte, bijna tot de rand
+
+      ctx.beginPath();
+      ctx.moveTo(segX,y-lineHeight);
+      ctx.quadraticCurveTo(segX+(i*3),y,segX,y+lineHeight);
+      ctx.stroke();
+    }
+
+    // Steeltje (groen)
+    const stemWidth=deco.size*0.12;
+    const stemHeight=deco.size*0.2;
+    ctx.fillStyle=`hsla(120,45%,${30*lightMul}%,${fadeAlpha})`;
+    ctx.fillRect(x-stemWidth/2,y-pumpkinHeight*0.45-stemHeight,stemWidth,stemHeight);
+
+    // Jack-o'-lantern gezicht (statische gloeiende ogen en mond)
+    const eyeGlow=`hsla(45,100%,${65*lightMul}%,${fadeAlpha})`;
+
+    // Linker oog (driehoek)
+    ctx.fillStyle=eyeGlow;
+    ctx.beginPath();
+    ctx.moveTo(x-pumpkinWidth*0.25,y-pumpkinHeight*0.15);
+    ctx.lineTo(x-pumpkinWidth*0.15,y-pumpkinHeight*0.15);
+    ctx.lineTo(x-pumpkinWidth*0.2,y-pumpkinHeight*0.05);
+    ctx.fill();
+
+    // Rechter oog (driehoek)
+    ctx.beginPath();
+    ctx.moveTo(x+pumpkinWidth*0.15,y-pumpkinHeight*0.15);
+    ctx.lineTo(x+pumpkinWidth*0.25,y-pumpkinHeight*0.15);
+    ctx.lineTo(x+pumpkinWidth*0.2,y-pumpkinHeight*0.05);
+    ctx.fill();
+
+    // Mond (grillig)
+    ctx.beginPath();
+    ctx.moveTo(x-pumpkinWidth*0.25,y+pumpkinHeight*0.1);
+    ctx.quadraticCurveTo(x-pumpkinWidth*0.15,y+pumpkinHeight*0.2,x-pumpkinWidth*0.05,y+pumpkinHeight*0.1);
+    ctx.quadraticCurveTo(x,y+pumpkinHeight*0.2,x+pumpkinWidth*0.05,y+pumpkinHeight*0.1);
+    ctx.quadraticCurveTo(x+pumpkinWidth*0.15,y+pumpkinHeight*0.2,x+pumpkinWidth*0.25,y+pumpkinHeight*0.1);
+    ctx.lineWidth=3;
+    ctx.strokeStyle=eyeGlow;
+    ctx.stroke();
   }
   else if(deco.type==='chest'){
     const x=deco.x;
@@ -2848,7 +3003,9 @@ function makeFishFromData(serverFish) {
 }
 
 function updateLightUI() {
-    document.getElementById('tank').style.background = lightsOn ? BG : BG_NIGHT;
+    // In Halloween mode: altijd donkere achtergrond (ongeacht lampen status)
+    const bgColor = halloweenTheme ? BG_HALLOWEEN : (lightsOn ? BG : BG_NIGHT);
+    document.getElementById('tank').style.background = bgColor;
     document.body.classList.toggle('light', lightsOn);
     document.body.classList.toggle('dark', !lightsOn);
 }
