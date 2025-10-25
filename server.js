@@ -24,6 +24,27 @@ try {
     console.error('Fout bij laden config:', error);
 }
 
+// Theme logic - determine current theme based on config or date
+function getCurrentTheme() {
+    // If theme is set in config, use that (override)
+    if (config.theme) {
+        return config.theme;
+    }
+
+    // Otherwise, check date for automatic themes
+    const now = new Date();
+    const month = now.getMonth(); // 0-11 (0=January, 9=October)
+    const day = now.getDate(); // 1-31
+
+    // Halloween: October 29 - November 2 (inclusive)
+    if ((month === 9 && day >= 29) || (month === 10 && day <= 2)) {
+        return 'halloween';
+    }
+
+    // Default theme
+    return 'normal';
+}
+
 // Create HTTP server for serving files
 const server = http.createServer((req, res) => {
     let filePath = '';
@@ -99,6 +120,9 @@ let appState = {
 
 // Track last broadcasted waterGreenness to avoid unnecessary updates
 let lastBroadcastedGreenness = 0;
+
+// Track current theme to detect changes
+let currentTheme = getCurrentTheme();
 
 // Load existing state from file
 function loadState() {
@@ -719,7 +743,8 @@ function broadcastStatusUpdate() {
             fishCount: appState.fishes.length,
             temperature: appState.temperature,
             heatingOn: appState.heatingOn,
-            roomTemperature: getRoomTemperature()
+            roomTemperature: getRoomTemperature(),
+            theme: currentTheme
         }
     };
 
@@ -831,7 +856,8 @@ function sendGameState(client) {
             discoOn: appState.discoOn,
             pumpOn: appState.pumpOn,
             poopCount: appState.poopCount,
-            waterGreenness: appState.waterGreenness
+            waterGreenness: appState.waterGreenness,
+            theme: currentTheme
         }
     };
 
@@ -920,6 +946,23 @@ setInterval(() => {
     generateAccessCode();
     broadcastNewAccessCode();
 }, 50 * 60 * 1000); // Every 50 minutes (10 minute buffer before 1 hour expiry)
+
+// Check for theme changes every minute
+setInterval(() => {
+    const newTheme = getCurrentTheme();
+    if (newTheme !== currentTheme) {
+        console.log(`🎨 Theme changed from "${currentTheme}" to "${newTheme}" - broadcasting reload`);
+        currentTheme = newTheme;
+
+        // Broadcast reload to all main apps
+        broadcastToMainApp({ type: 'reload', reason: 'theme_change', newTheme });
+
+        // Also update status to reflect new theme immediately
+        if (controllers.size > 0) {
+            broadcastStatusUpdate();
+        }
+    }
+}, 60 * 1000); // Check every minute
 
 // Temperature regulation with smart thermostat (every 5 minutes)
 setInterval(() => {
