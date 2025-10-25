@@ -82,7 +82,7 @@ let lastFed=0;let fishCounter=1;let lastT=Date.now();let TOP_N=3;
 let lightsOn=true;let discoOn=false;let pumpOn=false;const pumpPos={x:0,y:0};let pumpJustOnUntil=0;
 let waterGreenness=0;let waterGreennessTarget=0;
 let currentTemperature=24;
-let halloweenTheme=true; // Halloween theme toggle (later with date range)
+let halloweenTheme=false; // Halloween theme toggle (loaded from server)
 
 function setupLamps(){const n=4;const baseWidth=180;const spread=0.12;const hue=48;const margin=W*0.08;const step=(W-2*margin)/Math.max(1,n-1);lamps=[];for(let i=0;i<n;i++){const x=margin+i*step+rand(-step*spread,step*spread);const intensity=rand(0.55,0.8);const width=baseWidth*rand(0.9,1.1);const phase=rand(0,Math.PI*2);const stripePhase=rand(0,Math.PI*2);lamps.push({x,width,intensity,hueBase:hue,phase,stripePhase})}}
 
@@ -2999,6 +2999,21 @@ function handleRemoteCommand(data) {
             if(data.data && data.data.temperature !== undefined) {
                 currentTemperature = data.data.temperature;
             }
+            // Update theme from server
+            if(data.data && data.data.theme !== undefined) {
+                const newTheme = data.data.theme;
+                if(newTheme === 'halloween' && !halloweenTheme) {
+                    console.log('🎃 Halloween theme activated from server');
+                    halloweenTheme = true;
+                } else if(newTheme !== 'halloween' && halloweenTheme) {
+                    console.log('🎃 Halloween theme deactivated from server');
+                    halloweenTheme = false;
+                }
+            }
+            break;
+        case 'reload':
+            console.log('🔄 Reload request from server:', data.reason);
+            location.reload();
             break;
         case 'accessCode':
             console.log('🔄 Received new access code from server:', data.code);
@@ -3089,6 +3104,12 @@ function loadGameState(state) {
     pumpOn = state.pumpOn;
     waterGreenness = state.waterGreenness || 0;
     waterGreennessTarget = state.waterGreenness || 0;
+
+    // Update theme from game state
+    if(state.theme !== undefined) {
+        halloweenTheme = (state.theme === 'halloween');
+        console.log('🎃 Theme from server:', state.theme, '(halloweenTheme:', halloweenTheme, ')');
+    }
 
     // Clear current fishes and load from server
     fishes.length = 0;
