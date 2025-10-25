@@ -79,7 +79,7 @@ const playBalls=[]; // Speelballen voor vissen
 const spiderWebs=[]; // Halloween spinnenwebben (statisch)
 let recentActivity=[];
 let lastFed=0;let fishCounter=1;let lastT=Date.now();let TOP_N=3;
-let lightsOn=true;let discoOn=false;let pumpOn=false;const pumpPos={x:0,y:0};let pumpJustOnUntil=0;
+let lightsOn=true;let discoOn=false;let pumpOn=false;let heatingOn=true;const pumpPos={x:0,y:0};let pumpJustOnUntil=0;
 let waterGreenness=0;let waterGreennessTarget=0;
 let currentTemperature=24;
 let halloweenTheme=false; // Halloween theme toggle (loaded from server)
@@ -3008,6 +3008,22 @@ function handleRemoteCommand(data) {
             if(data.data && data.data.temperature !== undefined) {
                 currentTemperature = data.data.temperature;
             }
+            // Update heating status from server
+            if(data.data && data.data.heatingOn !== undefined) {
+                heatingOn = data.data.heatingOn;
+            }
+            // Update lights status from server
+            if(data.data && data.data.lightsOn !== undefined) {
+                lightsOn = data.data.lightsOn;
+            }
+            // Update disco status from server
+            if(data.data && data.data.discoOn !== undefined) {
+                discoOn = data.data.discoOn;
+            }
+            // Update pump status from server
+            if(data.data && data.data.pumpOn !== undefined) {
+                pumpOn = data.data.pumpOn;
+            }
             // Update theme from server
             if(data.data && data.data.theme !== undefined) {
                 const newTheme = data.data.theme;
@@ -3111,6 +3127,7 @@ function loadGameState(state) {
     lightsOn = state.lightsOn;
     discoOn = state.discoOn;
     pumpOn = state.pumpOn;
+    heatingOn = state.heatingOn !== undefined ? state.heatingOn : true;
     waterGreenness = state.waterGreenness || 0;
     waterGreennessTarget = state.waterGreenness || 0;
 
@@ -3286,13 +3303,68 @@ function updateCooldown(){
     const left=Math.max(0,FEED_CD-(Date.now()-lastFed));
 
     if(left<=0){
-        cd.textContent='✅ Beschikbaar';
+        cd.textContent='🍤 Voeren: beschikbaar';
         cd.classList.add('ready');
     } else {
         // Better time formatting like ageLabelMS
         const timeText = ageLabelMS(left);
-        cd.textContent=`Voeren kan over ${timeText}`;
+        cd.textContent=`🍤 Voeren: over ${timeText}`;
         cd.classList.remove('ready');
+    }
+}
+
+function updateStatusBar(){
+    // Temperature
+    const tempEl = document.getElementById('temperature');
+    const temp = Math.round(currentTemperature);
+    tempEl.textContent = `🌡️ ${temp}°C`;
+    tempEl.classList.remove('status-on', 'status-warn', 'status-danger');
+    if(temp >= 22 && temp <= 26) {
+        tempEl.classList.add('status-on');
+    } else if(temp >= 20 && temp <= 28) {
+        tempEl.classList.add('status-warn');
+    } else {
+        tempEl.classList.add('status-danger');
+    }
+
+    // Light
+    const lightEl = document.getElementById('light');
+    lightEl.textContent = lightsOn ? '💡 Licht: aan' : '💡 Licht: uit';
+    lightEl.classList.remove('status-on', 'status-off');
+    lightEl.classList.add(lightsOn ? 'status-on' : 'status-off');
+
+    // Pump
+    const pumpEl = document.getElementById('pump');
+    pumpEl.textContent = pumpOn ? '💨 Pomp: aan' : '💨 Pomp: uit';
+    pumpEl.classList.remove('status-on', 'status-off');
+    pumpEl.classList.add(pumpOn ? 'status-on' : 'status-off');
+
+    // Heating
+    const heatingEl = document.getElementById('heating');
+    heatingEl.textContent = heatingOn ? '🔥 Verwarming: aan' : '🔥 Verwarming: uit';
+    heatingEl.classList.remove('status-on', 'status-off');
+    heatingEl.classList.add(heatingOn ? 'status-on' : 'status-off');
+
+    // Water quality
+    const waterEl = document.getElementById('water');
+    const greenness = Math.round(waterGreenness);
+    waterEl.classList.remove('status-on', 'status-warn', 'status-danger');
+
+    if(greenness < 10) {
+        waterEl.textContent = '💧 Water: helder';
+        waterEl.classList.add('status-on');
+    } else if(greenness < 25) {
+        waterEl.textContent = `💧 Water: ${greenness}% groen`;
+        waterEl.classList.add('status-on');
+    } else if(greenness < 50) {
+        waterEl.textContent = `💧 Water: ${greenness}% groen`;
+        waterEl.classList.add('status-warn');
+    } else if(greenness < 75) {
+        waterEl.textContent = `💧 Water: ${greenness}% groen`;
+        waterEl.classList.add('status-warn');
+    } else {
+        waterEl.textContent = `💧 Water: ${greenness}% groen`;
+        waterEl.classList.add('status-danger');
     }
 }
 
@@ -3365,7 +3437,7 @@ function hideLoadingIndicator() {
     }
 }
 
-function init(){document.getElementById('tank').style.background=BG;document.body.classList.add('dark');document.body.classList.remove('light');lightsOn=true;resize();updateCooldown();drawLists();drawActivityList();showLoadingIndicator();initWebSocket()}
+function init(){document.getElementById('tank').style.background=BG;document.body.classList.add('dark');document.body.classList.remove('light');lightsOn=true;resize();updateCooldown();updateStatusBar();drawLists();drawActivityList();showLoadingIndicator();initWebSocket()}
 init();
 
 function loop(){
@@ -3437,7 +3509,7 @@ ctx.restore();
 for(let i=fishes.length-1;i>=0;i--){if(fishes[i].dead){const deadFish={name:fishes[i].name,bornAt:fishes[i].bornAt,diedAt:Date.now()};deadLog.push(deadFish);fishes.splice(i,1);if(ws && ws.readyState === WebSocket.OPEN){ws.send(JSON.stringify({command:'fishDied',fish:deadFish}))}}}
 
 if(now-lastListUpdate>LIST_UPDATE_INTERVAL){drawLists();drawActivityList();lastListUpdate=now}
-if(now-lastCooldownUpdate>COOLDOWN_UPDATE_INTERVAL){updateCooldown();lastCooldownUpdate=now}
+if(now-lastCooldownUpdate>COOLDOWN_UPDATE_INTERVAL){updateCooldown();updateStatusBar();lastCooldownUpdate=now}
 
 // Periodieke ball state sync met server (elke 10 seconden)
 if(now-lastBallStateSync>BALL_STATE_SYNC_INTERVAL){
