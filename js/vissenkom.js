@@ -280,7 +280,7 @@ function discoEffects(time){
   ctx.globalCompositeOperation='source-over';
 }
 
-function makeFish(x=rand(50,W-50),y=rand(50,H-50),name){const base=rand(18,30);let hue=Math.floor(rand(0,360));if(isNaN(hue))hue=0;const initialVx=rand(-2.5,2.5);const initialVy=rand(-.3,.3);const f={x,y,vx:initialVx,vy:initialVy,speed:rand(1.5,3.0),baseSize:base,hue,dir:Math.random()*Math.PI*2,turnTimer:Math.floor(rand(600,1800)),blink:0,name:name||`Vis ${fishCounter++}`,lastEat:Date.now(),bornAt:Date.now(),eats:0,sickTop:Math.random()<0.5,hungerWindow:DAY*rand(0.9,1.1),behaviorState:'normal',behaviorTimer:0,wallFollowTarget:null,lastPoop:Date.now(),targetVx:initialVx,targetVy:initialVy};fishes.push(f)}
+function makeFish(x=rand(50,W-50),y=rand(50,H-50),name){const base=rand(18,30);let hue=Math.floor(rand(0,360));if(isNaN(hue))hue=0;const initialVx=rand(-2.5,2.5);const initialVy=rand(-.3,.3);const f={x,y,vx:initialVx,vy:initialVy,speed:rand(1.5,3.0),baseSize:base,hue,dir:Math.random()*Math.PI*2,turnTimer:Math.floor(rand(600,1800)),blink:0,name:name||`Vis ${fishCounter++}`,lastEat:Date.now(),bornAt:Date.now(),eats:0,sickTop:Math.random()<0.5,hungerWindow:DAY*rand(0.9,1.1),behaviorState:'normal',behaviorTimer:0,wallFollowTarget:null,lastPoop:Date.now(),targetVx:initialVx,targetVy:initialVy,ballApproachSide:Math.random()<0.5?-1:1};fishes.push(f)}
 for(let i=0;i<8;i++)makeFish();
 
 function makeFood(){const n=Math.max(8,fishes.length);const candyColors=['#ff1744','#ff6f00','#9c27b0','#ff4081','#00e676'];for(let i=0;i<n;i++){const color=halloweenTheme?candyColors[Math.floor(Math.random()*candyColors.length)]:'#ffb37a';foods.push({x:rand(40,W-40),y:50+rand(0,30),vy:rand(0.7,1.5),r:7,ttl:6000,color})}}
@@ -2209,19 +2209,20 @@ function handlePlaying(f) {
         targetX = closestBall.x + rand(-40, 40); // Wat variatie in x
         targetY = closestBall.y + closestBall.radius + rand(30, 70); // Onder de bal
       } else {
-        // Normale vis positioneert zich BOVEN de bal
-        // Voeg random offset toe aan positie (niet allemaal op hetzelfde punt)
-        const xOffset = rand(-60, 60); // Random offset links/rechts
-        const yOffset = rand(-70, -30); // Random hoogte boven bal (tussen 30-70 pixels)
+        // Normale vis - kies random aanpak: van boven (50%) of van de zijkant (50%)
+        // Gebruik ballApproachSide als positief = van zijkant, negatief = van boven
+        const approachFromSide = Math.abs(f.ballApproachSide) === 1 && Math.random() < 0.5;
 
-        targetX = closestBall.x + xOffset;
-        targetY = closestBall.y + yOffset;
-
-        // Als bal al diep is, probeer van de zijkant met variatie
-        if(closestBall.y > H - 150) {
-          const side = Math.random() > 0.5 ? 1 : -1;
-          targetX = closestBall.x + side * rand(80, 120);
+        if(approachFromSide || closestBall.y > H - 150) {
+          // Van de zijkant met vaste voorkeur per vis
+          targetX = closestBall.x + f.ballApproachSide * rand(80, 120);
           targetY = closestBall.y + rand(-30, 30);
+        } else {
+          // Van boven
+          const xOffset = rand(-60, 60);
+          const yOffset = rand(-70, -30);
+          targetX = closestBall.x + xOffset;
+          targetY = closestBall.y + yOffset;
         }
       }
 
@@ -3196,7 +3197,9 @@ function makeFishFromData(serverFish) {
         // Behavior state (new, defaults to normal)
         behaviorState: 'normal',
         behaviorTimer: 0,
-        wallFollowTarget: null
+        wallFollowTarget: null,
+        // Ball approach preference (random per fish)
+        ballApproachSide: Math.random() < 0.5 ? -1 : 1
     };
     return f;
 }
