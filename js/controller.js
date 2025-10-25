@@ -6,6 +6,10 @@
         let feedCooldownEndTime = 0;
         let medicineCooldownEndTime = 0;
 
+        // QR code validity tracking
+        let accessCodeExpiry = 0;
+        let qrValidityCheckInterval = null;
+
         // DOM elements
         const feedBtn = document.getElementById('feedBtn');
         const lightBtn = document.getElementById('lightBtn');
@@ -33,6 +37,9 @@
         const heatingStatus = document.getElementById('heatingStatus');
         const fishCountStatus = document.getElementById('fishCountStatus');
         const ballStatus = document.getElementById('ballStatus');
+        const qrValidityStatus = document.getElementById('qrValidityStatus');
+        const qrValidityIcon = document.getElementById('qrValidityIcon');
+        const qrValidityText = document.getElementById('qrValidityText');
 
 
         function connectWebSocket() {
@@ -391,6 +398,15 @@
             heatingStatus.textContent = status.heatingOn ? '🔥 Aan' : 'Uit';
             heatingStatus.style.color = status.heatingOn ? '#e9f1f7' : '#999';
 
+            // Update QR code validity if expiry time is provided
+            if (status.accessCodeExpiry) {
+                accessCodeExpiry = status.accessCodeExpiry;
+                // Start the validity check if not already running
+                if (!qrValidityCheckInterval) {
+                    startQRValidityCheck();
+                }
+            }
+
             // Update button texts
             lightBtn.textContent = status.lightsOn ? '💡 Licht uit' : '💡 Licht aan';
             discoBtn.textContent = status.discoOn ? '🎉 Disco uit' : '🎉 Disco aan';
@@ -493,6 +509,46 @@
                 fishCountStatus.textContent = `🐟 ${fishCount}`;
                 fishCountStatus.style.color = '#e9f1f7';
             }
+        }
+
+        function updateQRValidity() {
+            const now = Date.now();
+            const timeRemaining = accessCodeExpiry - now;
+
+            // Remove all classes
+            qrValidityStatus.classList.remove('valid', 'expiring', 'expired');
+
+            if (timeRemaining <= 0) {
+                // Expired
+                qrValidityStatus.classList.add('expired');
+                qrValidityIcon.textContent = '🔒';
+                qrValidityText.textContent = 'verlopen';
+            } else if (timeRemaining < 10 * 60 * 1000) {
+                // Less than 10 minutes remaining - expiring soon
+                const minutesLeft = Math.floor(timeRemaining / 60000);
+                qrValidityStatus.classList.add('expiring');
+                qrValidityIcon.textContent = '🔓';
+                qrValidityText.textContent = `nog ${minutesLeft} min`;
+            } else {
+                // Valid - show full time remaining
+                const minutesLeft = Math.floor(timeRemaining / 60000);
+                qrValidityStatus.classList.add('valid');
+                qrValidityIcon.textContent = '🔓';
+                qrValidityText.textContent = `nog ${minutesLeft} min`;
+            }
+        }
+
+        function startQRValidityCheck() {
+            // Clear any existing interval
+            if (qrValidityCheckInterval) {
+                clearInterval(qrValidityCheckInterval);
+            }
+
+            // Update immediately
+            updateQRValidity();
+
+            // Update every 30 seconds
+            qrValidityCheckInterval = setInterval(updateQRValidity, 30000);
         }
 
         function showAccessDenied(message) {

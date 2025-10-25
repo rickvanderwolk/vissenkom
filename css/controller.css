@@ -45,6 +45,45 @@
             margin-bottom: 20px;
         }
 
+        /* Version and QR container */
+        .version-qr-container {
+            text-align: center;
+            margin-top: 20px;
+            opacity: 0.7;
+            font-size: 0.85em;
+        }
+
+        .version-line {
+            display: inline;
+        }
+
+        .qr-line {
+            display: inline;
+            margin-left: 8px;
+        }
+
+        .version-line::after {
+            content: ' - ';
+        }
+
+        /* QR Validity Status */
+        .qr-validity-status {
+            transition: all 0.3s ease;
+            font-weight: 500;
+        }
+
+        .qr-validity-status.valid {
+            color: #3ecf5c;
+        }
+
+        .qr-validity-status.expiring {
+            color: #f39c12;
+        }
+
+        .qr-validity-status.expired {
+            color: #eb5757;
+        }
+
         /* Fallback for browsers without backdrop-filter support */
         @supports not (backdrop-filter: blur(10px)) {
             .controller-container {
@@ -310,6 +349,25 @@
 
             .version-display {
                 padding: 0 15px 15px 15px;
+            }
+
+            /* Version and QR next to each other on mobile */
+            .version-line {
+                display: inline;
+            }
+
+            .qr-line {
+                display: inline;
+                margin-left: 8px;
+            }
+
+            .version-line::after {
+                content: ' - ';
+            }
+
+            /* Hide QR label on mobile, keep only icon and time */
+            .qr-label {
+                display: none;
             }
 
             .controls-grid {

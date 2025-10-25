@@ -744,7 +744,8 @@ function broadcastStatusUpdate() {
             temperature: appState.temperature,
             heatingOn: appState.heatingOn,
             roomTemperature: getRoomTemperature(),
-            theme: currentTheme
+            theme: currentTheme,
+            accessCodeExpiry: accessCodeExpiry
         }
     };
 
@@ -774,7 +775,8 @@ function sendStatusUpdate(client) {
             fishCount: appState.fishes.length,
             temperature: appState.temperature,
             heatingOn: appState.heatingOn,
-            roomTemperature: getRoomTemperature()
+            roomTemperature: getRoomTemperature(),
+            accessCodeExpiry: accessCodeExpiry
         }
     };
 
