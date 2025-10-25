@@ -206,9 +206,9 @@
                 connectingDiv.id = 'connectingScreen';
                 connectingDiv.innerHTML = `
                     <div style="text-align: center; padding: 40px; color: #eb5757;">
-                        <h1>❌ Geen Verbinding</h1>
+                        <h1>❌ Geen verbinding</h1>
                         <p style="font-size: 18px; margin-bottom: 30px;">Kan geen verbinding maken met de vissenkom.</p>
-                        <p style="opacity: 0.8; margin-bottom: 30px;">Controleer of de server draait en probeer opnieuw.</p>
+                        <p style="opacity: 0.8; margin-bottom: 30px;">Controleer of de vissenkom draait of controleer je internetverbinding.</p>
                         <button onclick="location.reload()" style="
                             background: #4ecdc4;
                             color: #0b1e2d;
@@ -218,7 +218,7 @@
                             border-radius: 8px;
                             cursor: pointer;
                             font-weight: bold;
-                        ">🔄 Opnieuw Proberen</button>
+                        ">🔄 Probeer opnieuw</button>
                     </div>
                 `;
                 connectingDiv.style.cssText = `

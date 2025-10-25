@@ -3520,7 +3520,7 @@ function showVisssenkomAlreadyActiveError(message) {
 
     content.innerHTML = `
         <div style="font-size: 48px; color: #ff6b6b; margin-bottom: 20px;">⚠️</div>
-        <h2 style="color: #333; margin: 0 0 15px 0; font-size: 24px;">Vissenkom Al Actief</h2>
+        <h2 style="color: #333; margin: 0 0 15px 0; font-size: 24px;">Vissenkom al actief</h2>
         <p style="color: #666; margin: 0 0 25px 0; line-height: 1.5;">${message}</p>
         <button onclick="location.reload()" style="
             background: #50e3c2;
@@ -3532,7 +3532,7 @@ function showVisssenkomAlreadyActiveError(message) {
             cursor: pointer;
             transition: background 0.2s;
         " onmouseover="this.style.background='#45d4b3'" onmouseout="this.style.background='#50e3c2'">
-            Probeer Opnieuw
+            Probeer opnieuw
         </button>
     `;
 
