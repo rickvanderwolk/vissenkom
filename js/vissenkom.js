@@ -3318,44 +3318,26 @@ function updateStatusBar(){
     const tempEl = document.getElementById('temperature');
     const temp = Math.round(currentTemperature);
     tempEl.textContent = `🌡️ ${temp}°C`;
-    tempEl.classList.remove('status-on', 'status-warn', 'status-danger');
+    tempEl.classList.remove('status-warn', 'status-danger');
     if(temp >= 22 && temp <= 26) {
-        tempEl.classList.add('status-on');
+        // Normal - no class (wit)
     } else if(temp >= 20 && temp <= 28) {
         tempEl.classList.add('status-warn');
     } else {
         tempEl.classList.add('status-danger');
     }
 
-    // Light
-    const lightEl = document.getElementById('light');
-    lightEl.textContent = lightsOn ? '💡 Licht: aan' : '💡 Licht: uit';
-    lightEl.classList.remove('status-on', 'status-off');
-    lightEl.classList.add(lightsOn ? 'status-on' : 'status-off');
-
-    // Pump
-    const pumpEl = document.getElementById('pump');
-    pumpEl.textContent = pumpOn ? '💨 Pomp: aan' : '💨 Pomp: uit';
-    pumpEl.classList.remove('status-on', 'status-off');
-    pumpEl.classList.add(pumpOn ? 'status-on' : 'status-off');
-
-    // Heating
-    const heatingEl = document.getElementById('heating');
-    heatingEl.textContent = heatingOn ? '🔥 Verwarming: aan' : '🔥 Verwarming: uit';
-    heatingEl.classList.remove('status-on', 'status-off');
-    heatingEl.classList.add(heatingOn ? 'status-on' : 'status-off');
-
     // Water quality
     const waterEl = document.getElementById('water');
     const greenness = Math.round(waterGreenness);
-    waterEl.classList.remove('status-on', 'status-warn', 'status-danger');
+    waterEl.classList.remove('status-warn', 'status-danger');
 
     if(greenness < 10) {
         waterEl.textContent = '💧 Water: helder';
-        waterEl.classList.add('status-on');
+        // Normal - no class (wit)
     } else if(greenness < 25) {
         waterEl.textContent = `💧 Water: ${greenness}% groen`;
-        waterEl.classList.add('status-on');
+        // Normal - no class (wit)
     } else if(greenness < 50) {
         waterEl.textContent = `💧 Water: ${greenness}% groen`;
         waterEl.classList.add('status-warn');
