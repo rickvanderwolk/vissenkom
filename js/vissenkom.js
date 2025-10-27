@@ -124,11 +124,11 @@ const THEMES={
   autumn:{
     name:'Herfst',
     emoji:'🍂',
-    bgLight:['#6d4c3d','#5d4137','#4e3629','#3f2b1f'],
-    bgDark:['#3a2419','#2f1d14','#24160f','#190f0a'],
-    vignette:0.18,
-    foodColors:['#ff6b35','#f77f00','#d62828'],
-    bubbleColor:'#d4a574',
+    bgLight:['#8b5a3c','#7a4d34','#6d432d','#5f3825'],
+    bgDark:['#4a2817','#3d2013','#30180f','#23120b'],
+    vignette:0.15,
+    foodColors:['#ff8c42','#ffa07a','#ff6347'],
+    bubbleColor:'#e8b77d',
     decorations:['leaf']
   },
   winter:{

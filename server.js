@@ -31,37 +31,38 @@ function getCurrentTheme() {
         return config.theme;
     }
 
-    // Otherwise, check date for automatic themes based on seasons
+    // Otherwise, check date for automatic themes
     const now = new Date();
     const month = now.getMonth(); // 0-11 (0=January, 9=October)
     const day = now.getDate(); // 1-31
 
-    // Halloween: October 29 - November 2 (inclusive) - overrides autumn
+    // Halloween: October 29 - November 2 (inclusive)
     if ((month === 9 && day >= 29) || (month === 10 && day <= 2)) {
         return 'halloween';
     }
 
-    // Spring: March 21 - June 20
-    if ((month === 2 && day >= 21) || (month > 2 && month < 5) || (month === 5 && day <= 20)) {
-        return 'spring';
-    }
+    // Automatic seasonal themes disabled - only normal and halloween
+    // // Spring: March 21 - June 20
+    // if ((month === 2 && day >= 21) || (month > 2 && month < 5) || (month === 5 && day <= 20)) {
+    //     return 'spring';
+    // }
 
-    // Summer: June 21 - September 20
-    if ((month === 5 && day >= 21) || (month > 5 && month < 8) || (month === 8 && day <= 20)) {
-        return 'summer';
-    }
+    // // Summer: June 21 - September 20
+    // if ((month === 5 && day >= 21) || (month > 5 && month < 8) || (month === 8 && day <= 20)) {
+    //     return 'summer';
+    // }
 
-    // Autumn: September 21 - December 20
-    if ((month === 8 && day >= 21) || (month > 8 && month < 11) || (month === 11 && day <= 20)) {
-        return 'autumn';
-    }
+    // // Autumn: September 21 - December 20
+    // if ((month === 8 && day >= 21) || (month > 8 && month < 11) || (month === 11 && day <= 20)) {
+    //     return 'autumn';
+    // }
 
-    // Winter: December 21 - March 20
-    if ((month === 11 && day >= 21) || month === 0 || month === 1 || (month === 2 && day <= 20)) {
-        return 'winter';
-    }
+    // // Winter: December 21 - March 20
+    // if ((month === 11 && day >= 21) || month === 0 || month === 1 || (month === 2 && day <= 20)) {
+    //     return 'winter';
+    // }
 
-    // Default fallback (should not happen with above logic)
+    // Default: normal theme
     return 'normal';
 }
 
