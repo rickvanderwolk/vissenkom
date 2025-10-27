@@ -41,7 +41,28 @@ function getCurrentTheme() {
         return 'halloween';
     }
 
-    // Default theme
+    // Automatic seasonal themes disabled - only normal and halloween
+    // // Spring: March 21 - June 20
+    // if ((month === 2 && day >= 21) || (month > 2 && month < 5) || (month === 5 && day <= 20)) {
+    //     return 'spring';
+    // }
+
+    // // Summer: June 21 - September 20
+    // if ((month === 5 && day >= 21) || (month > 5 && month < 8) || (month === 8 && day <= 20)) {
+    //     return 'summer';
+    // }
+
+    // // Autumn: September 21 - December 20
+    // if ((month === 8 && day >= 21) || (month > 8 && month < 11) || (month === 11 && day <= 20)) {
+    //     return 'autumn';
+    // }
+
+    // // Winter: December 21 - March 20
+    // if ((month === 11 && day >= 21) || month === 0 || month === 1 || (month === 2 && day <= 20)) {
+    //     return 'winter';
+    // }
+
+    // Default: normal theme
     return 'normal';
 }
 
@@ -407,6 +428,9 @@ function handleCommand(data, fromClient) {
         case 'toggleHeating':
             handleToggleHeating();
             break;
+        case 'cycleTheme':
+            handleCycleTheme();
+            break;
         default:
             console.log('Onbekend commando:', data.command);
     }
@@ -492,6 +516,47 @@ function handleToggleHeating() {
 
     broadcastStatusUpdate();
     saveState();
+}
+
+function handleCycleTheme() {
+    // Theme cycle order
+    const themes = ['normal', 'spring', 'summer', 'autumn', 'winter', 'tropical', 'arctic', 'halloween'];
+
+    // Get current theme (from config or auto)
+    const oldTheme = getCurrentTheme();
+
+    // Find next theme in cycle
+    const currentIndex = themes.indexOf(oldTheme);
+    const nextIndex = (currentIndex + 1) % themes.length;
+    const nextTheme = themes[nextIndex];
+
+    // Update config with new theme
+    config.theme = nextTheme;
+
+    // Write to config.json
+    const configFile = path.join(__dirname, 'config.json');
+    try {
+        fs.writeFileSync(configFile, JSON.stringify(config, null, 2), 'utf8');
+        console.log(`🎨 Thema gewijzigd van "${oldTheme}" naar "${nextTheme}"`);
+    } catch (error) {
+        console.error('Fout bij schrijven config:', error);
+    }
+
+    // Update global currentTheme variable
+    currentTheme = nextTheme;
+
+    // Log event
+    logEvent('theme_change', {
+        from: oldTheme,
+        to: nextTheme,
+        manual: true
+    });
+
+    // Broadcast reload to force theme update
+    broadcastToMainApp({ type: 'reload', reason: 'theme_change', newTheme: nextTheme });
+
+    // Update status for controllers
+    broadcastStatusUpdate();
 }
 
 function handleCleanTank() {
@@ -776,6 +841,7 @@ function sendStatusUpdate(client) {
             temperature: appState.temperature,
             heatingOn: appState.heatingOn,
             roomTemperature: getRoomTemperature(),
+            theme: currentTheme,
             accessCodeExpiry: accessCodeExpiry
         }
     };

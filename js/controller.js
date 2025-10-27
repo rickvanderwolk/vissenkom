@@ -10,6 +10,18 @@
         let accessCodeExpiry = 0;
         let qrValidityCheckInterval = null;
 
+        // Theme names and emojis
+        const THEME_INFO = {
+            'normal': { name: 'Normaal', emoji: '🐟' },
+            'spring': { name: 'Lente', emoji: '🌸' },
+            'summer': { name: 'Zomer', emoji: '☀️' },
+            'autumn': { name: 'Herfst', emoji: '🍂' },
+            'winter': { name: 'Winter', emoji: '❄️' },
+            'tropical': { name: 'Tropisch', emoji: '🌴' },
+            'arctic': { name: 'Arctisch', emoji: '🧊' },
+            'halloween': { name: 'Halloween', emoji: '🎃' }
+        };
+
         // DOM elements
         const feedBtn = document.getElementById('feedBtn');
         const lightBtn = document.getElementById('lightBtn');
@@ -23,6 +35,7 @@
         const fishNameInput = document.getElementById('fishNameInput');
         const heatingBtn = document.getElementById('heatingBtn');
         const playBallBtn = document.getElementById('playBallBtn');
+        // const themeBtn = document.getElementById('themeBtn'); // Tijdelijk uitgeschakeld
 
         // Status displays
         const lightStatus = document.getElementById('lightStatus');
@@ -37,6 +50,7 @@
         const heatingStatus = document.getElementById('heatingStatus');
         const fishCountStatus = document.getElementById('fishCountStatus');
         const ballStatus = document.getElementById('ballStatus');
+        // const themeStatus = document.getElementById('themeStatus'); // Tijdelijk uitgeschakeld
         const qrValidityStatus = document.getElementById('qrValidityStatus');
         const qrValidityIcon = document.getElementById('qrValidityIcon');
         const qrValidityText = document.getElementById('qrValidityText');
@@ -169,7 +183,7 @@
             isConnected = connected;
 
             // Enable/disable controls based on connection
-            const controls = [feedBtn, lightBtn, discoBtn, pumpBtn, cleanBtn, refreshWaterBtn, tapGlassBtn, medicineBtn, addFishBtn, fishNameInput, heatingBtn, playBallBtn];
+            const controls = [feedBtn, lightBtn, discoBtn, pumpBtn, cleanBtn, refreshWaterBtn, tapGlassBtn, medicineBtn, addFishBtn, fishNameInput, heatingBtn, playBallBtn]; // themeBtn tijdelijk verwijderd
             controls.forEach(control => {
                 if (control) {
                     control.disabled = !connected;
@@ -398,6 +412,13 @@
             heatingStatus.textContent = status.heatingOn ? '🔥 Aan' : 'Uit';
             heatingStatus.style.color = status.heatingOn ? '#e9f1f7' : '#999';
 
+            // Update theme status (tijdelijk uitgeschakeld)
+            // if (status.theme) {
+            //     const themeInfo = THEME_INFO[status.theme] || THEME_INFO['normal'];
+            //     themeStatus.textContent = `${themeInfo.emoji} ${themeInfo.name}`;
+            //     themeStatus.style.color = '#e9f1f7';
+            // }
+
             // Update QR code validity if expiry time is provided
             if (status.accessCodeExpiry) {
                 accessCodeExpiry = status.accessCodeExpiry;
@@ -624,6 +645,7 @@
         medicineBtn.addEventListener('click', () => sendCommand('addMedicine'));
         heatingBtn.addEventListener('click', () => sendCommand('toggleHeating'));
         playBallBtn.addEventListener('click', () => sendCommand('addPlayBall'));
+        // themeBtn.addEventListener('click', () => sendCommand('cycleTheme')); // Tijdelijk uitgeschakeld
 
         addFishBtn.addEventListener('click', () => {
             const name = fishNameInput.value.trim();

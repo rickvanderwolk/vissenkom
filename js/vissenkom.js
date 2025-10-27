@@ -82,7 +82,96 @@ let lastFed=0;let fishCounter=1;let lastT=Date.now();let TOP_N=3;
 let lightsOn=true;let discoOn=false;let pumpOn=false;let heatingOn=true;const pumpPos={x:0,y:0};let pumpJustOnUntil=0;
 let waterGreenness=0;let waterGreennessTarget=0;
 let currentTemperature=24;
-let halloweenTheme=false; // Halloween theme toggle (loaded from server)
+let currentTheme='normal'; // Current theme (loaded from server)
+
+// Helper functions for theme
+function getThemeConfig(){return THEMES[currentTheme]||THEMES.normal}
+function isHalloween(){return currentTheme==='halloween'}
+function hasDecoration(type){return getThemeConfig().decorations.includes(type)}
+
+// Theme configurations
+const THEMES={
+  normal:{
+    name:'Normaal',
+    emoji:'🐟',
+    bgLight:['#0d5168','#094050','#073342','#052530'],
+    bgDark:['#082030','#051520','#030f18','#020a10'],
+    vignette:0.15,
+    foodColors:['#ffb37a'],
+    bubbleColor:'#bfeaf5',
+    decorations:[]
+  },
+  spring:{
+    name:'Lente',
+    emoji:'🌸',
+    bgLight:['#1a7a6e','#156b5f','#105c50','#0b4d42'],
+    bgDark:['#0a4038','#083630','#062c28','#042220'],
+    vignette:0.12,
+    foodColors:['#ffb37a','#ffd700','#98fb98'],
+    bubbleColor:'#d4f1f4',
+    decorations:['flower','butterfly']
+  },
+  summer:{
+    name:'Zomer',
+    emoji:'☀️',
+    bgLight:['#1e88e5','#1976d2','#1565c0','#0d47a1'],
+    bgDark:['#0d3d70','#0a3060','#082450','#051840'],
+    vignette:0.10,
+    foodColors:['#ffb37a','#ff9800','#ffeb3b'],
+    bubbleColor:'#81d4fa',
+    decorations:[]
+  },
+  autumn:{
+    name:'Herfst',
+    emoji:'🍂',
+    bgLight:['#8b5a3c','#7a4d34','#6d432d','#5f3825'],
+    bgDark:['#4a2817','#3d2013','#30180f','#23120b'],
+    vignette:0.15,
+    foodColors:['#ff8c42','#ffa07a','#ff6347'],
+    bubbleColor:'#e8b77d',
+    decorations:['leaf']
+  },
+  winter:{
+    name:'Winter',
+    emoji:'❄️',
+    bgLight:['#1a4d6d','#16415c','#12354a','#0e2938'],
+    bgDark:['#0a1f2e','#081924','#06131a','#040d10'],
+    vignette:0.20,
+    foodColors:['#e0f7fa','#b2ebf2','#80deea'],
+    bubbleColor:'#b3e5fc',
+    decorations:['snowflake']
+  },
+  tropical:{
+    name:'Tropisch',
+    emoji:'🌴',
+    bgLight:['#00838f','#00796b','#00695c','#004d40'],
+    bgDark:['#003d3d','#003333','#002929','#001f1f'],
+    vignette:0.14,
+    foodColors:['#ff6b9d','#4ecdc4','#ffd93d'],
+    bubbleColor:'#4dd0e1',
+    decorations:['coral']
+  },
+  arctic:{
+    name:'Arctisch',
+    emoji:'🧊',
+    bgLight:['#1e3a5f','#1a324f','#162a40','#122230'],
+    bgDark:['#0f1b2e','#0c1624','#09111a','#060c10'],
+    vignette:0.22,
+    foodColors:['#b3e5fc','#81d4fa','#4fc3f7'],
+    bubbleColor:'#b2ebf2',
+    decorations:['aurora','ice']
+  },
+  halloween:{
+    name:'Halloween',
+    emoji:'🎃',
+    bgLight:['#0a1418','#050c10','#020608','#000000'],
+    bgDark:['#0a1418','#050c10','#020608','#000000'],
+    vignette:0.40,
+    foodColors:['#ff1744','#ff6f00','#9c27b0','#ff4081','#00e676'],
+    bubbleColor:'#9d4edd',
+    decorations:['pumpkin','skull','spiderweb']
+  }
+};
 
 function setupLamps(){const n=4;const baseWidth=180;const spread=0.12;const hue=48;const margin=W*0.08;const step=(W-2*margin)/Math.max(1,n-1);lamps=[];for(let i=0;i<n;i++){const x=margin+i*step+rand(-step*spread,step*spread);const intensity=rand(0.55,0.8);const width=baseWidth*rand(0.9,1.1);const phase=rand(0,Math.PI*2);const stripePhase=rand(0,Math.PI*2);lamps.push({x,width,intensity,hueBase:hue,phase,stripePhase})}}
 
@@ -211,21 +300,21 @@ function setupDecorations(){
   decorations.length=0;
   const sandHeight=70;
 
-  // Halloween pompoen of normaal kasteeltje
+  // Theme-based decoration or normal castle
   // In Halloween mode: altijd minimaal 1 pompoen, anders 30% kans
-  const shouldAddDecoration=halloweenTheme||Math.random()<0.3;
+  const shouldAddDecoration=isHalloween()||Math.random()<0.3;
 
   if(shouldAddDecoration){
     const x=rand(80,W-80);
     // Pompoen kan groter zijn dan kasteel: 80-280 (soms 2x zo groot)
-    const size=halloweenTheme?rand(80,280):rand(80,140);
+    const size=isHalloween()?rand(80,280):rand(80,140);
     const bobPhase=rand(0,Math.PI*2);
     const zIndex=Math.random()<0.7?'back':'front';
     const minY=H-size/2;
     const maxY=H-sandHeight+10;
     const y=rand(minY,maxY);
 
-    if(halloweenTheme){
+    if(isHalloween()){
       decorations.push({type:'pumpkin',x,y,size,hue:rand(25,35),bobPhase,zIndex});
     }else{
       decorations.push({type:'castle',x,y,size,hue:rand(200,220),bobPhase,zIndex});
@@ -233,7 +322,7 @@ function setupDecorations(){
   }
 
   // Halloween: extra schedel decoratie (50% kans)
-  if(halloweenTheme&&Math.random()<0.5){
+  if(isHalloween()&&Math.random()<0.5){
     const x=rand(80,W-80);
     const size=rand(70,250); // Vergelijkbaar met pompoen maar iets kleiner
     const bobPhase=rand(0,Math.PI*2);
@@ -246,7 +335,7 @@ function setupDecorations(){
 }
 function lampHueFor(L,time){if(!discoOn)return L.hueBase;const speed=2.5;const range=340;const wave=(Math.sin(time*speed+L.phase)+1)/2;return (L.hueBase+wave*range)%360}
 function strobeAlpha(time){if(!discoOn)return 1;const hz=1.5;const duty=0.8;const cycle=(time*hz)%1;return cycle<duty?1:0.75}
-function flickerEffect(L,time){if(!halloweenTheme)return 1;const baseFlicker=Math.sin(time*8+L.phase)*0.5+0.5;const stutter=Math.random()<0.05?Math.random()*0.3:0;const shortFlash=Math.random()<0.02?0:1;return Math.max(0.3,baseFlicker-stutter)*shortFlash}
+function flickerEffect(L,time){if(!isHalloween())return 1;const baseFlicker=Math.sin(time*8+L.phase)*0.5+0.5;const stutter=Math.random()<0.05?Math.random()*0.3:0;const shortFlash=Math.random()<0.02?0:1;return Math.max(0.3,baseFlicker-stutter)*shortFlash}
 let discoCache={};let lastDiscoTime=0;
 function discoEffects(time){
   if(!discoOn)return;
@@ -283,7 +372,7 @@ function discoEffects(time){
 function makeFish(x=rand(50,W-50),y=rand(50,H-50),name){const base=rand(18,30);let hue=Math.floor(rand(0,360));if(isNaN(hue))hue=0;const initialVx=rand(-2.5,2.5);const initialVy=rand(-.3,.3);const f={x,y,vx:initialVx,vy:initialVy,speed:rand(1.5,3.0),baseSize:base,hue,dir:Math.random()*Math.PI*2,turnTimer:Math.floor(rand(600,1800)),blink:0,name:name||`Vis ${fishCounter++}`,lastEat:Date.now(),bornAt:Date.now(),eats:0,sickTop:Math.random()<0.5,hungerWindow:DAY*rand(0.9,1.1),behaviorState:'normal',behaviorTimer:0,wallFollowTarget:null,lastPoop:Date.now(),targetVx:initialVx,targetVy:initialVy,ballApproachSide:Math.random()<0.5?-1:1};fishes.push(f)}
 // Dummy vissen verwijderd - vissen komen nu alleen van server na gameState
 
-function makeFood(){const n=Math.max(8,fishes.length);const candyColors=['#ff1744','#ff6f00','#9c27b0','#ff4081','#00e676'];for(let i=0;i<n;i++){const color=halloweenTheme?candyColors[Math.floor(Math.random()*candyColors.length)]:'#ffb37a';foods.push({x:rand(40,W-40),y:50+rand(0,30),vy:rand(0.7,1.5),r:7,ttl:6000,color})}}
+function makeFood(){const n=Math.max(8,fishes.length);const theme=getThemeConfig();const foodColors=theme.foodColors;for(let i=0;i<n;i++){const color=foodColors[Math.floor(Math.random()*foodColors.length)];foods.push({x:rand(40,W-40),y:50+rand(0,30),vy:rand(0.7,1.5),r:7,ttl:6000,color})}}
 function makeBubble(){
   const b=getBubble();
   b.x=pumpPos.x+rand(-6,6);
@@ -508,7 +597,7 @@ function drawStars(time){
 }
 
 function drawHalloweenMoon(){
-  if(!halloweenTheme||lightsOn)return;
+  if(!isHalloween()||lightsOn)return;
 
   // Grote volle maan rechtsboven
   const moonX=W*0.85;
@@ -550,7 +639,7 @@ function drawHalloweenMoon(){
 
 function setupSpiderWebs(){
   spiderWebs.length=0;
-  if(!halloweenTheme)return;
+  if(!isHalloween())return;
 
   // Alleen 2 webben: linksboven en rechtsboven (altijd in de hoeken)
   const corners=[
@@ -591,7 +680,7 @@ function setupSpiderWebs(){
 }
 
 function drawSpiderWebs(){
-  if(!halloweenTheme||spiderWebs.length===0)return;
+  if(!isHalloween()||spiderWebs.length===0)return;
 
   // In Halloween mode: spinnenwebben altijd zichtbaar (ook bij licht uit)
   ctx.strokeStyle='rgba(200,200,200,0.15)';
@@ -760,32 +849,21 @@ function clearFrame(time){
   ctx.rect(0,0,W,H);
   ctx.clip();
 
-  // Fill viewport area with gradient background for depth - meer variatie
+  // Fill viewport area with gradient background for depth - theme based
+  const theme=getThemeConfig();
+  const bgColors=lightsOn?theme.bgLight:theme.bgDark;
   const bgGrad=ctx.createLinearGradient(0,0,0,H);
-  if(halloweenTheme){
-    // Halloween: altijd donker/griezelig (ongeacht lampen)
-    bgGrad.addColorStop(0,'#0a1418'); // Zeer donker met hint van blauw
-    bgGrad.addColorStop(0.3,'#050c10'); // Bijna zwart
-    bgGrad.addColorStop(0.7,'#020608'); // Zeer donker
-    bgGrad.addColorStop(1,'#000000'); // Zwart onderaan
-  } else if(lightsOn){
-    bgGrad.addColorStop(0,'#0d5168'); // Lichter blauw bovenaan
-    bgGrad.addColorStop(0.3,'#094050'); // Midden
-    bgGrad.addColorStop(0.7,'#073342'); // Dieper
-    bgGrad.addColorStop(1,'#052530'); // Donkerst onderaan
-  } else {
-    bgGrad.addColorStop(0,'#082030'); // Nacht boven (met hint van blauw)
-    bgGrad.addColorStop(0.4,'#051520'); // Midden
-    bgGrad.addColorStop(0.8,'#030f18'); // Dieper
-    bgGrad.addColorStop(1,'#020a10'); // Bijna zwart onderaan
-  }
+  bgGrad.addColorStop(0,bgColors[0]);
+  bgGrad.addColorStop(0.3,bgColors[1]);
+  bgGrad.addColorStop(0.7,bgColors[2]);
+  bgGrad.addColorStop(1,bgColors[3]);
   ctx.fillStyle=bgGrad;
   ctx.fillRect(0,0,W,H);
 
   // Extra subtiele radiale gradient voor meer diepte (donkerder in hoeken)
   const vignetteGrad=ctx.createRadialGradient(W/2,H/2,Math.min(W,H)*0.3,W/2,H/2,Math.max(W,H)*0.8);
   vignetteGrad.addColorStop(0,'rgba(0,0,0,0)');
-  vignetteGrad.addColorStop(1,halloweenTheme?'rgba(0,0,0,0.4)':'rgba(0,0,0,0.15)'); // Donkerdere vignette in Halloween
+  vignetteGrad.addColorStop(1,`rgba(0,0,0,${theme.vignette})`);
   ctx.fillStyle=vignetteGrad;
   ctx.fillRect(0,0,W,H);
 
@@ -810,7 +888,7 @@ function drawFood(){for(let i=foods.length-1;i>=0;i--){const p=foods[i];
   ctx.fillStyle=p.color||'#ffb37a';ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fill();
   // Verwijder alleen als ttl verloopt (niet meer als het de bodem raakt)
   if(p.ttl<=0){foods.splice(i,1)}}}
-function drawBubbles(){for(let i=bubbles.length-1;i>=0;i--){const b=bubbles[i];b.y-=b.vy;b.x+=b.vx;b.ttl--;ctx.globalAlpha=lightsOn?0.7:0.5;ctx.fillStyle=halloweenTheme?'#9d4edd':'#bfeaf5';ctx.beginPath();ctx.arc(b.x,b.y,b.r,0,Math.PI*2);ctx.fill();ctx.globalAlpha=1;if(b.y<-10||b.ttl<=0){releaseBubble(b);bubbles.splice(i,1)}}}
+function drawBubbles(){const theme=getThemeConfig();for(let i=bubbles.length-1;i>=0;i--){const b=bubbles[i];b.y-=b.vy;b.x+=b.vx;b.ttl--;ctx.globalAlpha=lightsOn?0.7:0.5;ctx.fillStyle=theme.bubbleColor;ctx.beginPath();ctx.arc(b.x,b.y,b.r,0,Math.PI*2);ctx.fill();ctx.globalAlpha=1;if(b.y<-10||b.ttl<=0){releaseBubble(b);bubbles.splice(i,1)}}}
 
 function drawPoops(){
   for(const p of poops) {
@@ -964,7 +1042,7 @@ function drawPlayBalls(){
     ctx.fill();
     ctx.globalAlpha = 1;
 
-    if(halloweenTheme){
+    if(isHalloween()){
       // Halloween: pompoen stijl bal (zelfde stijl als decoratie)
       const lightMul = lightsOn ? 1 : 0.6;
       const hue = 30; // Oranje hue (zoals pompoen decoratie)
@@ -1066,7 +1144,7 @@ function drawPlayBalls(){
     // Fade out effect in laatste seconden
     if(ball.ttl < 120){ // Laatste 2 seconden
       ctx.globalAlpha = ball.ttl / 120;
-      ctx.strokeStyle = halloweenTheme ? '#ff8c42' : ball.color.light;
+      ctx.strokeStyle = isHalloween() ? '#ff8c42' : ball.color.light;
       ctx.lineWidth = 3;
       ctx.setLineDash([8, 8]);
       ctx.beginPath();
@@ -1597,8 +1675,11 @@ function drawFish(f,t,now){
 
   ctx.restore();
   const hp=healthPct(f,now);
-  const behaviorEmoji=appConfig.showBehaviorEmoji ? getBehaviorEmoji(f.behaviorState || 'normal', f) + ' ' : '';
-  const label1=behaviorEmoji + f.name;
+  // Sick emoji is always shown, behavior emoji only if enabled
+  const sickEmoji=getSickEmoji(f);
+  const behaviorEmoji=appConfig.showBehaviorEmoji ? getBehaviorEmoji(f.behaviorState || 'normal', f) : '';
+  const emojiPrefix = (sickEmoji ? sickEmoji + ' ' : '') + (behaviorEmoji ? behaviorEmoji + ' ' : '');
+  const label1=emojiPrefix + f.name;
   const label2=ageLabel(f,now);
   const labelAlpha=lightsOn?0.92:0.7;
   const pad=6;
@@ -1621,16 +1702,18 @@ function drawFish(f,t,now){
 
 function roundRect(x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath()}
 
+// Sick emoji mapping - shown separately from behavior
+function getSickEmoji(fish) {
+  if (!fish || !fish.sick) return '';
+
+  const health = fish.health || 100;
+  if (health <= 30) return '💀'; // Critical
+  if (health <= 60) return '🤢'; // Sick
+  return '🦠'; // Early stage
+}
+
 // Behavior emoji mapping
 function getBehaviorEmoji(behaviorState, fish) {
-  // Check if fish is sick - override behavior emoji
-  if (fish && fish.sick) {
-    const health = fish.health || 100;
-    if (health <= 30) return '💀'; // Critical
-    if (health <= 60) return '🤢'; // Sick
-    return '😕'; // Early stage
-  }
-
   switch(behaviorState) {
     case 'bottom_dwelling': return '⬇️';
     case 'wall_following': return '🧱';
@@ -3027,12 +3110,9 @@ function handleRemoteCommand(data) {
             // Update theme from server
             if(data.data && data.data.theme !== undefined) {
                 const newTheme = data.data.theme;
-                if(newTheme === 'halloween' && !halloweenTheme) {
-                    console.log('🎃 Halloween theme activated from server');
-                    halloweenTheme = true;
-                } else if(newTheme !== 'halloween' && halloweenTheme) {
-                    console.log('🎃 Halloween theme deactivated from server');
-                    halloweenTheme = false;
+                if(newTheme !== currentTheme) {
+                    console.log(`🎨 Theme changed from "${currentTheme}" to "${newTheme}"`);
+                    currentTheme = newTheme;
                 }
             }
             break;
@@ -3106,11 +3186,13 @@ function handleRemoteCommand(data) {
                     break;
                 case 'addMedicine':
                     console.log('💊 Medicine added - fish will recover');
-                    // No visual action needed, server handles the logic
+                    // Request updated game state to sync sick/medicated status
+                    sendToServer({ command: 'getGameState' });
                     break;
                 case 'diseaseUpdate':
-                    console.log('🦠 Disease status updated');
-                    // No visual action needed, server handles the logic
+                    console.log('🦠 Disease status updated - syncing with server');
+                    // Request updated game state to get latest sick fish data
+                    sendToServer({ command: 'getGameState' });
                     break;
                 default:
                     console.log('Onbekend commando:', data.command);
@@ -3133,16 +3215,40 @@ function loadGameState(state) {
 
     // Update theme from game state
     if(state.theme !== undefined) {
-        halloweenTheme = (state.theme === 'halloween');
-        console.log('🎃 Theme from server:', state.theme, '(halloweenTheme:', halloweenTheme, ')');
+        currentTheme = state.theme || 'normal';
+        console.log('🎨 Theme from server:', state.theme, '(currentTheme:', currentTheme, ')');
     }
 
-    // Clear current fishes and load from server
-    fishes.length = 0;
+    // Update existing fishes or add new ones (don't clear to preserve animations)
+    // First, update existing fishes with server data
     state.fishes.forEach(serverFish => {
-        const fish = makeFishFromData(serverFish);
-        if (fish) fishes.push(fish);
+        const existingFish = fishes.find(f => f.name === serverFish.name);
+        if (existingFish) {
+            // Update disease properties without destroying the fish object
+            existingFish.sick = serverFish.sick || false;
+            existingFish.sickStartedAt = serverFish.sickStartedAt || null;
+            existingFish.medicated = serverFish.medicated || false;
+            existingFish.medicatedAt = serverFish.medicatedAt || null;
+            existingFish.health = serverFish.health !== undefined ? serverFish.health : 100;
+            // Also update stats that may have changed
+            existingFish.eats = serverFish.eats || existingFish.eats;
+            existingFish.lastEat = serverFish.lastEat || existingFish.lastEat;
+        } else {
+            // New fish from server - add it
+            const fish = makeFishFromData(serverFish);
+            if (fish) fishes.push(fish);
+        }
     });
+
+    // Remove fishes that no longer exist on server
+    const fishesToRemove = [];
+    for (let i = fishes.length - 1; i >= 0; i--) {
+        const fish = fishes[i];
+        if (!state.fishes.find(sf => sf.name === fish.name)) {
+            fishesToRemove.push(i);
+        }
+    }
+    fishesToRemove.forEach(index => fishes.splice(index, 1));
 
     // Load dead log
     deadLog.length = 0;
@@ -3230,8 +3336,11 @@ function makeFishFromData(serverFish) {
 }
 
 function updateLightUI() {
-    // In Halloween mode: altijd donkere achtergrond (ongeacht lampen status)
-    const bgColor = halloweenTheme ? BG_HALLOWEEN : (lightsOn ? BG : BG_NIGHT);
+    // Get theme-based background color
+    const theme = getThemeConfig();
+    const bgColors = lightsOn ? theme.bgLight : theme.bgDark;
+    // Use the darkest color from the gradient as solid background
+    const bgColor = bgColors[3];
     document.getElementById('tank').style.background = bgColor;
     document.body.classList.toggle('light', lightsOn);
     document.body.classList.toggle('dark', !lightsOn);
