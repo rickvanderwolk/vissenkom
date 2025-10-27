@@ -1227,7 +1227,7 @@ setInterval(() => {
         if (fish.sick) return; // Already sick
 
         // Environmental infection (dirty water)
-        if (appState.poopCount > 15 || appState.waterGreenness > 80) {
+        if (appState.poopCount > 30 || appState.waterGreenness > 80) {
             // Base: 1% chance per 12 hours = 0.0833% per hour
             const baseEnvironmentalChance = 0.0083;
             const environmentalChance = baseEnvironmentalChance * tempDiseaseMultiplier;

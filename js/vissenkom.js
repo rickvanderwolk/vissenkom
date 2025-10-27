@@ -2664,25 +2664,29 @@ function updateFish(f,dt,now){
   bounceOffWalls(f);
   for(let i=foods.length-1;i>=0;i--){const p=foods[i];if(Math.hypot(p.x-f.x,p.y-f.y)<fishSize(f,now)*0.7+p.r){foods.splice(i,1);f.blink=8;f.lastEat=Date.now();f.eats++;if(ws && ws.readyState === WebSocket.OPEN){ws.send(JSON.stringify({command:'updateFishStats',fishName:f.name,stats:{eats:f.eats,lastEat:f.lastEat}}))}}}
 
-  // Pooping logic - fish poop 15-60 minutes after eating
+  // Pooping logic - fish poop 15-60 minutes after eating (50% chance to reduce frequency)
   const timeSinceEat = now - f.lastEat;
   const timeSincePoop = now - f.lastPoop;
   const minPoopInterval = 15 * 60 * 1000; // 15 minutes
   const maxPoopInterval = 60 * 60 * 1000; // 60 minutes
 
+  // Check if fish should poop (reduced frequency for better balance with many fish)
   if(timeSinceEat > minPoopInterval && timeSincePoop > minPoopInterval && Math.random() < 0.00001) {
-    // Create poop at fish location
-    poops.push({
-      x: f.x + rand(-5, 5),
-      y: f.y + rand(5, 15), // Slightly below fish
-      createdAt: now,
-      size: rand(3, 6)
-    });
-    f.lastPoop = now;
+    // 50% chance to actually poop (reduces poop accumulation rate)
+    if(Math.random() < 0.5) {
+      // Create poop at fish location
+      poops.push({
+        x: f.x + rand(-5, 5),
+        y: f.y + rand(5, 15), // Slightly below fish
+        createdAt: now,
+        size: rand(3, 6)
+      });
+      f.lastPoop = now;
 
-    // Report poop count to server for controller updates
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({ command: 'reportPoop', poopCount: poops.length }));
+      // Report poop count to server for controller updates
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ command: 'reportPoop', poopCount: poops.length }));
+      }
     }
   }
 
