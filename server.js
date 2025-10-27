@@ -1135,16 +1135,16 @@ setInterval(() => {
 
         // === HEALTH LOSS ===
 
-        // 1. Hunger damage: -2.08% per hour (fish dies in 48h without food)
-        // Per 10 minutes: -0.347%
-        const hungerDamage = -0.347;
+        // 1. Hunger damage: -1% per hour (fish dies in 100h/4+ days without food)
+        // Per 10 minutes: -0.167%
+        const hungerDamage = -0.167;
         fish.health = Math.max(0, fish.health + hungerDamage);
         healthChanged = true;
 
-        // 2. Disease damage (extra loss): -1% per hour when sick and not medicated
-        // Per 10 minutes: -0.167%
+        // 2. Disease damage (extra loss): -0.5% per hour when sick and not medicated
+        // Per 10 minutes: -0.083%
         if (fish.sick && !fish.medicated) {
-            const diseaseDamage = -0.167;
+            const diseaseDamage = -0.083;
             fish.health = Math.max(0, fish.health + diseaseDamage);
         }
 
@@ -1161,10 +1161,10 @@ setInterval(() => {
 
         // === HEALTH GAIN ===
 
-        // Medicine recovery: +3% per hour when medicated
-        // Per 10 minutes: +0.5%
+        // Medicine recovery: +2% per hour when medicated
+        // Per 10 minutes: +0.333%
         if (fish.medicated) {
-            fish.health = Math.min(100, fish.health + 0.5);
+            fish.health = Math.min(100, fish.health + 0.333);
         }
 
         // === CHECK HEALTH STATUS ===
