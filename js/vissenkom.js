@@ -1675,8 +1675,11 @@ function drawFish(f,t,now){
 
   ctx.restore();
   const hp=healthPct(f,now);
-  const behaviorEmoji=appConfig.showBehaviorEmoji ? getBehaviorEmoji(f.behaviorState || 'normal', f) + ' ' : '';
-  const label1=behaviorEmoji + f.name;
+  // Sick emoji is always shown, behavior emoji only if enabled
+  const sickEmoji=getSickEmoji(f);
+  const behaviorEmoji=appConfig.showBehaviorEmoji ? getBehaviorEmoji(f.behaviorState || 'normal', f) : '';
+  const emojiPrefix = (sickEmoji ? sickEmoji + ' ' : '') + (behaviorEmoji ? behaviorEmoji + ' ' : '');
+  const label1=emojiPrefix + f.name;
   const label2=ageLabel(f,now);
   const labelAlpha=lightsOn?0.92:0.7;
   const pad=6;
@@ -1699,16 +1702,18 @@ function drawFish(f,t,now){
 
 function roundRect(x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath()}
 
+// Sick emoji mapping - shown separately from behavior
+function getSickEmoji(fish) {
+  if (!fish || !fish.sick) return '';
+
+  const health = fish.health || 100;
+  if (health <= 30) return '💀'; // Critical
+  if (health <= 60) return '🤢'; // Sick
+  return '🦠'; // Early stage
+}
+
 // Behavior emoji mapping
 function getBehaviorEmoji(behaviorState, fish) {
-  // Check if fish is sick - override behavior emoji
-  if (fish && fish.sick) {
-    const health = fish.health || 100;
-    if (health <= 30) return '💀'; // Critical
-    if (health <= 60) return '🤢'; // Sick
-    return '😕'; // Early stage
-  }
-
   switch(behaviorState) {
     case 'bottom_dwelling': return '⬇️';
     case 'wall_following': return '🧱';
@@ -3181,11 +3186,13 @@ function handleRemoteCommand(data) {
                     break;
                 case 'addMedicine':
                     console.log('💊 Medicine added - fish will recover');
-                    // No visual action needed, server handles the logic
+                    // Request updated game state to sync sick/medicated status
+                    sendToServer({ command: 'getGameState' });
                     break;
                 case 'diseaseUpdate':
-                    console.log('🦠 Disease status updated');
-                    // No visual action needed, server handles the logic
+                    console.log('🦠 Disease status updated - syncing with server');
+                    // Request updated game state to get latest sick fish data
+                    sendToServer({ command: 'getGameState' });
                     break;
                 default:
                     console.log('Onbekend commando:', data.command);
@@ -3212,12 +3219,29 @@ function loadGameState(state) {
         console.log('🎨 Theme from server:', state.theme, '(currentTheme:', currentTheme, ')');
     }
 
-    // Clear current fishes and load from server
-    fishes.length = 0;
+    // Update existing fishes or add new ones (don't clear to preserve animations)
+    // First, update existing fishes with server data
     state.fishes.forEach(serverFish => {
-        const fish = makeFishFromData(serverFish);
-        if (fish) fishes.push(fish);
+        const existingFish = fishes.find(f => f.name === serverFish.name);
+        if (existingFish) {
+            // Update disease properties without destroying the fish object
+            existingFish.sick = serverFish.sick || false;
+            existingFish.sickStartedAt = serverFish.sickStartedAt || null;
+            existingFish.medicated = serverFish.medicated || false;
+            existingFish.medicatedAt = serverFish.medicatedAt || null;
+            existingFish.health = serverFish.health !== undefined ? serverFish.health : 100;
+            // Also update stats that may have changed
+            existingFish.eats = serverFish.eats || existingFish.eats;
+            existingFish.lastEat = serverFish.lastEat || existingFish.lastEat;
+        } else {
+            // New fish from server - add it
+            const fish = makeFishFromData(serverFish);
+            if (fish) fishes.push(fish);
+        }
     });
+
+    // Remove fishes that no longer exist on server
+    fishes = fishes.filter(f => state.fishes.find(sf => sf.name === f.name));
 
     // Load dead log
     deadLog.length = 0;
