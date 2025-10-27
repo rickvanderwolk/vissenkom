@@ -394,7 +394,13 @@ function makeFishBubble(fx,fy){
   bubbles.push(b);
 }
 
-function healthPct(f,now){return clamp(100*(1-((now-f.lastEat)/f.hungerWindow)),0,100)}
+// Unified health system - always use fish.health from server (managed by hunger, disease, temp)
+function healthPct(f,now){
+  // If fish has health property from server, use it (unified health)
+  if(f.health !== undefined) return clamp(f.health, 0, 100);
+  // Fallback for backwards compatibility (shouldn't happen with new system)
+  return clamp(100*(1-((now-f.lastEat)/f.hungerWindow)),0,100);
+}
 function fishSize(f,now){const ageDays=(now-f.bornAt)/DAY;const growth=1+Math.log(1+ageDays*0.15)*0.35+Math.log(1+f.eats*0.5)*0.25;return f.baseSize*growth}
 function steerTowards(f,tx,ty,str){
   // Validate inputs to prevent jumping
@@ -1613,15 +1619,15 @@ function drawFish(f,t,now){
   }
 
   ctx.save();ctx.translate(f.x,f.y);ctx.rotate(a);
-  const dimBase=1-(1-healthPct(f,now)/100)*0.4;const lightMul=lightsOn?1:0.6;let dim=dimBase*lightMul;
+  const hp=healthPct(f,now); // Unified health (includes hunger, disease, temp effects)
+  const dimBase=1-(1-hp/100)*0.4;const lightMul=lightsOn?1:0.6;let dim=dimBase*lightMul;
 
-  // Sick fish appear duller and more transparent
+  // Sick fish appear duller and more transparent based on their health
   if(f.sick && !f.medicated) {
-    const sickHealth = f.health || healthPct(f,now);
-    if(sickHealth <= 30) {
+    if(hp <= 30) {
       ctx.globalAlpha = 0.6; // Critical: very dull
       dim *= 0.6;
-    } else if(sickHealth <= 60) {
+    } else if(hp <= 60) {
       ctx.globalAlpha = 0.75; // Sick: moderately dull
       dim *= 0.75;
     } else {
@@ -1674,7 +1680,7 @@ function drawFish(f,t,now){
   }
 
   ctx.restore();
-  const hp=healthPct(f,now);
+  // hp already calculated above - reuse it for label and health bar
   // Sick emoji is always shown, behavior emoji only if enabled
   const sickEmoji=getSickEmoji(f);
   const behaviorEmoji=appConfig.showBehaviorEmoji ? getBehaviorEmoji(f.behaviorState || 'normal', f) : '';
@@ -2603,12 +2609,11 @@ function updateFish(f,dt,now){
   }
   if(discoOn) slow *= 1.2; // Disco mode speed boost
 
-  // Sick fish are slower
+  // Sick fish are slower (based on unified health)
   if(f.sick && !f.medicated) {
-    const sickHealth = f.health || hp;
-    if(sickHealth <= 30) {
+    if(hp <= 30) {
       slow *= 0.4; // Critical: very slow
-    } else if(sickHealth <= 60) {
+    } else if(hp <= 60) {
       slow *= 0.6; // Sick: moderately slow
     } else {
       slow *= 0.8; // Early stage: slightly slow

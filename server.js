@@ -955,11 +955,18 @@ function handleUpdateFishStats(fishName, stats) {
     if (fish) {
         // Update fish statistics
         if (stats.eats !== undefined) fish.eats = stats.eats;
-        if (stats.lastEat !== undefined) fish.lastEat = stats.lastEat;
+        if (stats.lastEat !== undefined) {
+            fish.lastEat = stats.lastEat;
+            // Reset health to 100 when fish eats (unified health system)
+            fish.health = 100;
+            console.log(`${fishName} ate food - health restored to 100%`);
+        }
 
         console.log(`Stats bijgewerkt voor ${fishName}: eats=${fish.eats}`);
 
         // Auto-save will handle persistence (every 30s)
+        // Broadcast status update so controllers see updated health
+        broadcastStatusUpdate();
     }
 }
 
@@ -1116,7 +1123,8 @@ setInterval(() => {
     }
 }, 5 * 60 * 1000); // Every 5 minutes
 
-// Disease health loss and temperature damage - every 10 minutes
+// Unified health system - hunger, disease, and temperature all affect one health value
+// Runs every 10 minutes
 setInterval(() => {
     const now = Date.now();
     const temp = appState.temperature;
@@ -1125,7 +1133,22 @@ setInterval(() => {
     appState.fishes.forEach(fish => {
         if (!fish.health) fish.health = 100; // Initialize health if missing
 
-        // Temperature stress damage
+        // === HEALTH LOSS ===
+
+        // 1. Hunger damage: -2.08% per hour (fish dies in 48h without food)
+        // Per 10 minutes: -0.347%
+        const hungerDamage = -0.347;
+        fish.health = Math.max(0, fish.health + hungerDamage);
+        healthChanged = true;
+
+        // 2. Disease damage (extra loss): -1% per hour when sick and not medicated
+        // Per 10 minutes: -0.167%
+        if (fish.sick && !fish.medicated) {
+            const diseaseDamage = -0.167;
+            fish.health = Math.max(0, fish.health + diseaseDamage);
+        }
+
+        // 3. Temperature stress damage
         let tempDamage = 0;
         if (temp < 18) tempDamage = -0.5;      // Cold: -0.5%/hour = -0.083%/10min
         if (temp < 16) tempDamage = -1.0;      // Very cold: -1%/hour = -0.167%/10min
@@ -1134,50 +1157,52 @@ setInterval(() => {
 
         if (tempDamage < 0) {
             fish.health = Math.max(0, fish.health + (tempDamage / 6)); // /6 because every 10 min
-            healthChanged = true;
         }
 
-        if (fish.sick && !fish.medicated) {
-            // Sick fish lose health
-            fish.health = Math.max(0, fish.health - 0.5);
-            healthChanged = true;
+        // === HEALTH GAIN ===
 
-            // Log critical health
-            if (fish.health <= 30 && fish.health > 29.5) {
-                logEvent('fish_critical_health', {
-                    name: fish.name,
-                    health: fish.health,
-                    temperature: temp
-                });
-                console.log(`⚠️ ${fish.name} is in critical condition (${fish.health.toFixed(1)}% health)`);
-            }
+        // Medicine recovery: +3% per hour when medicated
+        // Per 10 minutes: +0.5%
+        if (fish.medicated) {
+            fish.health = Math.min(100, fish.health + 0.5);
+        }
 
-            // Check if fish died from disease
-            if (fish.health <= 0) {
-                console.log(`💀 ${fish.name} died from disease/temperature`);
-                logEvent('fish_died_disease', {
-                    name: fish.name,
-                    temperature: temp,
-                    sickDuration: now - fish.sickStartedAt
-                });
-                // Will be handled by client's death detection
-            }
-        } else if (fish.medicated) {
-            // Medicated fish recover health slowly
-            fish.health = Math.min(100, fish.health + 2); // +2% per 10 minutes
-            healthChanged = true;
+        // === CHECK HEALTH STATUS ===
 
-            // Check if fully recovered
-            if (fish.health >= 100 && fish.sick) {
-                fish.sick = false;
-                fish.sickStartedAt = null;
-                fish.medicated = false;
-                fish.medicatedAt = null;
-                console.log(`✅ ${fish.name} fully recovered!`);
-                logEvent('fish_recovered', {
-                    name: fish.name
-                });
-            }
+        // Log critical health warning
+        if (fish.health <= 30 && fish.health > 29.5) {
+            logEvent('fish_critical_health', {
+                name: fish.name,
+                health: fish.health,
+                temperature: temp,
+                sick: fish.sick
+            });
+            console.log(`⚠️ ${fish.name} is in critical condition (${fish.health.toFixed(1)}% health)`);
+        }
+
+        // Check if fish died (health reached 0)
+        if (fish.health <= 0) {
+            console.log(`💀 ${fish.name} died (health: 0%)`);
+            const cause = fish.sick ? 'disease' : 'hunger';
+            logEvent('fish_died_disease', {
+                name: fish.name,
+                cause: cause,
+                temperature: temp,
+                sickDuration: fish.sick ? (now - fish.sickStartedAt) : 0
+            });
+            // Will be handled by client's death detection
+        }
+
+        // Check if fully recovered from disease
+        if (fish.health >= 100 && fish.sick && fish.medicated) {
+            fish.sick = false;
+            fish.sickStartedAt = null;
+            fish.medicated = false;
+            fish.medicatedAt = null;
+            console.log(`✅ ${fish.name} fully recovered!`);
+            logEvent('fish_recovered', {
+                name: fish.name
+            });
         }
     });
 
