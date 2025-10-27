@@ -3241,7 +3241,14 @@ function loadGameState(state) {
     });
 
     // Remove fishes that no longer exist on server
-    fishes = fishes.filter(f => state.fishes.find(sf => sf.name === f.name));
+    const fishesToRemove = [];
+    for (let i = fishes.length - 1; i >= 0; i--) {
+        const fish = fishes[i];
+        if (!state.fishes.find(sf => sf.name === fish.name)) {
+            fishesToRemove.push(i);
+        }
+    }
+    fishesToRemove.forEach(index => fishes.splice(index, 1));
 
     // Load dead log
     deadLog.length = 0;
