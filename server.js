@@ -1203,6 +1203,9 @@ setInterval(() => {
             logEvent('fish_recovered', {
                 name: fish.name
             });
+            // Broadcast recovery to main app to update UI
+            broadcastToMainApp({ command: 'diseaseUpdate' });
+            healthChanged = true;
         }
     });
 
