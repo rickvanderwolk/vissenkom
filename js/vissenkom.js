@@ -2662,7 +2662,7 @@ function updateFish(f,dt,now){
   if(isNaN(f.y)) f.y = H / 2;
 
   bounceOffWalls(f);
-  for(let i=foods.length-1;i>=0;i--){const p=foods[i];if(Math.hypot(p.x-f.x,p.y-f.y)<fishSize(f,now)*0.7+p.r){foods.splice(i,1);f.blink=8;f.lastEat=Date.now();f.eats++;if(ws && ws.readyState === WebSocket.OPEN){ws.send(JSON.stringify({command:'updateFishStats',fishName:f.name,stats:{eats:f.eats,lastEat:f.lastEat}}))}}}
+  for(let i=foods.length-1;i>=0;i--){const p=foods[i];if(Math.hypot(p.x-f.x,p.y-f.y)<fishSize(f,now)*0.7+p.r){foods.splice(i,1);f.blink=8;f.lastEat=Date.now();f.eats++;f.health=100;if(ws && ws.readyState === WebSocket.OPEN){ws.send(JSON.stringify({command:'updateFishStats',fishName:f.name,stats:{eats:f.eats,lastEat:f.lastEat}}))}}}
 
   // Pooping logic - fish poop 15-60 minutes after eating (50% chance to reduce frequency)
   const timeSinceEat = now - f.lastEat;
