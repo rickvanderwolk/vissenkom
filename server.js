@@ -967,6 +967,13 @@ function handleUpdateFishStats(fishName, stats) {
         // Auto-save will handle persistence (every 30s)
         // Broadcast status update so controllers see updated health
         broadcastStatusUpdate();
+
+        // Also broadcast to main app to sync health bar immediately
+        broadcastToMainApp({
+            command: 'healthUpdate',
+            fishName: fishName,
+            health: fish.health
+        });
     }
 }
 

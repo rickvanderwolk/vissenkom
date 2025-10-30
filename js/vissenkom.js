@@ -3203,6 +3203,16 @@ function handleRemoteCommand(data) {
                     // Request updated game state to get latest sick fish data
                     sendToServer({ command: 'getGameState' });
                     break;
+                case 'healthUpdate':
+                    // Update specific fish health immediately
+                    if (data.fishName && data.health !== undefined) {
+                        const fish = fishes.find(f => f.name === data.fishName);
+                        if (fish) {
+                            fish.health = data.health;
+                            console.log(`💚 Health updated for ${data.fishName}: ${data.health}%`);
+                        }
+                    }
+                    break;
                 default:
                     console.log('Onbekend commando:', data.command);
             }
@@ -3234,14 +3244,15 @@ function loadGameState(state) {
         const existingFish = fishes.find(f => f.name === serverFish.name);
         if (existingFish) {
             // Update disease properties without destroying the fish object
-            existingFish.sick = serverFish.sick || false;
-            existingFish.sickStartedAt = serverFish.sickStartedAt || null;
-            existingFish.medicated = serverFish.medicated || false;
-            existingFish.medicatedAt = serverFish.medicatedAt || null;
+            // Use explicit undefined checks to properly handle false values
+            existingFish.sick = serverFish.sick !== undefined ? serverFish.sick : false;
+            existingFish.sickStartedAt = serverFish.sickStartedAt !== undefined ? serverFish.sickStartedAt : null;
+            existingFish.medicated = serverFish.medicated !== undefined ? serverFish.medicated : false;
+            existingFish.medicatedAt = serverFish.medicatedAt !== undefined ? serverFish.medicatedAt : null;
             existingFish.health = serverFish.health !== undefined ? serverFish.health : 100;
             // Also update stats that may have changed
-            existingFish.eats = serverFish.eats || existingFish.eats;
-            existingFish.lastEat = serverFish.lastEat || existingFish.lastEat;
+            existingFish.eats = serverFish.eats !== undefined ? serverFish.eats : existingFish.eats;
+            existingFish.lastEat = serverFish.lastEat !== undefined ? serverFish.lastEat : existingFish.lastEat;
         } else {
             // New fish from server - add it
             const fish = makeFishFromData(serverFish);
