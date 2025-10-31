@@ -960,6 +960,34 @@ function handleUpdateFishStats(fishName, stats) {
             // Reset health to 100 when fish eats (unified health system)
             fish.health = 100;
             console.log(`${fishName} ate food - health restored to 100%`);
+
+            // Check if fish should recover from sickness immediately after eating
+            let recovered = false;
+            if (fish.health >= 100 && fish.sick && fish.medicated) {
+                fish.sick = false;
+                fish.sickStartedAt = null;
+                fish.medicated = false;
+                fish.medicatedAt = null;
+                recovered = true;
+                console.log(`✅ ${fish.name} fully recovered after eating!`);
+                logEvent('fish_recovered', {
+                    name: fish.name
+                });
+            }
+
+            // Broadcast health update with sick status to sync immediately
+            broadcastToMainApp({
+                command: 'healthUpdate',
+                fishName: fishName,
+                health: fish.health,
+                sick: fish.sick,
+                medicated: fish.medicated
+            });
+
+            // Also broadcast disease update if fish recovered to trigger full gameState sync
+            if (recovered) {
+                broadcastToMainApp({ command: 'diseaseUpdate' });
+            }
         }
 
         console.log(`Stats bijgewerkt voor ${fishName}: eats=${fish.eats}`);
@@ -967,13 +995,6 @@ function handleUpdateFishStats(fishName, stats) {
         // Auto-save will handle persistence (every 30s)
         // Broadcast status update so controllers see updated health
         broadcastStatusUpdate();
-
-        // Also broadcast to main app to sync health bar immediately
-        broadcastToMainApp({
-            command: 'healthUpdate',
-            fishName: fishName,
-            health: fish.health
-        });
     }
 }
 

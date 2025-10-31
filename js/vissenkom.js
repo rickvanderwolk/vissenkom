@@ -3209,7 +3209,10 @@ function handleRemoteCommand(data) {
                         const fish = fishes.find(f => f.name === data.fishName);
                         if (fish) {
                             fish.health = data.health;
-                            console.log(`💚 Health updated for ${data.fishName}: ${data.health}%`);
+                            // Also update sick/medicated status if provided to keep emoji in sync
+                            if (data.sick !== undefined) fish.sick = data.sick;
+                            if (data.medicated !== undefined) fish.medicated = data.medicated;
+                            console.log(`💚 Health updated for ${data.fishName}: ${data.health}% (sick: ${fish.sick}, medicated: ${fish.medicated})`);
                         }
                     }
                     break;
