@@ -796,6 +796,14 @@ function broadcastToMainApp(command) {
 function broadcastStatusUpdate() {
     const sickCount = appState.fishes.filter(f => f.sick).length;
 
+    // Include fish health data for real-time updates
+    const fishHealthData = appState.fishes.map(f => ({
+        name: f.name,
+        health: f.health || 100,
+        sick: f.sick || false,
+        medicated: f.medicated || false
+    }));
+
     const statusMessage = {
         type: 'status',
         data: {
@@ -810,7 +818,8 @@ function broadcastStatusUpdate() {
             heatingOn: appState.heatingOn,
             roomTemperature: getRoomTemperature(),
             theme: currentTheme,
-            accessCodeExpiry: accessCodeExpiry
+            accessCodeExpiry: accessCodeExpiry,
+            fishHealth: fishHealthData
         }
     };
 
@@ -828,6 +837,14 @@ function broadcastStatusUpdate() {
 function sendStatusUpdate(client) {
     const sickCount = appState.fishes.filter(f => f.sick).length;
 
+    // Include fish health data for real-time updates
+    const fishHealthData = appState.fishes.map(f => ({
+        name: f.name,
+        health: f.health || 100,
+        sick: f.sick || false,
+        medicated: f.medicated || false
+    }));
+
     const statusMessage = {
         type: 'status',
         data: {
@@ -842,7 +859,8 @@ function sendStatusUpdate(client) {
             heatingOn: appState.heatingOn,
             roomTemperature: getRoomTemperature(),
             theme: currentTheme,
-            accessCodeExpiry: accessCodeExpiry
+            accessCodeExpiry: accessCodeExpiry,
+            fishHealth: fishHealthData
         }
     };
 

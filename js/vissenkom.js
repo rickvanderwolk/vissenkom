@@ -3124,6 +3124,17 @@ function handleRemoteCommand(data) {
                     currentTheme = newTheme;
                 }
             }
+            // Update fish health data for real-time health bar updates
+            if(data.data && data.data.fishHealth && Array.isArray(data.data.fishHealth)) {
+                data.data.fishHealth.forEach(healthData => {
+                    const fish = fishes.find(f => f.name === healthData.name);
+                    if(fish) {
+                        fish.health = healthData.health;
+                        fish.sick = healthData.sick;
+                        fish.medicated = healthData.medicated;
+                    }
+                });
+            }
             break;
         case 'reload':
             console.log('🔄 Reload request from server:', data.reason);
