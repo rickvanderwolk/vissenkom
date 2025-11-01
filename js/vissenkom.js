@@ -3020,6 +3020,8 @@ let ws = null;
 let currentVersion = null; // Store current version to detect changes
 let appConfig = { showBehaviorEmoji: false }; // Store config from server
 let gameLoopStarted = false; // Track if game loop has been started
+let wsReconnectAttempts = 0; // Track reconnection attempts
+let wsConnectedOnce = false; // Track if we've successfully connected before
 
 function initWebSocket() {
     try {
@@ -3029,6 +3031,18 @@ function initWebSocket() {
 
         ws.onopen = function() {
             console.log('WebSocket verbonden met server');
+
+            // If this is a reconnection after being connected before, refresh the page
+            // This ensures we get fresh data and QR codes after server restart
+            if (wsConnectedOnce && wsReconnectAttempts > 0) {
+                console.log('🔄 Server herstart gedetecteerd - pagina wordt ververst...');
+                location.reload();
+                return;
+            }
+
+            wsConnectedOnce = true;
+            wsReconnectAttempts = 0; // Reset counter on successful connection
+
             // Request current game state from server
             ws.send(JSON.stringify({ command: 'getGameState' }));
             // Request access code for QR
@@ -3065,7 +3079,8 @@ function initWebSocket() {
         };
 
         ws.onclose = function() {
-            console.log('WebSocket verbinding gesloten, probeer opnieuw...');
+            wsReconnectAttempts++;
+            console.log(`WebSocket verbinding gesloten, probeer opnieuw... (poging ${wsReconnectAttempts})`);
             setTimeout(initWebSocket, 3000);
         };
 
@@ -3074,6 +3089,7 @@ function initWebSocket() {
         };
     } catch (error) {
         console.error('Kan geen WebSocket verbinding maken:', error);
+        wsReconnectAttempts++;
         setTimeout(initWebSocket, 3000);
     }
 }
