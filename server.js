@@ -771,13 +771,24 @@ function handleAddMedicine() {
     appState.lastMedicine = now;
     console.log('💊 Medicine toegevoegd aan tank!');
 
-    // Medicate all sick fish
+    // Medicate all sick fish and collect data for immediate UI update
     let medicatedCount = 0;
+    const medicatedFish = [];
+
     appState.fishes.forEach(fish => {
         if (fish.sick) {
             fish.medicated = true;
             fish.medicatedAt = now;
             medicatedCount++;
+
+            // Track for immediate UI update
+            medicatedFish.push({
+                name: fish.name,
+                sick: fish.sick,
+                medicated: fish.medicated,
+                medicatedAt: fish.medicatedAt,
+                health: fish.health
+            });
         }
     });
 
@@ -788,8 +799,11 @@ function handleAddMedicine() {
         cooldownHours: appState.medicineCooldown / (60 * 60 * 1000)
     });
 
-    // Broadcast to main app to update visuals
-    broadcastToMainApp({ command: 'addMedicine' });
+    // Broadcast to main app with complete medicine data for immediate UI update
+    broadcastToMainApp({
+        command: 'addMedicine',
+        medicatedFish: medicatedFish
+    });
 
     // Update cooldown status for controllers
     broadcastMedicineCooldownUpdate();
@@ -1311,6 +1325,17 @@ function updateFishHealth() {
             fish.medicatedAt = null;
             console.log(`✅ ${fish.name} fully recovered!`);
             logEvent('fish_recovered', { name: fish.name });
+
+            // Send immediate healthUpdate for instant visual feedback
+            broadcastToMainApp({
+                command: 'healthUpdate',
+                fishName: fish.name,
+                health: fish.health,
+                sick: fish.sick,
+                medicated: fish.medicated
+            });
+
+            // Also send diseaseUpdate for UI counters
             broadcastToMainApp({ command: 'diseaseUpdate' });
             healthChanged = true;
         }
@@ -1325,6 +1350,7 @@ function updateDiseaseSpread() {
     const now = Date.now();
     const temp = appState.temperature;
     let newInfections = 0;
+    const affectedFish = []; // Track fish that got sick for immediate UI update
 
     let tempDiseaseMultiplier = 1.0;
     if (temp < 20) tempDiseaseMultiplier = 1.5;
@@ -1343,6 +1369,16 @@ function updateDiseaseSpread() {
                 fish.sick = true;
                 fish.sickStartedAt = now;
                 newInfections++;
+
+                // Track for immediate UI update
+                affectedFish.push({
+                    name: fish.name,
+                    sick: fish.sick,
+                    sickStartedAt: fish.sickStartedAt,
+                    medicated: fish.medicated,
+                    health: fish.health
+                });
+
                 console.log(`🦠 ${fish.name} got sick from dirty environment (temp: ${temp.toFixed(1)}°C)`);
                 logEvent('fish_infected_environment', {
                     name: fish.name,
@@ -1364,6 +1400,16 @@ function updateDiseaseSpread() {
                 fish.sick = true;
                 fish.sickStartedAt = now;
                 newInfections++;
+
+                // Track for immediate UI update
+                affectedFish.push({
+                    name: fish.name,
+                    sick: fish.sick,
+                    sickStartedAt: fish.sickStartedAt,
+                    medicated: fish.medicated,
+                    health: fish.health
+                });
+
                 console.log(`🦠 ${fish.name} got infected by contact with sick fish (temp: ${temp.toFixed(1)}°C)`);
                 logEvent('fish_infected_contact', {
                     name: fish.name,
@@ -1378,7 +1424,11 @@ function updateDiseaseSpread() {
     if (newInfections > 0) {
         console.log(`🦠 Disease spread: ${newInfections} new infections`);
         broadcastStatusUpdate();
-        broadcastToMainApp({ command: 'diseaseUpdate' });
+        // Send complete disease data for immediate UI update
+        broadcastToMainApp({
+            command: 'diseaseUpdate',
+            affectedFish: affectedFish
+        });
     }
 }
 

@@ -3265,13 +3265,43 @@ function handleRemoteCommand(data) {
                     makePlayBall();
                     break;
                 case 'addMedicine':
-                    console.log('💊 Medicine added - fish will recover');
-                    // Request updated game state to sync sick/medicated status
+                    console.log('💊 Medicine added - updating fish status');
+
+                    // Immediate update if server sent medicated fish data
+                    if (data.medicatedFish && Array.isArray(data.medicatedFish)) {
+                        data.medicatedFish.forEach(medData => {
+                            const fish = fishes.find(f => f.name === medData.name);
+                            if (fish) {
+                                fish.sick = medData.sick;
+                                fish.medicated = medData.medicated;
+                                fish.medicatedAt = medData.medicatedAt;
+                                fish.health = medData.health;
+                                console.log(`💊 ${fish.name} immediately medicated`);
+                            }
+                        });
+                    }
+
+                    // Still request full game state as fallback for complete sync
                     sendToServer({ command: 'getGameState' });
                     break;
                 case 'diseaseUpdate':
                     console.log('🦠 Disease status updated - syncing with server');
-                    // Request updated game state to get latest sick fish data
+
+                    // Immediate update if server sent affected fish data
+                    if (data.affectedFish && Array.isArray(data.affectedFish)) {
+                        data.affectedFish.forEach(diseaseData => {
+                            const fish = fishes.find(f => f.name === diseaseData.name);
+                            if (fish) {
+                                fish.sick = diseaseData.sick;
+                                fish.sickStartedAt = diseaseData.sickStartedAt;
+                                fish.medicated = diseaseData.medicated;
+                                fish.health = diseaseData.health;
+                                console.log(`🦠 ${fish.name} immediately updated - sick: ${fish.sick}`);
+                            }
+                        });
+                    }
+
+                    // Still request full game state as fallback for complete sync
                     sendToServer({ command: 'getGameState' });
                     break;
                 case 'healthUpdate':
