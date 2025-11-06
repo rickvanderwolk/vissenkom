@@ -196,10 +196,130 @@ function saveState() {
     }
 }
 
-// Auto-save state every 30 seconds
-setInterval(() => {
+// Game tick intervals (all in seconds)
+const TICK_INTERVALS = {
+    saveState: 30,          // Auto-save every 30 seconds
+    statusBroadcast: 5,      // Broadcast status every 5 seconds
+    accessCode: 50 * 60,     // Regenerate access code every 50 minutes
+    themeCheck: 60,          // Check theme changes every minute
+    temperature: 5 * 60,     // Temperature regulation every 5 minutes
+    waterGreenness: 5 * 60,  // Algae growth every 5 minutes
+    health: 10 * 60,         // Health system every 10 minutes
+    disease: 60 * 60         // Disease spread every hour
+};
+
+// Track last execution times for each tick
+const lastTickTimes = {
+    saveState: 0,
+    statusBroadcast: 0,
+    accessCode: Date.now(), // Start with current time to avoid immediate regeneration
+    themeCheck: 0,
+    temperature: 0,
+    waterGreenness: 0,
+    health: 0,
+    disease: 0
+};
+
+// Consolidated game tick - runs every 5 seconds (highest common frequency)
+let gameTickInterval = null;
+
+function startGameTick() {
+    if (gameTickInterval) {
+        console.log('⚠️ Game tick already running');
+        return;
+    }
+
+    console.log('🎮 Starting consolidated game tick');
+    gameTickInterval = setInterval(() => {
+        const now = Date.now();
+
+        // Auto-save state every 30 seconds
+        if (now - lastTickTimes.saveState >= TICK_INTERVALS.saveState * 1000) {
+            lastTickTimes.saveState = now;
+            saveState();
+        }
+
+        // Broadcast status updates every 5 seconds
+        if (now - lastTickTimes.statusBroadcast >= TICK_INTERVALS.statusBroadcast * 1000) {
+            lastTickTimes.statusBroadcast = now;
+            if (controllers.size > 0) {
+                broadcastStatusUpdate();
+            }
+        }
+
+        // Auto-regenerate access code every 50 minutes
+        if (now - lastTickTimes.accessCode >= TICK_INTERVALS.accessCode * 1000) {
+            lastTickTimes.accessCode = now;
+            console.log('🔄 Auto-regenerating access code for QR update...');
+            generateAccessCode();
+            broadcastNewAccessCode();
+        }
+
+        // Check for theme changes every minute
+        if (now - lastTickTimes.themeCheck >= TICK_INTERVALS.themeCheck * 1000) {
+            lastTickTimes.themeCheck = now;
+            const newTheme = getCurrentTheme();
+            if (newTheme !== currentTheme) {
+                console.log(`🎨 Theme changed from "${currentTheme}" to "${newTheme}" - broadcasting reload`);
+                currentTheme = newTheme;
+                broadcastToMainApp({ type: 'reload', reason: 'theme_change', newTheme });
+                if (controllers.size > 0) {
+                    broadcastStatusUpdate();
+                }
+            }
+        }
+
+        // Temperature regulation every 5 minutes
+        if (now - lastTickTimes.temperature >= TICK_INTERVALS.temperature * 1000) {
+            lastTickTimes.temperature = now;
+            updateTemperature();
+        }
+
+        // Water greenness every 5 minutes
+        if (now - lastTickTimes.waterGreenness >= TICK_INTERVALS.waterGreenness * 1000) {
+            lastTickTimes.waterGreenness = now;
+            updateWaterGreenness();
+        }
+
+        // Health system every 10 minutes
+        if (now - lastTickTimes.health >= TICK_INTERVALS.health * 1000) {
+            lastTickTimes.health = now;
+            updateFishHealth();
+        }
+
+        // Disease spread every hour
+        if (now - lastTickTimes.disease >= TICK_INTERVALS.disease * 1000) {
+            lastTickTimes.disease = now;
+            updateDiseaseSpread();
+        }
+
+    }, 5000); // Run consolidated tick every 5 seconds
+}
+
+function stopGameTick() {
+    if (gameTickInterval) {
+        clearInterval(gameTickInterval);
+        gameTickInterval = null;
+        console.log('🛑 Game tick stopped');
+    }
+}
+
+// Cleanup on server shutdown
+process.on('SIGINT', () => {
+    console.log('\n🛑 Shutting down server...');
+    stopGameTick();
     saveState();
-}, 30000);
+    saveEventLog();
+    process.exit(0);
+});
+
+process.on('SIGTERM', () => {
+    console.log('\n🛑 Shutting down server (SIGTERM)...');
+    stopGameTick();
+    saveState();
+    saveEventLog();
+    process.exit(0);
+});
 
 // Get room temperature based on current season (real calendar)
 function getRoomTemperature() {
@@ -973,13 +1093,14 @@ function handleUpdateFishStats(fishName, stats) {
     if (fish) {
         // Update fish statistics
         if (stats.eats !== undefined) fish.eats = stats.eats;
-        if (stats.lastEat !== undefined) {
-            fish.lastEat = stats.lastEat;
-            // Reset health to 100 when fish eats (unified health system)
-            fish.health = 100;
-            console.log(`${fishName} ate food - health restored to 100%`);
+        if (stats.lastEat !== undefined) fish.lastEat = stats.lastEat;
 
-            // Check if fish should recover from sickness immediately after eating
+        // Update health if provided by client (gradual restore, not instant)
+        if (stats.health !== undefined) {
+            fish.health = Math.min(100, Math.max(0, stats.health));
+            console.log(`${fishName} ate food - health increased to ${fish.health.toFixed(1)}%`);
+
+            // Check if fish should recover from sickness after healing to full
             let recovered = false;
             if (fish.health >= 100 && fish.sick && fish.medicated) {
                 fish.sick = false;
@@ -1054,39 +1175,9 @@ function sendRecentActivity(client) {
 // Controllers handle their own countdown timers for smooth UX.
 // Status updates every 5 seconds act as sync check to correct any drift.
 
-// Broadcast status updates every 5 seconds to keep controllers in sync
-setInterval(() => {
-    if (controllers.size > 0) {
-        broadcastStatusUpdate();
-    }
-}, 5000);
+// Extracted tick functions for cleaner organization
 
-// Auto-regenerate access code 10 minutes before expiry (50 minutes interval for 1 hour codes)
-setInterval(() => {
-    console.log('🔄 Auto-regenerating access code for QR update...');
-    generateAccessCode();
-    broadcastNewAccessCode();
-}, 50 * 60 * 1000); // Every 50 minutes (10 minute buffer before 1 hour expiry)
-
-// Check for theme changes every minute
-setInterval(() => {
-    const newTheme = getCurrentTheme();
-    if (newTheme !== currentTheme) {
-        console.log(`🎨 Theme changed from "${currentTheme}" to "${newTheme}" - broadcasting reload`);
-        currentTheme = newTheme;
-
-        // Broadcast reload to all main apps
-        broadcastToMainApp({ type: 'reload', reason: 'theme_change', newTheme });
-
-        // Also update status to reflect new theme immediately
-        if (controllers.size > 0) {
-            broadcastStatusUpdate();
-        }
-    }
-}, 60 * 1000); // Check every minute
-
-// Temperature regulation with smart thermostat (every 5 minutes)
-setInterval(() => {
+function updateTemperature() {
     const roomTemp = getRoomTemperature();
 
     // Calculate heat from lights (fixed amounts)
@@ -1100,13 +1191,10 @@ setInterval(() => {
     if (appState.heatingOn) {
         // Thermostat mode: maintain 24°C
         if (appState.temperature < targetTemp) {
-            // Too cold: heating works
             appState.temperature += 0.2;
         } else if (appState.temperature > targetTemp) {
-            // Too warm: heating off, cools down
             appState.temperature -= 0.1;
         }
-        // Don't exceed target temp
         appState.temperature = Math.min(targetTemp, appState.temperature);
     } else {
         // Heating off: move toward natural temp
@@ -1119,43 +1207,33 @@ setInterval(() => {
 
     // Absolute safety limits
     appState.temperature = Math.max(15, Math.min(35, appState.temperature));
-
-    // Broadcast update
     broadcastStatusUpdate();
-}, 5 * 60 * 1000); // Every 5 minutes
+}
 
-// Water greenness increases over time (algae growth)
-// Base: +0.07% every 5 minutes = 100% in ~5 days (120 hours)
-setInterval(() => {
+function updateWaterGreenness() {
     if (appState.waterGreenness < 100) {
-        // Base growth rate
         let growthRate = 0.07;
 
-        // Temperature modifier (primary factor for cold, secondary for warm)
         const temp = appState.temperature;
         let tempModifier = 1.0;
-        if (temp < 18) tempModifier = 0.3;      // Very cold = almost no growth
-        else if (temp < 22) tempModifier = 0.7; // Cool = slow growth
-        else tempModifier = 1.0;                // Warm = normal growth
+        if (temp < 18) tempModifier = 0.3;
+        else if (temp < 22) tempModifier = 0.7;
+        else tempModifier = 1.0;
 
-        // Light modifier (primary factor)
         let lightModifier = 1.0;
-        if (!appState.lightsOn) lightModifier = 0.5;  // Dark = very slow
-        if (appState.discoOn) lightModifier = 2.0;     // Disco = explosive growth
+        if (!appState.lightsOn) lightModifier = 0.5;
+        if (appState.discoOn) lightModifier = 2.0;
 
-        // Calculate final growth
         growthRate = growthRate * tempModifier * lightModifier;
-
         appState.waterGreenness = Math.min(100, appState.waterGreenness + growthRate);
+
         console.log(`🌿 Water greenness increased to ${appState.waterGreenness.toFixed(2)}% (temp: ${temp.toFixed(1)}°C, rate: ${growthRate.toFixed(3)})`);
 
-        // Only broadcast if greenness changed significantly (>= 0.5%)
         if (Math.abs(appState.waterGreenness - lastBroadcastedGreenness) >= 0.5) {
             broadcastStatusUpdate();
             lastBroadcastedGreenness = appState.waterGreenness;
         }
 
-        // Log significant milestones
         const rounded = Math.round(appState.waterGreenness);
         if (rounded === 25 || rounded === 50 || rounded === 75 || rounded === 100) {
             logEvent('water_greenness_milestone', {
@@ -1167,55 +1245,42 @@ setInterval(() => {
             });
         }
     }
-}, 5 * 60 * 1000); // Every 5 minutes
+}
 
-// Unified health system - hunger, disease, and temperature all affect one health value
-// Runs every 10 minutes
-setInterval(() => {
+function updateFishHealth() {
     const now = Date.now();
     const temp = appState.temperature;
     let healthChanged = false;
 
     appState.fishes.forEach(fish => {
-        if (!fish.health) fish.health = 100; // Initialize health if missing
+        if (!fish.health) fish.health = 100;
 
-        // === HEALTH LOSS ===
-
-        // 1. Hunger damage: -1% per hour (fish dies in 100h/4+ days without food)
-        // Per 10 minutes: -0.167%
-        const hungerDamage = -0.167;
-        fish.health = Math.max(0, fish.health + hungerDamage);
+        // Hunger damage: -0.167% per 10 minutes
+        fish.health = Math.max(0, fish.health - 0.167);
         healthChanged = true;
 
-        // 2. Disease damage (extra loss): -0.5% per hour when sick and not medicated
-        // Per 10 minutes: -0.083%
+        // Disease damage: -0.083% per 10 minutes when sick
         if (fish.sick && !fish.medicated) {
-            const diseaseDamage = -0.083;
-            fish.health = Math.max(0, fish.health + diseaseDamage);
+            fish.health = Math.max(0, fish.health - 0.083);
         }
 
-        // 3. Temperature stress damage
+        // Temperature stress damage
         let tempDamage = 0;
-        if (temp < 18) tempDamage = -0.5;      // Cold: -0.5%/hour = -0.083%/10min
-        if (temp < 16) tempDamage = -1.0;      // Very cold: -1%/hour = -0.167%/10min
-        if (temp > 30) tempDamage = -1.0;      // Hot: -1%/hour
-        if (temp > 32) tempDamage = -2.0;      // Very hot: -2%/hour
+        if (temp < 18) tempDamage = -0.5;
+        if (temp < 16) tempDamage = -1.0;
+        if (temp > 30) tempDamage = -1.0;
+        if (temp > 32) tempDamage = -2.0;
 
         if (tempDamage < 0) {
-            fish.health = Math.max(0, fish.health + (tempDamage / 6)); // /6 because every 10 min
+            fish.health = Math.max(0, fish.health + (tempDamage / 6));
         }
 
-        // === HEALTH GAIN ===
-
-        // Medicine recovery: +2% per hour when medicated
-        // Per 10 minutes: +0.333%
+        // Medicine recovery: +0.333% per 10 minutes when medicated
         if (fish.medicated) {
             fish.health = Math.min(100, fish.health + 0.333);
         }
 
-        // === CHECK HEALTH STATUS ===
-
-        // Log critical health warning
+        // Log critical health
         if (fish.health <= 30 && fish.health > 29.5) {
             logEvent('fish_critical_health', {
                 name: fish.name,
@@ -1226,7 +1291,7 @@ setInterval(() => {
             console.log(`⚠️ ${fish.name} is in critical condition (${fish.health.toFixed(1)}% health)`);
         }
 
-        // Check if fish died (health reached 0)
+        // Check death
         if (fish.health <= 0) {
             console.log(`💀 ${fish.name} died (health: 0%)`);
             const cause = fish.sick ? 'disease' : 'hunger';
@@ -1236,20 +1301,16 @@ setInterval(() => {
                 temperature: temp,
                 sickDuration: fish.sick ? (now - fish.sickStartedAt) : 0
             });
-            // Will be handled by client's death detection
         }
 
-        // Check if fully recovered from disease
+        // Check recovery
         if (fish.health >= 100 && fish.sick && fish.medicated) {
             fish.sick = false;
             fish.sickStartedAt = null;
             fish.medicated = false;
             fish.medicatedAt = null;
             console.log(`✅ ${fish.name} fully recovered!`);
-            logEvent('fish_recovered', {
-                name: fish.name
-            });
-            // Broadcast recovery to main app to update UI
+            logEvent('fish_recovered', { name: fish.name });
             broadcastToMainApp({ command: 'diseaseUpdate' });
             healthChanged = true;
         }
@@ -1258,26 +1319,23 @@ setInterval(() => {
     if (healthChanged) {
         broadcastStatusUpdate();
     }
-}, 10 * 60 * 1000); // Every 10 minutes
+}
 
-// Disease spread logic - runs every hour
-setInterval(() => {
+function updateDiseaseSpread() {
     const now = Date.now();
     const temp = appState.temperature;
     let newInfections = 0;
 
-    // Temperature affects disease spread
     let tempDiseaseMultiplier = 1.0;
-    if (temp < 20) tempDiseaseMultiplier = 1.5;   // Cold = +50% disease chance
-    if (temp > 28) tempDiseaseMultiplier = 2.0;   // Warm = +100% disease chance
+    if (temp < 20) tempDiseaseMultiplier = 1.5;
+    if (temp > 28) tempDiseaseMultiplier = 2.0;
 
     appState.fishes.forEach(fish => {
-        if (!fish.health) fish.health = 100; // Initialize health if missing
-        if (fish.sick) return; // Already sick
+        if (!fish.health) fish.health = 100;
+        if (fish.sick) return;
 
-        // Environmental infection (dirty water)
+        // Environmental infection
         if (appState.poopCount > 30 || appState.waterGreenness > 80) {
-            // Base: 1% chance per 12 hours = 0.0833% per hour
             const baseEnvironmentalChance = 0.0083;
             const environmentalChance = baseEnvironmentalChance * tempDiseaseMultiplier;
 
@@ -1296,12 +1354,9 @@ setInterval(() => {
             }
         }
 
-        // Contact infection - check distance to sick fish
-        // This is a simplification - client will report actual positions later
-        // For now, just use probability based on number of sick fish
+        // Contact infection
         const sickFish = appState.fishes.filter(f => f.sick && !f.medicated);
         if (sickFish.length > 0 && !fish.sick) {
-            // Base: 3% chance per hour per sick fish (proximity assumed)
             const baseContactChance = 0.03;
             const contactChance = (sickFish.length * baseContactChance) * tempDiseaseMultiplier;
 
@@ -1323,10 +1378,9 @@ setInterval(() => {
     if (newInfections > 0) {
         console.log(`🦠 Disease spread: ${newInfections} new infections`);
         broadcastStatusUpdate();
-        // Broadcast to main app to update visuals
         broadcastToMainApp({ command: 'diseaseUpdate' });
     }
-}, 60 * 60 * 1000); // Every hour
+}
 
 // Create WebSocket server on the same HTTP server
 const wss = new WebSocket.Server({ server });
@@ -1432,4 +1486,7 @@ server.listen(3000, () => {
     console.log('WebSocket server gestart op dezelfde poort (3000)');
     console.log('Bezoek http://localhost:3000 voor de vissenkom');
     console.log('Bezoek http://localhost:3000/controller voor de controller');
+
+    // Start consolidated game tick
+    startGameTick();
 });

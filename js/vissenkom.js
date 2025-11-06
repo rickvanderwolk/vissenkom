@@ -2636,6 +2636,9 @@ function updateFish(f,dt,now){
 
   slow *= tempSpeedMultiplier;
 
+  // Validate slow multiplier to prevent NaN propagation
+  if(isNaN(slow) || !isFinite(slow) || slow <= 0) slow = 0.95;
+
   // Apply friction and speed adjustments
   f.vx*=0.99;f.vy*=0.99;f.vx*=slow;f.vy*=slow;
 
@@ -2662,7 +2665,7 @@ function updateFish(f,dt,now){
   if(isNaN(f.y)) f.y = H / 2;
 
   bounceOffWalls(f);
-  for(let i=foods.length-1;i>=0;i--){const p=foods[i];if(Math.hypot(p.x-f.x,p.y-f.y)<fishSize(f,now)*0.7+p.r){foods.splice(i,1);f.blink=8;f.lastEat=Date.now();f.eats++;f.health=100;if(ws && ws.readyState === WebSocket.OPEN){ws.send(JSON.stringify({command:'updateFishStats',fishName:f.name,stats:{eats:f.eats,lastEat:f.lastEat}}))}}}
+  for(let i=foods.length-1;i>=0;i--){const p=foods[i];if(Math.hypot(p.x-f.x,p.y-f.y)<fishSize(f,now)*0.7+p.r){foods.splice(i,1);f.blink=8;f.lastEat=Date.now();f.eats++;f.health=Math.min(100,f.health+15);sendToServer({command:'updateFishStats',fishName:f.name,stats:{eats:f.eats,lastEat:f.lastEat,health:f.health}})}}
 
   // Pooping logic - fish poop 15-60 minutes after eating (50% chance to reduce frequency)
   const timeSinceEat = now - f.lastEat;
@@ -2684,9 +2687,7 @@ function updateFish(f,dt,now){
       f.lastPoop = now;
 
       // Report poop count to server for controller updates
-      if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ command: 'reportPoop', poopCount: poops.length }));
-      }
+      sendToServer({ command: 'reportPoop', poopCount: poops.length });
     }
   }
 
@@ -3022,6 +3023,26 @@ let appConfig = { showBehaviorEmoji: false }; // Store config from server
 let gameLoopStarted = false; // Track if game loop has been started
 let wsReconnectAttempts = 0; // Track reconnection attempts
 let wsConnectedOnce = false; // Track if we've successfully connected before
+let wsReconnectTimer = null; // Track reconnection timer for cleanup
+
+// Safe WebSocket send with error handling
+function sendToServer(data) {
+    try {
+        if (!ws) {
+            console.warn('WebSocket not initialized, skipping message:', data);
+            return false;
+        }
+        if (ws.readyState !== WebSocket.OPEN) {
+            console.warn('WebSocket not open, skipping message:', data);
+            return false;
+        }
+        ws.send(JSON.stringify(data));
+        return true;
+    } catch (error) {
+        console.error('Failed to send WebSocket message:', error, data);
+        return false;
+    }
+}
 
 function initWebSocket() {
     try {
@@ -3054,11 +3075,8 @@ function initWebSocket() {
             // Request recent activity for activity list
             ws.send(JSON.stringify({ command: 'getRecentActivity' }));
 
-            // Sync ball state: report if there is NO ball (to reset server state after refresh)
-            if (playBalls.length === 0) {
-                console.log('🔄 Syncing ball state: no balls present, resetting server state');
-                ws.send(JSON.stringify({ command: 'ballGone' }));
-            }
+            // Don't sync ball state here - let server be authoritative
+            // The gameState response will contain hasBall status which we'll respect
         };
 
         ws.onmessage = function(event) {
@@ -3080,17 +3098,43 @@ function initWebSocket() {
 
         ws.onclose = function() {
             wsReconnectAttempts++;
-            console.log(`WebSocket verbinding gesloten, probeer opnieuw... (poging ${wsReconnectAttempts})`);
-            setTimeout(initWebSocket, 3000);
+
+            // Clear any existing reconnect timer
+            if (wsReconnectTimer) {
+                clearTimeout(wsReconnectTimer);
+                wsReconnectTimer = null;
+            }
+
+            // Exponential backoff: 3s, 6s, 12s, 24s, max 30s
+            const delay = Math.min(3000 * Math.pow(2, wsReconnectAttempts - 1), 30000);
+            console.log(`WebSocket verbinding gesloten, probeer opnieuw in ${delay/1000}s... (poging ${wsReconnectAttempts})`);
+
+            wsReconnectTimer = setTimeout(() => {
+                wsReconnectTimer = null;
+                initWebSocket();
+            }, delay);
         };
 
         ws.onerror = function(error) {
             console.error('WebSocket fout:', error);
+            // Error will trigger onclose, which handles reconnection
         };
     } catch (error) {
         console.error('Kan geen WebSocket verbinding maken:', error);
         wsReconnectAttempts++;
-        setTimeout(initWebSocket, 3000);
+
+        // Clear any existing reconnect timer
+        if (wsReconnectTimer) {
+            clearTimeout(wsReconnectTimer);
+            wsReconnectTimer = null;
+        }
+
+        // Exponential backoff on error
+        const delay = Math.min(3000 * Math.pow(2, wsReconnectAttempts - 1), 30000);
+        wsReconnectTimer = setTimeout(() => {
+            wsReconnectTimer = null;
+            initWebSocket();
+        }, delay);
     }
 }
 
@@ -3319,6 +3363,17 @@ function loadGameState(state) {
     }
     console.log(`Regenerated ${poopCount} poop objects`);
 
+    // Sync ball state from server (server is authoritative)
+    if (state.hasBall && playBalls.length === 0) {
+        // Server says there's a ball, but we don't have one - add it
+        console.log('🎾 Syncing ball from server - adding ball');
+        makePlayBall();
+    } else if (!state.hasBall && playBalls.length > 0) {
+        // Server says no ball, but we have one - remove it
+        console.log('🎾 Syncing ball from server - removing ball');
+        playBalls.length = 0;
+    }
+
     // Update UI
     updateLightUI();
     updateDiscoUI();
@@ -3330,9 +3385,7 @@ function loadGameState(state) {
     console.log(`Geladen: ${fishes.length} vissen, ${deadLog.length} overleden vissen`);
 
     // Report current poop count to server
-    if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ command: 'reportPoop', poopCount: poops.length }));
-    }
+    sendToServer({ command: 'reportPoop', poopCount: poops.length });
 }
 
 function makeFishFromData(serverFish) {
@@ -3348,14 +3401,28 @@ function makeFishFromData(serverFish) {
     if(isNaN(startX) || startX < 50 || startX > W - 50) startX = W / 2;
     if(isNaN(startY) || startY < 50 || startY > H - 50) startY = H / 2;
 
+    // Initialize velocities with validation
+    let vx = rand(-1, 1);
+    let vy = rand(-0.5, 0.5);
+    if(isNaN(vx) || !isFinite(vx)) vx = 0.1;
+    if(isNaN(vy) || !isFinite(vy)) vy = 0.05;
+
+    // Initialize speed with validation
+    let speed = serverFish.speed !== undefined ? serverFish.speed : rand(1.5, 3.0);
+    if(isNaN(speed) || !isFinite(speed) || speed <= 0) speed = 2.0;
+
+    // Initialize baseSize with validation
+    let baseSize = serverFish.baseSize !== undefined ? serverFish.baseSize : rand(18, 30);
+    if(isNaN(baseSize) || !isFinite(baseSize) || baseSize <= 0) baseSize = 24;
+
     const f = {
         x: startX,
         y: startY,
-        vx: rand(-1, 1),
-        vy: rand(-0.5, 0.5),
+        vx: vx,
+        vy: vy,
         // Use saved visual properties or fallback to random (for backwards compatibility)
-        speed: serverFish.speed !== undefined ? serverFish.speed : rand(1.5, 3.0),
-        baseSize: serverFish.baseSize !== undefined ? serverFish.baseSize : rand(18, 30),
+        speed: speed,
+        baseSize: baseSize,
         hue: hue,
         sickTop: serverFish.sickTop !== undefined ? serverFish.sickTop : (Math.random() < 0.5),
         hungerWindow: serverFish.hungerWindow !== undefined ? serverFish.hungerWindow : (DAY * rand(0.9, 1.1)),
@@ -3430,9 +3497,7 @@ function cleanTank(){
   console.log('Tank opgeruimd! Alle poep weggehaald.');
 
   // Report poop count to server for controller updates
-  if (ws && ws.readyState === WebSocket.OPEN) {
-    ws.send(JSON.stringify({ command: 'reportPoop', poopCount: 0 }));
-  }
+  sendToServer({ command: 'reportPoop', poopCount: 0 });
 }
 function refreshWater(){
   waterGreenness=0;
@@ -3441,9 +3506,7 @@ function refreshWater(){
   console.log('💧 Water ververst! Greenness gereset naar 0%.');
 
   // Report water greenness to server for controller updates
-  if (ws && ws.readyState === WebSocket.OPEN) {
-    ws.send(JSON.stringify({ command: 'reportWaterGreenness', waterGreenness: 0 }));
-  }
+  sendToServer({ command: 'reportWaterGreenness', waterGreenness: 0 });
 }
 
 function tapGlass(){
@@ -3647,19 +3710,14 @@ drawWaterGreenness();
 
 ctx.restore();
 
-for(let i=fishes.length-1;i>=0;i--){if(fishes[i].dead){const deadFish={name:fishes[i].name,bornAt:fishes[i].bornAt,diedAt:Date.now()};deadLog.push(deadFish);fishes.splice(i,1);if(ws && ws.readyState === WebSocket.OPEN){ws.send(JSON.stringify({command:'fishDied',fish:deadFish}))}}}
+for(let i=fishes.length-1;i>=0;i--){if(fishes[i].dead){const deadFish={name:fishes[i].name,bornAt:fishes[i].bornAt,diedAt:Date.now()};deadLog.push(deadFish);fishes.splice(i,1);sendToServer({command:'fishDied',fish:deadFish})}}
 
 if(now-lastListUpdate>LIST_UPDATE_INTERVAL){drawLists();drawActivityList();lastListUpdate=now}
 if(now-lastCooldownUpdate>COOLDOWN_UPDATE_INTERVAL){updateCooldown();updateStatusBar();lastCooldownUpdate=now}
 
 // Periodieke ball state sync met server (elke 10 seconden)
 if(now-lastBallStateSync>BALL_STATE_SYNC_INTERVAL){
-  if(ws && ws.readyState === WebSocket.OPEN){
-    // Sync: als er geen bal is, zorg dat server dat ook weet
-    if(playBalls.length === 0){
-      ws.send(JSON.stringify({ command: 'ballGone' }));
-    }
-  }
+  // Ball state sync removed - server is authoritative for ball state
   lastBallStateSync=now;
 }
 
