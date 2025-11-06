@@ -3186,14 +3186,25 @@ function handleRemoteCommand(data) {
             }
             // Update fish health data for real-time health bar updates
             if(data.data && data.data.fishHealth && Array.isArray(data.data.fishHealth)) {
+                let syncChanges = 0;
                 data.data.fishHealth.forEach(healthData => {
                     const fish = fishes.find(f => f.name === healthData.name);
                     if(fish) {
+                        // Track if sync corrected any mismatch
+                        if(fish.health !== healthData.health ||
+                           fish.sick !== healthData.sick ||
+                           fish.medicated !== healthData.medicated) {
+                            syncChanges++;
+                        }
                         fish.health = healthData.health;
                         fish.sick = healthData.sick;
                         fish.medicated = healthData.medicated;
                     }
                 });
+                // Log if sync corrected any state (means immediate update was missed)
+                if(syncChanges > 0) {
+                    console.log(`🔄 Status sync corrected ${syncChanges} fish state(s)`);
+                }
             }
             break;
         case 'reload':
