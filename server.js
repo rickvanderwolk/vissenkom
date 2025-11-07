@@ -275,7 +275,7 @@ function recoverFish(fish) {
     fish.medicated = false;
     fish.medicatedAt = null;
 
-    console.log(`✅ ${fish.name} fully recovered!`);
+    logger.info('Fish recovered', { fishName: fish.name });
     logEvent('fish_recovered', { name: fish.name });
 
     // Broadcast recovery immediately
@@ -288,6 +288,9 @@ function recoverFish(fish) {
     });
 
     broadcastToMainApp({ command: 'diseaseUpdate' });
+
+    // Immediate save to ensure recovery is persisted
+    saveState();
 
     return true;
 }
@@ -402,7 +405,11 @@ function validateAllFishStates() {
     });
 
     if (totalErrors > 0) {
-        logger.error('State validation completed with errors', { totalErrors });
+        logger.error('State validation completed with errors - auto-fixed issues', { totalErrors });
+
+        // Save fixed state immediately to prevent re-loading corrupted state
+        saveState();
+        logger.info('Saved auto-fixed state to disk');
     } else {
         logger.debug('State validation passed', { fishCount: appState.fishes.length });
     }
@@ -474,7 +481,7 @@ function saveState() {
 
 // Game tick intervals (all in seconds)
 const TICK_INTERVALS = {
-    saveState: 30,          // Auto-save every 30 seconds
+    saveState: 10,           // Auto-save every 10 seconds (reduced from 30 for better persistence)
     statusBroadcast: 5,      // Broadcast status every 5 seconds
     accessCode: 50 * 60,     // Regenerate access code every 50 minutes
     themeCheck: 60,          // Check theme changes every minute
@@ -810,6 +817,9 @@ function handleCommand(data, fromClient) {
             break;
         case 'getGameState':
             sendGameState(fromClient);
+            break;
+        case 'getStateHash':
+            sendStateHash(fromClient);
             break;
         case 'fishDied':
             handleFishDied(data.fish);
@@ -1359,13 +1369,64 @@ function sendGameState(client) {
             lightsOn: appState.lightsOn,
             discoOn: appState.discoOn,
             pumpOn: appState.pumpOn,
+            heatingOn: appState.heatingOn,
+            temperature: appState.temperature,
             poopCount: appState.poopCount,
             waterGreenness: appState.waterGreenness,
-            theme: currentTheme
+            theme: currentTheme,
+            hasBall: appState.hasBall
         }
     };
 
     sendToClient(client, gameStateMessage);
+}
+
+/**
+ * Simple hash function for state verification
+ * Helps detect if client and server are out of sync
+ */
+function calculateStateHash() {
+    // Create deterministic string from core state
+    const coreState = {
+        fishCount: appState.fishes.length,
+        fishes: appState.fishes.map(f => ({
+            name: f.name,
+            health: Math.round(f.health * 10) / 10, // Round to 1 decimal
+            sick: f.sick,
+            medicated: f.medicated
+        })),
+        lightsOn: appState.lightsOn,
+        discoOn: appState.discoOn,
+        pumpOn: appState.pumpOn,
+        hasBall: appState.hasBall
+    };
+
+    // Simple hash (not cryptographic, just for sync verification)
+    const stateString = JSON.stringify(coreState);
+    let hash = 0;
+    for (let i = 0; i < stateString.length; i++) {
+        const char = stateString.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash = hash & hash; // Convert to 32bit integer
+    }
+
+    return {
+        hash: hash.toString(16),
+        timestamp: Date.now(),
+        fishCount: appState.fishes.length,
+        sickCount: appState.fishes.filter(f => f.sick).length
+    };
+}
+
+function sendStateHash(client) {
+    const hashData = calculateStateHash();
+
+    sendToClient(client, {
+        type: 'stateHash',
+        data: hashData
+    });
+
+    logger.debug('State hash sent', hashData);
 }
 
 function handleFishDied(deadFish) {
@@ -1665,13 +1726,16 @@ function updateDiseaseSpread() {
         const newlyInfected = results.filter(r => r !== null);
 
         if (newlyInfected.length > 0) {
-            console.log(`🦠 Disease spread: ${newlyInfected.length} new infections`);
+            logger.info('Disease spread occurred', { newInfections: newlyInfected.length });
             broadcastStatusUpdate();
             // Send complete disease data for immediate UI update
             broadcastToMainApp({
                 command: 'diseaseUpdate',
                 affectedFish: newlyInfected
             });
+
+            // Immediate save to ensure infections are persisted
+            saveState();
         }
     });
 }

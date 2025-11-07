@@ -3334,8 +3334,87 @@ function handleRemoteCommand(data) {
     }
 }
 
+/**
+ * Validate received state from server
+ * Ensures core state is consistent and complete
+ */
+function validateReceivedState(state) {
+    const errors = [];
+
+    // Check if state exists
+    if (!state || typeof state !== 'object') {
+        errors.push('State is null or not an object');
+        return errors;
+    }
+
+    // Validate fishes array
+    if (!Array.isArray(state.fishes)) {
+        errors.push('Fishes is not an array');
+    } else {
+        // Validate each fish
+        state.fishes.forEach((fish, index) => {
+            if (!fish.name) {
+                errors.push(`Fish ${index} has no name`);
+            }
+
+            // Health must be 0-100
+            if (fish.health !== undefined && (fish.health < 0 || fish.health > 100)) {
+                errors.push(`Fish ${fish.name} health out of range: ${fish.health}`);
+            }
+
+            // Sick status consistency
+            if (fish.sick && !fish.sickStartedAt) {
+                errors.push(`Fish ${fish.name} is sick but has no sickStartedAt`);
+            }
+            if (!fish.sick && fish.sickStartedAt) {
+                errors.push(`Fish ${fish.name} is not sick but has sickStartedAt`);
+            }
+
+            // Medicated status consistency
+            if (fish.medicated && !fish.sick) {
+                errors.push(`Fish ${fish.name} is medicated but not sick`);
+            }
+            if (fish.medicated && !fish.medicatedAt) {
+                errors.push(`Fish ${fish.name} is medicated but has no medicatedAt`);
+            }
+            if (!fish.medicated && fish.medicatedAt) {
+                errors.push(`Fish ${fish.name} is not medicated but has medicatedAt`);
+            }
+        });
+    }
+
+    // Validate required properties
+    if (state.lightsOn === undefined) errors.push('lightsOn is undefined');
+    if (state.discoOn === undefined) errors.push('discoOn is undefined');
+    if (state.pumpOn === undefined) errors.push('pumpOn is undefined');
+    if (state.fishCounter === undefined) errors.push('fishCounter is undefined');
+    if (state.lastFed === undefined) errors.push('lastFed is undefined');
+
+    return errors;
+}
+
 function loadGameState(state) {
     console.log('Game state geladen van server:', state);
+
+    // Validate received state
+    const validationErrors = validateReceivedState(state);
+    if (validationErrors.length > 0) {
+        console.error('⚠️ State validation errors detected:', validationErrors);
+        console.error('Received state:', state);
+        console.error('❌ REFUSING to load invalid state - requesting fresh gameState from server');
+
+        // Request fresh state from server
+        setTimeout(() => {
+            console.log('🔄 Requesting fresh gameState from server...');
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: 'getGameState' }));
+            }
+        }, 1000);
+
+        return; // STOP! Don't load invalid state
+    } else {
+        console.log('✅ State validation passed');
+    }
 
     // Update global variables
     lastFed = state.lastFed;
