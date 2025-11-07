@@ -1712,7 +1712,7 @@ function roundRect(x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,
 function getSickEmoji(fish) {
   if (!fish || !fish.sick) return '';
 
-  const health = fish.health || 100;
+  const health = fish.health !== undefined ? fish.health : 100;
   if (health <= 30) return '💀'; // Critical
   if (health <= 60) return '🤢'; // Sick
   return '🦠'; // Early stage

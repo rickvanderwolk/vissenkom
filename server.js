@@ -6,6 +6,58 @@ const path = require('path');
 // Game logic functions (loaded async)
 let gameLogic = null;
 
+// Structured logging system
+const LOG_LEVELS = {
+    DEBUG: 0,
+    INFO: 1,
+    WARN: 2,
+    ERROR: 3
+};
+
+// Current log level (can be changed via environment variable)
+const CURRENT_LOG_LEVEL = LOG_LEVELS[process.env.LOG_LEVEL || 'INFO'];
+
+/**
+ * Structured logger with levels and timestamps
+ */
+const logger = {
+    debug: (message, context = {}) => {
+        if (CURRENT_LOG_LEVEL <= LOG_LEVELS.DEBUG) {
+            log('DEBUG', message, context);
+        }
+    },
+    info: (message, context = {}) => {
+        if (CURRENT_LOG_LEVEL <= LOG_LEVELS.INFO) {
+            log('INFO', message, context);
+        }
+    },
+    warn: (message, context = {}) => {
+        if (CURRENT_LOG_LEVEL <= LOG_LEVELS.WARN) {
+            log('WARN', message, context);
+        }
+    },
+    error: (message, context = {}) => {
+        if (CURRENT_LOG_LEVEL <= LOG_LEVELS.ERROR) {
+            log('ERROR', message, context);
+        }
+    }
+};
+
+function log(level, message, context) {
+    const timestamp = new Date().toISOString();
+    const contextStr = Object.keys(context).length > 0
+        ? ` | ${JSON.stringify(context)}`
+        : '';
+
+    const logMessage = `[${timestamp}] [${level}] ${message}${contextStr}`;
+
+    if (level === 'ERROR' || level === 'WARN') {
+        console.error(logMessage);
+    } else {
+        console.log(logMessage);
+    }
+}
+
 // Load package.json for version info
 const packageInfo = JSON.parse(fs.readFileSync(path.join(__dirname, 'package.json'), 'utf8'));
 const VERSION = packageInfo.version;
@@ -148,6 +200,216 @@ let lastBroadcastedGreenness = 0;
 // Track current theme to detect changes
 let currentTheme = getCurrentTheme();
 
+// Fish state update queue to prevent race conditions
+const fishUpdateQueue = new Map(); // fishName -> array of pending updates
+let isProcessingQueue = false;
+
+/**
+ * Centralized function to safely update fish state
+ * Prevents race conditions between eating, health ticks, and recovery
+ */
+async function updateFishState(fishName, updateFn, context = 'unknown') {
+    return new Promise((resolve) => {
+        // Add update to queue
+        if (!fishUpdateQueue.has(fishName)) {
+            fishUpdateQueue.set(fishName, []);
+        }
+
+        fishUpdateQueue.get(fishName).push({ updateFn, resolve, context });
+
+        // Process queue if not already processing
+        if (!isProcessingQueue) {
+            processNextFishUpdate();
+        }
+    });
+}
+
+/**
+ * Process pending fish updates sequentially
+ */
+function processNextFishUpdate() {
+    isProcessingQueue = true;
+
+    // Find next fish with pending updates
+    for (const [fishName, updates] of fishUpdateQueue.entries()) {
+        if (updates.length > 0) {
+            const { updateFn, resolve, context } = updates.shift();
+
+            // Find fish
+            const fish = appState.fishes.find(f => f.name === fishName);
+
+            if (fish) {
+                // Execute update function with fish object
+                const result = updateFn(fish);
+                resolve(result);
+            } else {
+                console.warn(`Fish ${fishName} not found during ${context} update`);
+                resolve(null);
+            }
+
+            // Remove empty queues
+            if (updates.length === 0) {
+                fishUpdateQueue.delete(fishName);
+            }
+
+            // Continue processing
+            setImmediate(processNextFishUpdate);
+            return;
+        }
+    }
+
+    // No more updates to process
+    isProcessingQueue = false;
+}
+
+/**
+ * Centralized recovery logic - prevents duplication
+ */
+function recoverFish(fish) {
+    if (!fish.sick || !fish.medicated || fish.health < 100) {
+        return false;
+    }
+
+    fish.sick = false;
+    fish.sickStartedAt = null;
+    fish.medicated = false;
+    fish.medicatedAt = null;
+
+    console.log(`✅ ${fish.name} fully recovered!`);
+    logEvent('fish_recovered', { name: fish.name });
+
+    // Broadcast recovery immediately
+    broadcastToMainApp({
+        command: 'healthUpdate',
+        fishName: fish.name,
+        health: fish.health,
+        sick: fish.sick,
+        medicated: fish.medicated
+    });
+
+    broadcastToMainApp({ command: 'diseaseUpdate' });
+
+    return true;
+}
+
+/**
+ * Validate fish state consistency
+ * Returns array of validation errors (empty if valid)
+ */
+function validateFishState(fish) {
+    const errors = [];
+
+    // Health must be 0-100
+    if (fish.health < 0 || fish.health > 100) {
+        errors.push(`Health out of range: ${fish.health}`);
+    }
+
+    // If sick, must have sickStartedAt timestamp
+    if (fish.sick && !fish.sickStartedAt) {
+        errors.push('Sick but no sickStartedAt timestamp');
+    }
+
+    // If not sick, sickStartedAt should be null
+    if (!fish.sick && fish.sickStartedAt) {
+        errors.push('Not sick but has sickStartedAt timestamp');
+    }
+
+    // If medicated, must have medicatedAt timestamp
+    if (fish.medicated && !fish.medicatedAt) {
+        errors.push('Medicated but no medicatedAt timestamp');
+    }
+
+    // If not medicated, medicatedAt should be null
+    if (!fish.medicated && fish.medicatedAt) {
+        errors.push('Not medicated but has medicatedAt timestamp');
+    }
+
+    // Can't be medicated if not sick (medicine is only for sick fish)
+    if (fish.medicated && !fish.sick) {
+        errors.push('Medicated but not sick');
+    }
+
+    return errors;
+}
+
+/**
+ * Validate all fish states and log any inconsistencies
+ * Called periodically to detect sync issues
+ */
+function validateAllFishStates() {
+    let totalErrors = 0;
+
+    appState.fishes.forEach(fish => {
+        const errors = validateFishState(fish);
+
+        if (errors.length > 0) {
+            logger.error(`State validation failed for ${fish.name}`, {
+                fishName: fish.name,
+                errors: errors,
+                health: fish.health,
+                sick: fish.sick,
+                medicated: fish.medicated,
+                sickStartedAt: fish.sickStartedAt,
+                medicatedAt: fish.medicatedAt
+            });
+            totalErrors += errors.length;
+
+            // Log to events for tracking
+            logEvent('state_validation_error', {
+                fishName: fish.name,
+                errors: errors,
+                state: {
+                    health: fish.health,
+                    sick: fish.sick,
+                    medicated: fish.medicated,
+                    sickStartedAt: fish.sickStartedAt,
+                    medicatedAt: fish.medicatedAt
+                }
+            });
+
+            // Auto-fix critical issues
+            if (fish.health < 0) {
+                logger.warn('Auto-fixing: setting health to 0', { fishName: fish.name });
+                fish.health = 0;
+            }
+            if (fish.health > 100) {
+                logger.warn('Auto-fixing: setting health to 100', { fishName: fish.name });
+                fish.health = 100;
+            }
+            if (fish.sick && !fish.sickStartedAt) {
+                logger.warn('Auto-fixing: setting sickStartedAt to current time', { fishName: fish.name });
+                fish.sickStartedAt = Date.now();
+            }
+            if (!fish.sick && fish.sickStartedAt) {
+                logger.warn('Auto-fixing: clearing sickStartedAt', { fishName: fish.name });
+                fish.sickStartedAt = null;
+            }
+            if (fish.medicated && !fish.sick) {
+                logger.warn('Auto-fixing: clearing medicated flag', { fishName: fish.name });
+                fish.medicated = false;
+                fish.medicatedAt = null;
+            }
+
+            // Broadcast fix to clients
+            broadcastToMainApp({
+                command: 'healthUpdate',
+                fishName: fish.name,
+                health: fish.health,
+                sick: fish.sick,
+                medicated: fish.medicated
+            });
+        }
+    });
+
+    if (totalErrors > 0) {
+        logger.error('State validation completed with errors', { totalErrors });
+    } else {
+        logger.debug('State validation passed', { fishCount: appState.fishes.length });
+    }
+
+    return totalErrors;
+}
+
 // Load existing state from file
 function loadState() {
     try {
@@ -176,8 +438,19 @@ function loadState() {
                 generateAccessCode();
             }
 
-            console.log('Game state geladen uit bestand');
-            console.log(`Geladen: ${appState.fishes.length} vissen, ${appState.deadLog.length} overleden vissen`);
+            logger.info('Game state loaded from file', {
+                fishCount: appState.fishes.length,
+                deadCount: appState.deadLog.length
+            });
+
+            // Validate loaded state immediately
+            logger.info('Validating loaded state');
+            const errors = validateAllFishStates();
+            if (errors === 0) {
+                logger.info('State validation passed - all fish states are consistent');
+            } else {
+                logger.warn('State validation found and fixed issues', { issuesFixed: errors });
+            }
         } else {
             console.log('Geen bestaande game state gevonden, start met fresh state');
             generateAccessCode();
@@ -208,13 +481,15 @@ const TICK_INTERVALS = {
     temperature: 5 * 60,     // Temperature regulation every 5 minutes
     waterGreenness: 5 * 60,  // Algae growth every 5 minutes
     health: 10 * 60,         // Health system every 10 minutes
-    disease: 60 * 60         // Disease spread every hour
+    disease: 60 * 60,        // Disease spread every hour
+    validation: 2 * 60       // State validation every 2 minutes
 };
 
 // Track last execution times for each tick
 const lastTickTimes = {
     saveState: 0,
     statusBroadcast: 0,
+    validation: 0,
     accessCode: Date.now(), // Start with current time to avoid immediate regeneration
     themeCheck: 0,
     temperature: 0,
@@ -294,6 +569,12 @@ function startGameTick() {
         if (now - lastTickTimes.disease >= TICK_INTERVALS.disease * 1000) {
             lastTickTimes.disease = now;
             updateDiseaseSpread();
+        }
+
+        // State validation every 2 minutes
+        if (now - lastTickTimes.validation >= TICK_INTERVALS.validation * 1000) {
+            lastTickTimes.validation = now;
+            validateAllFishStates();
         }
 
     }, 5000); // Run consolidated tick every 5 seconds
@@ -1108,49 +1389,38 @@ function handleFishDied(deadFish) {
 function handleUpdateFishStats(fishName, stats) {
     const fish = appState.fishes.find(f => f.name === fishName);
     if (fish) {
-        // Update fish statistics
+        // Update fish statistics (non-health stats can be updated directly)
         if (stats.eats !== undefined) fish.eats = stats.eats;
         if (stats.lastEat !== undefined) fish.lastEat = stats.lastEat;
 
-        // Update health if provided by client (gradual restore, not instant)
+        // Update health if provided by client - use queue to prevent race conditions
         if (stats.health !== undefined) {
-            fish.health = Math.min(100, Math.max(0, stats.health));
-            console.log(`${fishName} ate food - health increased to ${fish.health.toFixed(1)}%`);
+            updateFishState(fishName, (fish) => {
+                fish.health = Math.min(100, Math.max(0, stats.health));
+                console.log(`${fishName} ate food - health increased to ${fish.health.toFixed(1)}%`);
 
-            // Check if fish should recover from sickness after healing to full
-            let recovered = false;
-            if (fish.health >= 100 && fish.sick && fish.medicated) {
-                fish.sick = false;
-                fish.sickStartedAt = null;
-                fish.medicated = false;
-                fish.medicatedAt = null;
-                recovered = true;
-                console.log(`✅ ${fish.name} fully recovered after eating!`);
-                logEvent('fish_recovered', {
-                    name: fish.name
+                // Check if fish should recover using centralized recovery logic
+                const recovered = recoverFish(fish);
+
+                // Broadcast health update with sick status to sync immediately
+                broadcastToMainApp({
+                    command: 'healthUpdate',
+                    fishName: fishName,
+                    health: fish.health,
+                    sick: fish.sick,
+                    medicated: fish.medicated
                 });
-            }
 
-            // Broadcast health update with sick status to sync immediately
-            broadcastToMainApp({
-                command: 'healthUpdate',
-                fishName: fishName,
-                health: fish.health,
-                sick: fish.sick,
-                medicated: fish.medicated
+                return recovered;
+            }, 'eating').then(() => {
+                console.log(`Stats bijgewerkt voor ${fishName}: eats=${fish.eats}`);
+                // Broadcast status update so controllers see updated health
+                broadcastStatusUpdate();
             });
-
-            // Also broadcast disease update if fish recovered to trigger full gameState sync
-            if (recovered) {
-                broadcastToMainApp({ command: 'diseaseUpdate' });
-            }
+        } else {
+            console.log(`Stats bijgewerkt voor ${fishName}: eats=${fish.eats}`);
+            broadcastStatusUpdate();
         }
-
-        console.log(`Stats bijgewerkt voor ${fishName}: eats=${fish.eats}`);
-
-        // Auto-save will handle persistence (every 30s)
-        // Broadcast status update so controllers see updated health
-        broadcastStatusUpdate();
     }
 }
 
@@ -1269,147 +1539,141 @@ function updateFishHealth() {
     const temp = appState.temperature;
     let healthChanged = false;
 
-    appState.fishes.forEach(fish => {
-        // Use new game logic function to calculate health changes
-        const result = gameLogic.calculateHealthChange(fish, temp);
+    // Process all fish health updates sequentially to prevent race conditions
+    const updates = appState.fishes.map(fish => {
+        return updateFishState(fish.name, (fish) => {
+            // Use new game logic function to calculate health changes
+            const result = gameLogic.calculateHealthChange(fish, temp);
 
-        // Update fish health with calculated value
-        fish.health = result.health;
-        healthChanged = true;
+            // Update fish health with calculated value
+            fish.health = result.health;
 
-        // Log critical health
-        if (result.isCritical) {
-            logEvent('fish_critical_health', {
-                name: fish.name,
-                health: fish.health,
-                temperature: temp,
-                sick: fish.sick
-            });
-            console.log(`⚠️ ${fish.name} is in critical condition (${fish.health.toFixed(1)}% health)`);
-        }
+            // Log critical health
+            if (result.isCritical) {
+                logEvent('fish_critical_health', {
+                    name: fish.name,
+                    health: fish.health,
+                    temperature: temp,
+                    sick: fish.sick
+                });
+                console.log(`⚠️ ${fish.name} is in critical condition (${fish.health.toFixed(1)}% health)`);
+            }
 
-        // Check death
-        if (result.isDead) {
-            console.log(`💀 ${fish.name} died (health: 0%)`);
-            const cause = gameLogic.determineDeathCause(fish);
-            logEvent('fish_died_disease', {
-                name: fish.name,
-                cause: cause,
-                temperature: temp,
-                sickDuration: fish.sick ? (now - fish.sickStartedAt) : 0
-            });
-        }
+            // Check death
+            if (result.isDead) {
+                console.log(`💀 ${fish.name} died (health: 0%)`);
+                const cause = gameLogic.determineDeathCause(fish);
+                logEvent('fish_died_disease', {
+                    name: fish.name,
+                    cause: cause,
+                    temperature: temp,
+                    sickDuration: fish.sick ? (now - fish.sickStartedAt) : 0
+                });
+            }
 
-        // Check recovery
-        if (result.recovered) {
-            fish.sick = false;
-            fish.sickStartedAt = null;
-            fish.medicated = false;
-            fish.medicatedAt = null;
-            console.log(`✅ ${fish.name} fully recovered!`);
-            logEvent('fish_recovered', { name: fish.name });
+            // Check recovery using centralized recovery logic
+            if (result.recovered) {
+                recoverFish(fish);
+            }
 
-            // Send immediate healthUpdate for instant visual feedback
-            broadcastToMainApp({
-                command: 'healthUpdate',
-                fishName: fish.name,
-                health: fish.health,
-                sick: fish.sick,
-                medicated: fish.medicated
-            });
-
-            // Also send diseaseUpdate for UI counters
-            broadcastToMainApp({ command: 'diseaseUpdate' });
-            healthChanged = true;
-        }
+            return result;
+        }, 'health_tick');
     });
 
-    if (healthChanged) {
+    // Wait for all updates to complete
+    Promise.all(updates).then(() => {
         broadcastStatusUpdate();
-    }
+    });
 }
 
 function updateDiseaseSpread() {
     const now = Date.now();
     const temp = appState.temperature;
-    let newInfections = 0;
     const affectedFish = []; // Track fish that got sick for immediate UI update
 
     // Use new game logic function for temperature multiplier
     const tempDiseaseMultiplier = gameLogic.calculateTemperatureMultiplier(temp);
 
-    appState.fishes.forEach(fish => {
-        if (!fish.health) fish.health = 100;
-        if (fish.sick) return;
+    // Get current sick fish count (before any new infections)
+    const sickFish = appState.fishes.filter(f => f.sick && !f.medicated);
 
-        // Environmental infection - use new game logic function
-        const environmentalChance = gameLogic.calculateEnvironmentalInfectionChance(
-            appState.poopCount,
-            appState.waterGreenness,
-            temp
-        );
+    // Process all potential infections sequentially through queue
+    const infectionChecks = appState.fishes.map(fish => {
+        return updateFishState(fish.name, (fish) => {
+            if (!fish.health) fish.health = 100;
+            if (fish.sick) return null;
 
-        if (environmentalChance > 0 && gameLogic.shouldGetInfected(environmentalChance)) {
-            fish.sick = true;
-            fish.sickStartedAt = now;
-            newInfections++;
+            // Environmental infection - use new game logic function
+            const environmentalChance = gameLogic.calculateEnvironmentalInfectionChance(
+                appState.poopCount,
+                appState.waterGreenness,
+                temp
+            );
 
-            // Track for immediate UI update
-            affectedFish.push({
-                name: fish.name,
-                sick: fish.sick,
-                sickStartedAt: fish.sickStartedAt,
-                medicated: fish.medicated,
-                health: fish.health
-            });
+            if (environmentalChance > 0 && gameLogic.shouldGetInfected(environmentalChance)) {
+                fish.sick = true;
+                fish.sickStartedAt = now;
 
-            console.log(`🦠 ${fish.name} got sick from dirty environment (temp: ${temp.toFixed(1)}°C)`);
-            logEvent('fish_infected_environment', {
-                name: fish.name,
-                poopCount: appState.poopCount,
-                waterGreenness: appState.waterGreenness,
-                temperature: temp,
-                tempMultiplier: tempDiseaseMultiplier
-            });
-        }
+                console.log(`🦠 ${fish.name} got sick from dirty environment (temp: ${temp.toFixed(1)}°C)`);
+                logEvent('fish_infected_environment', {
+                    name: fish.name,
+                    poopCount: appState.poopCount,
+                    waterGreenness: appState.waterGreenness,
+                    temperature: temp,
+                    tempMultiplier: tempDiseaseMultiplier
+                });
 
-        // Contact infection - use new game logic function
-        const sickFish = appState.fishes.filter(f => f.sick && !f.medicated);
-        const contactChance = gameLogic.calculateContactInfectionChance(sickFish.length, temp);
+                return {
+                    name: fish.name,
+                    sick: fish.sick,
+                    sickStartedAt: fish.sickStartedAt,
+                    medicated: fish.medicated,
+                    health: fish.health
+                };
+            }
 
-        if (contactChance > 0 && !fish.sick && gameLogic.shouldGetInfected(contactChance)) {
-            fish.sick = true;
-            fish.sickStartedAt = now;
-            newInfections++;
+            // Contact infection - use new game logic function
+            const contactChance = gameLogic.calculateContactInfectionChance(sickFish.length, temp);
 
-            // Track for immediate UI update
-            affectedFish.push({
-                name: fish.name,
-                sick: fish.sick,
-                sickStartedAt: fish.sickStartedAt,
-                medicated: fish.medicated,
-                health: fish.health
-            });
+            if (contactChance > 0 && !fish.sick && gameLogic.shouldGetInfected(contactChance)) {
+                fish.sick = true;
+                fish.sickStartedAt = now;
 
-            console.log(`🦠 ${fish.name} got infected by contact with sick fish (temp: ${temp.toFixed(1)}°C)`);
-            logEvent('fish_infected_contact', {
-                name: fish.name,
-                sickFishCount: sickFish.length,
-                temperature: temp,
-                tempMultiplier: tempDiseaseMultiplier
+                console.log(`🦠 ${fish.name} got infected by contact with sick fish (temp: ${temp.toFixed(1)}°C)`);
+                logEvent('fish_infected_contact', {
+                    name: fish.name,
+                    sickFishCount: sickFish.length,
+                    temperature: temp,
+                    tempMultiplier: tempDiseaseMultiplier
+                });
+
+                return {
+                    name: fish.name,
+                    sick: fish.sick,
+                    sickStartedAt: fish.sickStartedAt,
+                    medicated: fish.medicated,
+                    health: fish.health
+                };
+            }
+
+            return null;
+        }, 'disease_spread');
+    });
+
+    // Wait for all infection checks to complete
+    Promise.all(infectionChecks).then(results => {
+        const newlyInfected = results.filter(r => r !== null);
+
+        if (newlyInfected.length > 0) {
+            console.log(`🦠 Disease spread: ${newlyInfected.length} new infections`);
+            broadcastStatusUpdate();
+            // Send complete disease data for immediate UI update
+            broadcastToMainApp({
+                command: 'diseaseUpdate',
+                affectedFish: newlyInfected
             });
         }
     });
-
-    if (newInfections > 0) {
-        console.log(`🦠 Disease spread: ${newInfections} new infections`);
-        broadcastStatusUpdate();
-        // Send complete disease data for immediate UI update
-        broadcastToMainApp({
-            command: 'diseaseUpdate',
-            affectedFish: affectedFish
-        });
-    }
 }
 
 // Create WebSocket server on the same HTTP server
