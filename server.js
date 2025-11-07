@@ -3,6 +3,9 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 
+// Game logic functions (loaded async)
+let gameLogic = null;
+
 // Load package.json for version info
 const packageInfo = JSON.parse(fs.readFileSync(path.join(__dirname, 'package.json'), 'utf8'));
 const VERSION = packageInfo.version;
@@ -1267,35 +1270,15 @@ function updateFishHealth() {
     let healthChanged = false;
 
     appState.fishes.forEach(fish => {
-        if (!fish.health) fish.health = 100;
+        // Use new game logic function to calculate health changes
+        const result = gameLogic.calculateHealthChange(fish, temp);
 
-        // Hunger damage: -0.167% per 10 minutes
-        fish.health = Math.max(0, fish.health - 0.167);
+        // Update fish health with calculated value
+        fish.health = result.health;
         healthChanged = true;
 
-        // Disease damage: -0.083% per 10 minutes when sick
-        if (fish.sick && !fish.medicated) {
-            fish.health = Math.max(0, fish.health - 0.083);
-        }
-
-        // Temperature stress damage
-        let tempDamage = 0;
-        if (temp < 18) tempDamage = -0.5;
-        if (temp < 16) tempDamage = -1.0;
-        if (temp > 30) tempDamage = -1.0;
-        if (temp > 32) tempDamage = -2.0;
-
-        if (tempDamage < 0) {
-            fish.health = Math.max(0, fish.health + (tempDamage / 6));
-        }
-
-        // Medicine recovery: +0.333% per 10 minutes when medicated
-        if (fish.medicated) {
-            fish.health = Math.min(100, fish.health + 0.333);
-        }
-
         // Log critical health
-        if (fish.health <= 30 && fish.health > 29.5) {
+        if (result.isCritical) {
             logEvent('fish_critical_health', {
                 name: fish.name,
                 health: fish.health,
@@ -1306,9 +1289,9 @@ function updateFishHealth() {
         }
 
         // Check death
-        if (fish.health <= 0) {
+        if (result.isDead) {
             console.log(`💀 ${fish.name} died (health: 0%)`);
-            const cause = fish.sick ? 'disease' : 'hunger';
+            const cause = gameLogic.determineDeathCause(fish);
             logEvent('fish_died_disease', {
                 name: fish.name,
                 cause: cause,
@@ -1318,7 +1301,7 @@ function updateFishHealth() {
         }
 
         // Check recovery
-        if (fish.health >= 100 && fish.sick && fish.medicated) {
+        if (result.recovered) {
             fish.sick = false;
             fish.sickStartedAt = null;
             fish.medicated = false;
@@ -1352,72 +1335,69 @@ function updateDiseaseSpread() {
     let newInfections = 0;
     const affectedFish = []; // Track fish that got sick for immediate UI update
 
-    let tempDiseaseMultiplier = 1.0;
-    if (temp < 20) tempDiseaseMultiplier = 1.5;
-    if (temp > 28) tempDiseaseMultiplier = 2.0;
+    // Use new game logic function for temperature multiplier
+    const tempDiseaseMultiplier = gameLogic.calculateTemperatureMultiplier(temp);
 
     appState.fishes.forEach(fish => {
         if (!fish.health) fish.health = 100;
         if (fish.sick) return;
 
-        // Environmental infection
-        if (appState.poopCount > 30 || appState.waterGreenness > 80) {
-            const baseEnvironmentalChance = 0.0083;
-            const environmentalChance = baseEnvironmentalChance * tempDiseaseMultiplier;
+        // Environmental infection - use new game logic function
+        const environmentalChance = gameLogic.calculateEnvironmentalInfectionChance(
+            appState.poopCount,
+            appState.waterGreenness,
+            temp
+        );
 
-            if (Math.random() < environmentalChance) {
-                fish.sick = true;
-                fish.sickStartedAt = now;
-                newInfections++;
+        if (environmentalChance > 0 && gameLogic.shouldGetInfected(environmentalChance)) {
+            fish.sick = true;
+            fish.sickStartedAt = now;
+            newInfections++;
 
-                // Track for immediate UI update
-                affectedFish.push({
-                    name: fish.name,
-                    sick: fish.sick,
-                    sickStartedAt: fish.sickStartedAt,
-                    medicated: fish.medicated,
-                    health: fish.health
-                });
+            // Track for immediate UI update
+            affectedFish.push({
+                name: fish.name,
+                sick: fish.sick,
+                sickStartedAt: fish.sickStartedAt,
+                medicated: fish.medicated,
+                health: fish.health
+            });
 
-                console.log(`🦠 ${fish.name} got sick from dirty environment (temp: ${temp.toFixed(1)}°C)`);
-                logEvent('fish_infected_environment', {
-                    name: fish.name,
-                    poopCount: appState.poopCount,
-                    waterGreenness: appState.waterGreenness,
-                    temperature: temp,
-                    tempMultiplier: tempDiseaseMultiplier
-                });
-            }
+            console.log(`🦠 ${fish.name} got sick from dirty environment (temp: ${temp.toFixed(1)}°C)`);
+            logEvent('fish_infected_environment', {
+                name: fish.name,
+                poopCount: appState.poopCount,
+                waterGreenness: appState.waterGreenness,
+                temperature: temp,
+                tempMultiplier: tempDiseaseMultiplier
+            });
         }
 
-        // Contact infection
+        // Contact infection - use new game logic function
         const sickFish = appState.fishes.filter(f => f.sick && !f.medicated);
-        if (sickFish.length > 0 && !fish.sick) {
-            const baseContactChance = 0.03;
-            const contactChance = (sickFish.length * baseContactChance) * tempDiseaseMultiplier;
+        const contactChance = gameLogic.calculateContactInfectionChance(sickFish.length, temp);
 
-            if (Math.random() < contactChance) {
-                fish.sick = true;
-                fish.sickStartedAt = now;
-                newInfections++;
+        if (contactChance > 0 && !fish.sick && gameLogic.shouldGetInfected(contactChance)) {
+            fish.sick = true;
+            fish.sickStartedAt = now;
+            newInfections++;
 
-                // Track for immediate UI update
-                affectedFish.push({
-                    name: fish.name,
-                    sick: fish.sick,
-                    sickStartedAt: fish.sickStartedAt,
-                    medicated: fish.medicated,
-                    health: fish.health
-                });
+            // Track for immediate UI update
+            affectedFish.push({
+                name: fish.name,
+                sick: fish.sick,
+                sickStartedAt: fish.sickStartedAt,
+                medicated: fish.medicated,
+                health: fish.health
+            });
 
-                console.log(`🦠 ${fish.name} got infected by contact with sick fish (temp: ${temp.toFixed(1)}°C)`);
-                logEvent('fish_infected_contact', {
-                    name: fish.name,
-                    sickFishCount: sickFish.length,
-                    temperature: temp,
-                    tempMultiplier: tempDiseaseMultiplier
-                });
-            }
+            console.log(`🦠 ${fish.name} got infected by contact with sick fish (temp: ${temp.toFixed(1)}°C)`);
+            logEvent('fish_infected_contact', {
+                name: fish.name,
+                sickFishCount: sickFish.length,
+                temperature: temp,
+                tempMultiplier: tempDiseaseMultiplier
+            });
         }
     });
 
@@ -1531,11 +1511,15 @@ wss.on('connection', (ws, req) => {
 });
 
 // Start HTTP server
-server.listen(3000, () => {
+server.listen(3000, async () => {
     console.log('HTTP server luistert op http://localhost:3000');
     console.log('WebSocket server gestart op dezelfde poort (3000)');
     console.log('Bezoek http://localhost:3000 voor de vissenkom');
     console.log('Bezoek http://localhost:3000/controller voor de controller');
+
+    // Load game logic functions
+    gameLogic = await import('./src/gameLogic.js');
+    console.log('Game logic functies geladen');
 
     // Start consolidated game tick
     startGameTick();
