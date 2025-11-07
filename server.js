@@ -200,6 +200,9 @@ let lastBroadcastedGreenness = 0;
 // Track current theme to detect changes
 let currentTheme = getCurrentTheme();
 
+// Message sequence tracking for detecting out-of-order messages
+let messageSequence = 0;
+
 // Fish state update queue to prevent race conditions
 const fishUpdateQueue = new Map(); // fishName -> array of pending updates
 let isProcessingQueue = false;
@@ -1215,6 +1218,10 @@ function sendToClient(client, message) {
 }
 
 function broadcastToMainApp(command) {
+    // Add sequence number and timestamp to track message ordering
+    command.seq = ++messageSequence;
+    command.timestamp = Date.now();
+
     console.log('Verstuur naar main apps:', command);
     mainApps.forEach(client => {
         sendToClient(client, command);
@@ -1366,6 +1373,9 @@ function sendGameState(client) {
             deadLog: appState.deadLog,
             fishCounter: appState.fishCounter,
             lastFed: appState.lastFed,
+            lastMedicine: appState.lastMedicine,
+            feedCooldown: appState.feedCooldown,
+            medicineCooldown: appState.medicineCooldown,
             lightsOn: appState.lightsOn,
             discoOn: appState.discoOn,
             pumpOn: appState.pumpOn,

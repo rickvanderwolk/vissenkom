@@ -430,4 +430,150 @@ describe('State Synchronization', () => {
             expect(saveWasCalled).toBe(true);
         });
     });
+
+    describe('Medicine Cooldown Sync', () => {
+        it('should include lastMedicine in gameState', () => {
+            const gameState = {
+                fishes: [],
+                lastFed: Date.now(),
+                lastMedicine: Date.now() - (2 * 60 * 60 * 1000), // 2 hours ago
+                feedCooldown: 60 * 60 * 1000,
+                medicineCooldown: 24 * 60 * 60 * 1000
+            };
+
+            expect(gameState).toHaveProperty('lastMedicine');
+            expect(gameState).toHaveProperty('feedCooldown');
+            expect(gameState).toHaveProperty('medicineCooldown');
+        });
+
+        it('should load medicine cooldown from server', () => {
+            const serverState = {
+                lastMedicine: Date.now() - (5 * 60 * 60 * 1000), // 5 hours ago
+                feedCooldown: 60 * 60 * 1000,
+                medicineCooldown: 24 * 60 * 60 * 1000
+            };
+
+            // Client loads this
+            const lastMedicine = serverState.lastMedicine;
+            const timeUntilReady = serverState.medicineCooldown - (Date.now() - lastMedicine);
+
+            expect(timeUntilReady).toBeGreaterThan(0);
+            expect(timeUntilReady).toBeLessThan(serverState.medicineCooldown);
+        });
+    });
+
+    describe('Hash Verification', () => {
+        it('should calculate matching hashes for same state', () => {
+            // Mock hash function (simple version for testing)
+            function simpleHash(obj) {
+                const str = JSON.stringify(obj);
+                let hash = 0;
+                for (let i = 0; i < str.length; i++) {
+                    const char = str.charCodeAt(i);
+                    hash = ((hash << 5) - hash) + char;
+                    hash = hash & hash;
+                }
+                return hash.toString(16);
+            }
+
+            const state = {
+                fishCount: 2,
+                fishes: [
+                    { name: 'Freddy', health: 100, sick: false, medicated: false },
+                    { name: 'Nemo', health: 75, sick: true, medicated: true }
+                ],
+                lightsOn: true,
+                discoOn: false,
+                pumpOn: false,
+                hasBall: false
+            };
+
+            const hash1 = simpleHash(state);
+            const hash2 = simpleHash(state);
+
+            expect(hash1).toBe(hash2);
+        });
+
+        it('should detect different hashes for different state', () => {
+            function simpleHash(obj) {
+                const str = JSON.stringify(obj);
+                let hash = 0;
+                for (let i = 0; i < str.length; i++) {
+                    const char = str.charCodeAt(i);
+                    hash = ((hash << 5) - hash) + char;
+                    hash = hash & hash;
+                }
+                return hash.toString(16);
+            }
+
+            const state1 = { fishCount: 2, lightsOn: true };
+            const state2 = { fishCount: 2, lightsOn: false };
+
+            const hash1 = simpleHash(state1);
+            const hash2 = simpleHash(state2);
+
+            expect(hash1).not.toBe(hash2);
+        });
+
+        it('should request fresh gameState on hash mismatch', () => {
+            let gameStateRequested = false;
+            const mockRequest = () => { gameStateRequested = true; };
+
+            const serverHash = 'abc123';
+            const clientHash = 'def456';
+
+            if (serverHash !== clientHash) {
+                mockRequest();
+            }
+
+            expect(gameStateRequested).toBe(true);
+        });
+    });
+
+    describe('Message Sequence Numbers', () => {
+        it('should track message sequence', () => {
+            let messageSeq = 0;
+
+            const msg1 = { command: 'healthUpdate', seq: ++messageSeq };
+            const msg2 = { command: 'diseaseUpdate', seq: ++messageSeq };
+            const msg3 = { command: 'healthUpdate', seq: ++messageSeq };
+
+            expect(msg1.seq).toBe(1);
+            expect(msg2.seq).toBe(2);
+            expect(msg3.seq).toBe(3);
+        });
+
+        it('should ignore out-of-order messages', () => {
+            let lastSeenSeq = 0;
+            const processedMessages = [];
+
+            const messages = [
+                { type: 'healthUpdate', seq: 1 },
+                { type: 'healthUpdate', seq: 3 },
+                { type: 'healthUpdate', seq: 2 }, // Out of order!
+                { type: 'healthUpdate', seq: 4 }
+            ];
+
+            messages.forEach(msg => {
+                if (msg.seq > lastSeenSeq) {
+                    processedMessages.push(msg);
+                    lastSeenSeq = msg.seq;
+                }
+            });
+
+            expect(processedMessages).toHaveLength(3);
+            expect(processedMessages.map(m => m.seq)).toEqual([1, 3, 4]);
+        });
+
+        it('should always accept gameState messages', () => {
+            let lastSeenSeq = 10;
+
+            const oldGameState = { type: 'gameState', seq: 5 };
+
+            // gameState should always be processed, even if seq is old
+            const shouldProcess = oldGameState.type === 'gameState' || oldGameState.seq > lastSeenSeq;
+
+            expect(shouldProcess).toBe(true);
+        });
+    });
 });

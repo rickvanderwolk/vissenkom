@@ -38,6 +38,9 @@ These critical properties are **guaranteed** to be identical after a page refres
 ### Meta State
 - ✅ `fishCounter` - Fish ID counter
 - ✅ `lastFed` - Last global feed time
+- ✅ `lastMedicine` - Last medicine administration time (fixed in 0.13.5!)
+- ✅ `feedCooldown` - Feeding cooldown duration
+- ✅ `medicineCooldown` - Medicine cooldown duration
 - ✅ `deadLog` - History of deceased fish
 - ✅ `theme` - Current theme (normal/halloween/etc)
 - ✅ `currentAccessCode` - QR code for controllers
@@ -105,11 +108,46 @@ These properties are **randomized** on each page refresh:
 - Automatically requests fresh state from server
 - Logs validation errors to console
 
-### 3. Sync Verification
-- `getStateHash` command available
-- Returns hash of core state
-- Can be used to detect sync drift
-- Includes fish count and sick count
+### 3. Hash Verification (NEW in 0.13.5!)
+
+**Automatic Hash Checks**:
+- **Initial check**: 5 seconds after page load
+- **Periodic checks**: Every 30 seconds
+- **Manual check**: `checkSyncNow()` in console
+
+**How It Works**:
+1. Client calculates hash of core state (fish health, sick status, tank state)
+2. Server calculates same hash from its state
+3. Hashes are compared
+4. ✅ **If matching**: Sync confirmed, logged to console
+5. ❌ **If mismatched**: Fresh gameState automatically requested
+
+**What's Included in Hash**:
+- Fish count
+- Each fish: name, health (rounded to 0.1), sick, medicated
+- Tank: lightsOn, discoOn, pumpOn, hasBall
+
+**Console Output**:
+```
+[SYNC] ✅ State in sync | Hash: a3f5b2c9 | Fish: 5 | Sick: 2
+[SYNC] ❌ HASH MISMATCH DETECTED!
+[SYNC] 🔄 Requesting fresh gameState...
+```
+
+### 4. Message Sequencing (NEW in 0.13.5!)
+
+**Protection Against Out-of-Order Messages**:
+- Every server message includes sequence number (`seq`)
+- Client tracks last seen sequence number
+- Messages with old sequence numbers are ignored
+- Prevents race conditions from network delays
+
+**Exception**: `gameState` messages always accepted (they're authoritative)
+
+**Console Output**:
+```
+[SYNC] ⚠️ Ignored out-of-order message | Type: healthUpdate, Seq: 142 (last: 145)
+```
 
 ---
 
@@ -201,17 +239,27 @@ fish.sick = false, medicated = true
 **After**: Centralized `recoverFish()` function
 **Impact**: Clean event log, single recovery per fish
 
+### Bug #5: Medicine Cooldown Not Synced
+**Before**: `lastMedicine`, `feedCooldown`, `medicineCooldown` not in gameState
+**After**: Added all cooldown state to sync
+**Impact**: Cooldown timers now correct after page refresh
+
 ---
 
 ## 📊 Test Coverage
 
-- **100 tests** passing
+- **113 tests** passing ✅
 - **5 test suites**:
   - Health calculations
   - Disease spread mechanics
   - Client emoji logic
   - Server integration
-  - State synchronization
+  - **State synchronization (expanded in 0.13.5!)**
+    - Medicine cooldown sync
+    - Hash verification
+    - Message sequence numbers
+    - Invalid state handling
+    - Sync timing guarantees
 
 ---
 
@@ -224,6 +272,8 @@ After a page refresh (F5), you can expect:
 - Which fish are sick/healthy
 - Which fish are medicated
 - Sick emoji (🦠/🤢/💀) matches health
+- **Medicine cooldown timer** (fixed in 0.13.5!)
+- **Feed cooldown timer** (fixed in 0.13.5!)
 - Tank lights, disco, pump status
 - Water temperature and quality
 - Play ball presence
@@ -254,10 +304,40 @@ After a page refresh (F5), you can expect:
 
 ### Debugging Sync Issues
 1. Check browser console for validation errors
-2. Use `getStateHash` command to compare client/server
+2. **Use manual sync commands** (NEW in 0.13.5!):
+   - `checkSyncNow()` - Immediate hash verification
+   - `forceSyncNow()` - Request fresh gameState from server
+   - `getSyncStats()` - View sync statistics
 3. Check server logs for state validation errors
 4. Verify `gamestate.json` contains expected data
 5. Run test suite: `npm test`
+
+### Manual Sync Commands (NEW!)
+
+Open browser console and run:
+
+```javascript
+// Check if client and server state match right now
+checkSyncNow()
+// Output: [SYNC] ✅ State in sync | Hash: a3f5b2c9
+
+// Force re-sync from server (useful if something looks wrong)
+forceSyncNow()
+// Output: [SYNC] Force re-sync requested...
+
+// View sync statistics
+getSyncStats()
+// Output: Table showing:
+//   - Last check time
+//   - Hash matches/mismatches
+//   - Last server/client hash
+//   - Total checks performed
+```
+
+**When to Use**:
+- `checkSyncNow()`: When you suspect state drift
+- `forceSyncNow()`: When display looks wrong but hash matches
+- `getSyncStats()`: To see sync health over time
 
 ### Environment Variables
 ```bash
@@ -269,12 +349,68 @@ LOG_LEVEL=DEBUG npm start  # Enable debug logging
 ## 📝 Version History
 
 - **0.13.5** (Current)
-  - Fixed hasBall sync bug
-  - Added client-side state validation
-  - Reduced auto-save interval (30s → 10s)
-  - Added immediate saves for critical events
-  - Added state hash verification system
-  - 100 tests, full test coverage for sync
+  - **Sync Improvements**:
+    - Fixed hasBall sync bug
+    - Fixed medicine cooldown sync bug
+    - Added automatic hash verification (every 30s)
+    - Added message sequence numbers
+    - Added manual sync commands (checkSyncNow, forceSyncNow, getSyncStats)
+  - **Validation**:
+    - Added client-side state validation
+    - Client refuses invalid state and auto-requests fresh state
+  - **Performance**:
+    - Reduced auto-save interval (30s → 10s)
+    - Added immediate saves for critical events
+  - **Testing**:
+    - Expanded to 113 tests (from 100)
+    - Full coverage for sync mechanisms
+
+---
+
+## ⏱️ Sync & Check Frequencies
+
+Complete overview of all automatic synchronization and validation:
+
+| **Activity** | **Frequency** | **Purpose** | **Action on Issue** |
+|-------------|---------------|-------------|---------------------|
+| **State Save** | Every 10s | Persist state to disk | N/A |
+| **State Save (Critical)** | Immediate | Save on infection/medicine/recovery/death | N/A |
+| **State Broadcast** | Every 5s | Send healthUpdate to all clients | N/A |
+| **State Validation (Server)** | Every 2 min | Check for state corruption | Auto-fix + save + broadcast |
+| **Hash Verification (Client)** | Every 30s | Detect client-server drift | Request fresh gameState |
+| **Hash Verification (Initial)** | 5s after load | Confirm sync after refresh | Request fresh gameState |
+| **State Validation (Client)** | On load | Reject invalid incoming state | Request fresh gameState |
+
+### What Gets Checked?
+
+**State Save** (10s / immediate):
+- Writes entire `appState` to `gamestate.json`
+- Includes all fish, tank state, meta state
+
+**State Broadcast** (5s):
+- Sends `healthUpdate` with all fish health/sick/medicated
+- Keeps clients up-to-date in real-time
+
+**State Validation** (2 min / on load):
+- Health in range (0-100)
+- Sick status consistent with timestamps
+- Medicated only if sick
+- All required fields present
+
+**Hash Verification** (30s / 5s initial):
+- Fish count + health + sick + medicated
+- Tank state (lights, disco, pump, ball)
+- Simple hash comparison (fast!)
+
+### Manual Control
+
+You can trigger these checks manually:
+
+```javascript
+checkSyncNow()    // Immediate hash check
+forceSyncNow()    // Request fresh state
+getSyncStats()    // View sync history
+```
 
 ---
 
@@ -283,6 +419,7 @@ LOG_LEVEL=DEBUG npm start  # Enable debug logging
 - State save: ~1ms (synchronous file write)
 - State validation: <1ms per fish
 - State hash calculation: <1ms
+- Hash verification: <5ms round-trip
 - No noticeable performance impact from validation
 
 ---

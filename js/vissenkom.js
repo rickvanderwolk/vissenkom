@@ -78,7 +78,7 @@ const plants=[];const decorations=[];const stars=[];const particles=[];const alg
 const playBalls=[]; // Speelballen voor vissen
 const spiderWebs=[]; // Halloween spinnenwebben (statisch)
 let recentActivity=[];
-let lastFed=0;let fishCounter=1;let lastT=Date.now();let TOP_N=3;
+let lastFed=0;let lastMedicine=0;let feedCooldown=60*60*1000;let medicineCooldown=24*60*60*1000;let fishCounter=1;let lastT=Date.now();let TOP_N=3;let lastSeenSeq=0;
 let lightsOn=true;let discoOn=false;let pumpOn=false;let heatingOn=true;const pumpPos={x:0,y:0};let pumpJustOnUntil=0;
 let waterGreenness=0;let waterGreennessTarget=0;
 let currentTemperature=24;
@@ -3077,6 +3077,10 @@ function initWebSocket() {
 
             // Don't sync ball state here - let server be authoritative
             // The gameState response will contain hasBall status which we'll respect
+
+            // Start periodic sync verification (every 30 seconds)
+            startPeriodicSyncCheck();
+            console.log('🔍 Periodic sync check started (every 30s)');
         };
 
         ws.onmessage = function(event) {
@@ -3139,6 +3143,16 @@ function initWebSocket() {
 }
 
 function handleRemoteCommand(data) {
+    // Check message sequence to detect out-of-order messages
+    if (data.seq !== undefined) {
+        if (data.seq <= lastSeenSeq && data.type !== 'gameState') {
+            // Ignore old message (except gameState which is always fresh)
+            console.warn(`[SYNC] ⚠️ Ignored out-of-order message | Type: ${data.type}, Seq: ${data.seq} (last: ${lastSeenSeq})`);
+            return;
+        }
+        lastSeenSeq = data.seq;
+    }
+
     switch (data.type) {
         case 'gameState':
             loadGameState(data.data);
@@ -3226,6 +3240,10 @@ function handleRemoteCommand(data) {
                     resize(); // Recalculate viewport dimensions
                 }
             }
+            break;
+        case 'stateHash':
+            // Handle state hash verification response from server
+            handleStateHashResponse(data.data);
             break;
         case 'version':
             // Check if version has changed (and currentVersion is not empty)
@@ -3335,6 +3353,163 @@ function handleRemoteCommand(data) {
 }
 
 /**
+ * Calculate client-side state hash
+ * Must match server calculateStateHash() logic exactly
+ */
+function calculateClientStateHash() {
+    // Match server's core state structure
+    const coreState = {
+        fishCount: fishes.length,
+        fishes: fishes.map(f => ({
+            name: f.name,
+            health: Math.round(f.health * 10) / 10, // Round to 1 decimal
+            sick: f.sick || false,
+            medicated: f.medicated || false
+        })),
+        lightsOn: lightsOn,
+        discoOn: discoOn,
+        pumpOn: pumpOn,
+        hasBall: playBalls.length > 0
+    };
+
+    // Simple hash (not cryptographic, just for sync verification)
+    const stateString = JSON.stringify(coreState);
+    let hash = 0;
+    for (let i = 0; i < stateString.length; i++) {
+        const char = stateString.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash = hash & hash; // Convert to 32bit integer
+    }
+
+    return hash.toString(16);
+}
+
+/**
+ * Sync stats tracking
+ */
+const syncStats = {
+    lastCheck: 0,
+    lastServerHash: null,
+    lastClientHash: null,
+    hashMatches: 0,
+    hashMismatches: 0,
+    correctionsApplied: 0,
+    lastMismatchTime: 0
+};
+
+/**
+ * Handle state hash response from server
+ */
+function handleStateHashResponse(serverHashData) {
+    const serverHash = serverHashData.hash;
+    const clientHash = calculateClientStateHash();
+
+    syncStats.lastCheck = Date.now();
+    syncStats.lastServerHash = serverHash;
+    syncStats.lastClientHash = clientHash;
+
+    const timeSinceLastCheck = syncStats.lastCheck - (syncStats.lastCheck - 30000);
+
+    if (serverHash === clientHash) {
+        // Hashes match - state is in sync!
+        syncStats.hashMatches++;
+        console.log(
+            `%c[SYNC] ✅ State in sync`,
+            'color: #00ff00; font-weight: bold',
+            `| Hash: ${serverHash}`,
+            `| Fish: ${serverHashData.fishCount} total, ${serverHashData.sickCount} sick`,
+            `| Matches: ${syncStats.hashMatches}, Mismatches: ${syncStats.hashMismatches}`
+        );
+    } else {
+        // Hash mismatch - state is out of sync!
+        syncStats.hashMismatches++;
+        syncStats.lastMismatchTime = Date.now();
+        syncStats.correctionsApplied++;
+
+        console.error(
+            `%c[SYNC] ❌ HASH MISMATCH DETECTED!`,
+            'color: #ff0000; font-weight: bold; font-size: 14px'
+        );
+        console.error(`Server Hash: ${serverHash}`);
+        console.error(`Client Hash: ${clientHash}`);
+        console.error(`Server Fish Count: ${serverHashData.fishCount}, Sick: ${serverHashData.sickCount}`);
+        console.error(`Client Fish Count: ${fishes.length}, Sick: ${fishes.filter(f => f.sick).length}`);
+        console.log('%c[SYNC] 🔄 Requesting fresh gameState to restore sync...', 'color: #ffaa00; font-weight: bold');
+
+        // Request fresh gameState to fix sync
+        sendToServer({ command: 'getGameState' });
+    }
+}
+
+/**
+ * Periodic sync check - request hash from server every 30 seconds
+ */
+function startPeriodicSyncCheck() {
+    // Initial check after 5 seconds (give time for initial state load)
+    setTimeout(() => {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            sendToServer({ command: 'getStateHash' });
+        }
+    }, 5000);
+
+    // Then check every 30 seconds
+    setInterval(() => {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            sendToServer({ command: 'getStateHash' });
+        }
+    }, 30000);
+}
+
+/**
+ * Manual sync commands (available in console)
+ */
+window.checkSyncNow = function() {
+    console.log('[SYNC] Manual sync check requested...');
+    if (ws && ws.readyState === WebSocket.OPEN) {
+        sendToServer({ command: 'getStateHash' });
+    } else {
+        console.error('[SYNC] WebSocket not connected');
+    }
+};
+
+window.forceSyncNow = function() {
+    console.log('[SYNC] Force re-sync requested...');
+    if (ws && ws.readyState === WebSocket.OPEN) {
+        sendToServer({ command: 'getGameState' });
+        console.log('[SYNC] ✅ Fresh gameState requested');
+    } else {
+        console.error('[SYNC] WebSocket not connected');
+    }
+};
+
+window.getSyncStats = function() {
+    const stats = {
+        lastCheck: syncStats.lastCheck ? new Date(syncStats.lastCheck).toLocaleTimeString() : 'Never',
+        timeSinceLastCheck: syncStats.lastCheck ? `${Math.round((Date.now() - syncStats.lastCheck) / 1000)}s ago` : 'N/A',
+        lastServerHash: syncStats.lastServerHash || 'N/A',
+        lastClientHash: syncStats.lastClientHash || 'N/A',
+        hashMatches: syncStats.hashMatches,
+        hashMismatches: syncStats.hashMismatches,
+        correctionsApplied: syncStats.correctionsApplied,
+        lastMismatch: syncStats.lastMismatchTime ? new Date(syncStats.lastMismatchTime).toLocaleTimeString() : 'Never',
+        currentState: {
+            fishCount: fishes.length,
+            sickCount: fishes.filter(f => f.sick).length,
+            medicatedCount: fishes.filter(f => f.medicated).length,
+            lightsOn: lightsOn,
+            discoOn: discoOn,
+            pumpOn: pumpOn
+        }
+    };
+
+    console.log('%c=== SYNC STATISTICS ===', 'font-weight: bold; font-size: 16px');
+    console.table(stats);
+    console.log('%cCommands: checkSyncNow(), forceSyncNow(), getSyncStats()', 'color: #888');
+
+    return stats;
+};
+
+/**
  * Validate received state from server
  * Ensures core state is consistent and complete
  */
@@ -3418,6 +3593,9 @@ function loadGameState(state) {
 
     // Update global variables
     lastFed = state.lastFed;
+    lastMedicine = state.lastMedicine || 0;
+    feedCooldown = state.feedCooldown || (60 * 60 * 1000);
+    medicineCooldown = state.medicineCooldown || (24 * 60 * 60 * 1000);
     fishCounter = state.fishCounter;
     lightsOn = state.lightsOn;
     discoOn = state.discoOn;
