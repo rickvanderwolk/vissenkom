@@ -1,6 +1,6 @@
 # Vissenkom
 
-![Vissenkom preview](assets/preview.png)
+<img src="assets/preview2-optimized.png" width="49%" /> <img src="assets/preview3-optimized.png" width="49%" />
 
 Virtuele vissenkom met remote control. Scan de QR-code met je telefoon (max. 1 uur geldig) en voeg vissen toe, geef ze voer, bedien het licht en de pomp, maak de kom schoon, etc.
 
