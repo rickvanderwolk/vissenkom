@@ -4,3 +4,7 @@ node_modules
 events.json
 gamestate.json
 config.json
+
+# Test coverage
+coverage/
+.nyc_output/
