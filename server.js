@@ -1596,7 +1596,7 @@ function updateWaterGreenness() {
         if (rounded === 25 || rounded === 50 || rounded === 75 || rounded === 100) {
             logEvent('water_greenness_milestone', {
                 greenness: appState.waterGreenness,
-                level: rounded,
+                percentage: rounded,
                 temperature: appState.temperature,
                 tempModifier: tempModifier,
                 lightModifier: lightModifier
