@@ -4,6 +4,7 @@
   "footerLink": "https://github.com/rickvanderwolk/vissenkom",
   "footerLinkText": "View on GitHub",
   "showBehaviorEmoji": false,
+  "showControllerStatusBlocks": true,
   "viewport": {
     "offsetTop": 0,
     "offsetBottom": 0,

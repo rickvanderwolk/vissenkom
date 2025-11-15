@@ -1202,6 +1202,14 @@ function handleAddFish(name, fromClient) {
         fishCounter: appState.fishCounter
     });
 
+    // Send success message to the client that added the fish
+    if (fromClient) {
+        sendToClient(fromClient, {
+            type: 'success',
+            message: `Vis "${fishName}" toegevoegd! 🐟`
+        });
+    }
+
     broadcastToMainApp({
         command: 'addFish',
         fishData: fishData,

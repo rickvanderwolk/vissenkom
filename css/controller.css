@@ -292,6 +292,68 @@
             }
         }
 
+        /* Fish hint box on Home tab */
+        .fish-hint-box {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 24px;
+            padding: 16px 18px;
+            background: linear-gradient(135deg, rgba(155, 89, 182, 0.15), rgba(142, 68, 173, 0.15));
+            border: 2px solid rgba(155, 89, 182, 0.3);
+            border-radius: 14px;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+        }
+
+        .fish-hint-icon {
+            font-size: 28px;
+            flex-shrink: 0;
+            animation: gentle-bounce 2s ease-in-out infinite;
+        }
+
+        @keyframes gentle-bounce {
+            0%, 100% {
+                transform: translateY(0);
+            }
+            50% {
+                transform: translateY(-3px);
+            }
+        }
+
+        .fish-hint-text {
+            color: #e9f1f7;
+            font-size: 15px;
+            line-height: 1.5;
+            font-weight: 500;
+        }
+
+        .fish-hint-text strong {
+            color: #9b59b6;
+            font-weight: 700;
+        }
+
+        .fish-hint-link {
+            color: #9b59b6;
+            font-weight: 700;
+            cursor: pointer;
+            text-decoration: underline;
+            text-decoration-thickness: 2px;
+            text-underline-offset: 2px;
+            transition: all 0.2s ease;
+            /* Mobile touch optimization */
+            -webkit-tap-highlight-color: rgba(155, 89, 182, 0.2);
+        }
+
+        .fish-hint-link:hover {
+            color: #b370cf;
+            text-decoration-thickness: 3px;
+        }
+
+        .fish-hint-link:active {
+            color: #8e44ad;
+        }
+
         .add-fish-container {
             display: flex;
             gap: 6px; /* Reduced from 10px to 6px */
@@ -407,6 +469,20 @@
             .tab-header {
                 font-size: 1em !important;
                 margin-bottom: 15px !important;
+            }
+
+            .fish-hint-box {
+                gap: 10px;
+                margin-bottom: 20px;
+                padding: 14px 16px;
+            }
+
+            .fish-hint-icon {
+                font-size: 24px;
+            }
+
+            .fish-hint-text {
+                font-size: 14px;
             }
 
             .add-fish-container {
@@ -530,6 +606,20 @@
             }
 
 
+            .fish-hint-box {
+                gap: 8px;
+                margin-bottom: 16px;
+                padding: 12px 14px;
+            }
+
+            .fish-hint-icon {
+                font-size: 22px;
+            }
+
+            .fish-hint-text {
+                font-size: 13px;
+            }
+
             #fishNameInput {
                 padding: 10px;
                 font-size: 14px;
@@ -545,7 +635,7 @@
         .tab-navigation {
             display: flex;
             gap: 8px;
-            margin-bottom: 32px;
+            margin-bottom: 36px;
             background: rgba(0, 0, 0, 0.25);
             border-radius: 14px;
             padding: 8px;
@@ -559,7 +649,7 @@
             justify-content: center;
             gap: 6px;
             padding: 14px 10px;
-            border: none;
+            border: 2px solid transparent;
             border-radius: 10px;
             background: transparent;
             color: rgba(233, 241, 247, 0.6);
@@ -589,18 +679,49 @@
         }
 
         .tab-button.active {
-            background: rgba(80, 227, 194, 0.15);
+            background: rgba(80, 227, 194, 0.25);
             color: #50e3c2;
+            border: 2px solid rgba(80, 227, 194, 0.5);
+            box-shadow: 0 2px 8px rgba(80, 227, 194, 0.3);
         }
 
         .tab-button.active .tab-icon {
             transform: scale(1.1);
         }
 
+        /* Individual tab colors when active */
+        .tab-button[data-tab="care"].active {
+            background: rgba(62, 207, 92, 0.25);
+            color: #3ecf5c;
+            border-color: rgba(62, 207, 92, 0.5);
+            box-shadow: 0 2px 8px rgba(62, 207, 92, 0.3);
+        }
+
+        .tab-button[data-tab="tank"].active {
+            background: rgba(74, 144, 226, 0.25);
+            color: #4a90e2;
+            border-color: rgba(74, 144, 226, 0.5);
+            box-shadow: 0 2px 8px rgba(74, 144, 226, 0.3);
+        }
+
+        .tab-button[data-tab="maintenance"].active {
+            background: rgba(243, 156, 18, 0.25);
+            color: #f39c12;
+            border-color: rgba(243, 156, 18, 0.5);
+            box-shadow: 0 2px 8px rgba(243, 156, 18, 0.3);
+        }
+
+        .tab-button[data-tab="fish"].active {
+            background: rgba(155, 89, 182, 0.25);
+            color: #9b59b6;
+            border-color: rgba(155, 89, 182, 0.5);
+            box-shadow: 0 2px 8px rgba(155, 89, 182, 0.3);
+        }
+
         /* Tab Content */
         .tab-content {
             position: relative;
-            padding-top: 4px;
+            padding-top: 0;
         }
 
         .tab-panel {
@@ -655,18 +776,18 @@
         }
 
         .fish-button {
-            background: linear-gradient(135deg, #ff9f43, #ee5a24) !important;
-            box-shadow: 0 4px 16px rgba(255, 159, 67, 0.4), 0 2px 8px rgba(0, 0, 0, 0.2) !important;
+            background: linear-gradient(135deg, #9b59b6, #8e44ad) !important;
+            box-shadow: 0 4px 16px rgba(155, 89, 182, 0.4), 0 2px 8px rgba(0, 0, 0, 0.2) !important;
         }
 
         @media (hover: hover) and (pointer: fine) {
             .fish-button:hover {
-                box-shadow: 0 6px 24px rgba(255, 159, 67, 0.5), 0 3px 10px rgba(0, 0, 0, 0.25) !important;
+                box-shadow: 0 6px 24px rgba(155, 89, 182, 0.5), 0 3px 10px rgba(0, 0, 0, 0.25) !important;
             }
         }
 
         .fish-button:disabled {
-            box-shadow: 0 2px 8px rgba(255, 159, 67, 0.15) !important;
+            box-shadow: 0 2px 8px rgba(155, 89, 182, 0.15) !important;
         }
 
         /* Maintenance button colors */
@@ -714,7 +835,7 @@
             .tab-navigation {
                 gap: 5px;
                 padding: 5px;
-                margin-bottom: 20px;
+                margin-bottom: 18px;
             }
 
             .tab-button {

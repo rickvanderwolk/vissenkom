@@ -298,6 +298,16 @@
                 case 'config':
                     updateFooter(message.config);
                     break;
+                case 'success':
+                    showSuccess(message.message);
+                    // Switch to home tab after showing success toast
+                    setTimeout(() => {
+                        if (window.switchToTab) {
+                            window.switchToTab('care');
+                            localStorage.setItem('vissenkom_active_tab', 'care');
+                        }
+                    }, 500);
+                    break;
                 case 'error':
                     showError(message.message);
                     break;
@@ -331,6 +341,9 @@
                 // Create clickable link
                 footerEl.innerHTML = `<a href="${config.footerLink}" target="_blank" rel="noopener noreferrer" style="color: #50e3c2; text-decoration: none;">${linkText}</a>`;
             }
+
+            // Update status display visibility
+            initStatusDisplay(config);
         }
 
         function updateStatus(status) {
@@ -634,6 +647,37 @@
             }, 4000);
         }
 
+        function showSuccess(message) {
+            // Create success toast
+            const successDiv = document.createElement('div');
+            successDiv.textContent = message;
+            successDiv.style.cssText = `
+                position: fixed;
+                top: 20px;
+                left: 50%;
+                transform: translateX(-50%);
+                background: linear-gradient(135deg, #3ecf5c, #2db84b);
+                color: white;
+                padding: 15px 25px;
+                border-radius: 8px;
+                box-shadow: 0 4px 12px rgba(62, 207, 92, 0.4);
+                z-index: 10000;
+                font-size: 16px;
+                font-weight: 500;
+                max-width: 90%;
+                text-align: center;
+                animation: slideDown 0.3s ease-out;
+            `;
+
+            document.body.appendChild(successDiv);
+
+            // Remove after 3 seconds
+            setTimeout(() => {
+                successDiv.style.animation = 'slideUp 0.3s ease-out';
+                setTimeout(() => successDiv.remove(), 300);
+            }, 3000);
+        }
+
         // Event listeners
         feedBtn.addEventListener('click', () => sendCommand('feed'));
         lightBtn.addEventListener('click', () => sendCommand('toggleLight'));
@@ -652,6 +696,7 @@
             if (name) {
                 sendCommand('addFish', { name });
                 fishNameInput.value = '';
+                // Auto-redirect happens in success message handler
             }
         });
 
@@ -661,25 +706,24 @@
             }
         });
 
+        // Status display visibility
+        function initStatusDisplay(config) {
+            // Default to true if not specified
+            const showStatus = config && config.showControllerStatusBlocks !== undefined ? config.showControllerStatusBlocks : true;
+
+            const statusDisplays = document.querySelectorAll('.tab-status-display');
+            statusDisplays.forEach(display => {
+                display.style.display = showStatus ? 'grid' : 'none';
+            });
+        }
+
         // Tab switching functionality
         function initTabs() {
             const tabButtons = document.querySelectorAll('.tab-button');
             const tabPanels = document.querySelectorAll('.tab-panel');
 
-            // Restore last active tab from localStorage or default to 'care'
-            const savedTab = localStorage.getItem('vissenkom_active_tab') || 'care';
-            switchToTab(savedTab);
-
-            // Add click listeners to tab buttons
-            tabButtons.forEach(button => {
-                button.addEventListener('click', () => {
-                    const tabName = button.getAttribute('data-tab');
-                    switchToTab(tabName);
-                    localStorage.setItem('vissenkom_active_tab', tabName);
-                });
-            });
-
-            function switchToTab(tabName) {
+            // Make switchToTab globally accessible
+            window.switchToTab = function(tabName) {
                 // Update tab buttons
                 tabButtons.forEach(btn => {
                     if (btn.getAttribute('data-tab') === tabName) {
@@ -696,6 +740,28 @@
                     } else {
                         panel.classList.remove('active');
                     }
+                });
+            };
+
+            // Restore last active tab from localStorage or default to 'care'
+            const savedTab = localStorage.getItem('vissenkom_active_tab') || 'care';
+            window.switchToTab(savedTab);
+
+            // Add click listeners to tab buttons
+            tabButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    const tabName = button.getAttribute('data-tab');
+                    window.switchToTab(tabName);
+                    localStorage.setItem('vissenkom_active_tab', tabName);
+                });
+            });
+
+            // Add click listener to fish hint link
+            const fishTabLink = document.getElementById('fishTabLink');
+            if (fishTabLink) {
+                fishTabLink.addEventListener('click', () => {
+                    window.switchToTab('fish');
+                    localStorage.setItem('vissenkom_active_tab', 'fish');
                 });
             }
         }
