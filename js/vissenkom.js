@@ -87,6 +87,7 @@ let currentTheme='normal'; // Current theme (loaded from server)
 // Helper functions for theme
 function getThemeConfig(){return THEMES[currentTheme]||THEMES.normal}
 function isHalloween(){return currentTheme==='halloween'}
+function isChristmas(){return currentTheme==='christmas'}
 function hasDecoration(type){return getThemeConfig().decorations.includes(type)}
 
 // Theme configurations
@@ -170,6 +171,16 @@ const THEMES={
     foodColors:['#ff1744','#ff6f00','#9c27b0','#ff4081','#00e676'],
     bubbleColor:'#9d4edd',
     decorations:['pumpkin','skull','spiderweb']
+  },
+  christmas:{
+    name:'Kerst',
+    emoji:'🎄',
+    bgLight:['#0f1a38','#1a2540','#0d1f35','#162038'], // Donkerblauw met meer variatie
+    bgDark:['#070d1f','#0a1028','#060b1a','#081020'], // Diep donkerblauw
+    vignette:0.25,
+    foodColors:['#ff2d55','#00e676','#ffd700','#ffb3ba','#8b6f47'],
+    bubbleColor:'#e6f7ff',
+    decorations:['christmastree','snowman','christmaslights','snowflake']
   }
 };
 
@@ -242,7 +253,7 @@ function updateAlgenParticles(){
 function setupPlants(){
   plants.length=0;
   const sandHeight=70;
-  const numPlants=Math.floor(rand(4,7));
+  const numPlants=isChristmas()?Math.floor(rand(2,4)):Math.floor(rand(4,7)); // Minder bomen bij kerst
   for(let i=0;i<numPlants;i++){
     const plantTypes=['seaweed','kelp','fern','grass','anubias','vallisneria'];
     const type=plantTypes[Math.floor(Math.random()*plantTypes.length)];
@@ -301,8 +312,10 @@ function setupDecorations(){
   const sandHeight=70;
 
   // Theme-based decoration or normal castle
-  // In Halloween mode: altijd minimaal 1 pompoen, anders 30% kans
-  const shouldAddDecoration=isHalloween()||Math.random()<0.3;
+  // In Halloween mode: altijd minimaal 1 pompoen
+  // In Christmas mode: altijd huisje OF sneeuwpop
+  // Anders: 30% kans op kasteel
+  const shouldAddDecoration=isHalloween()||isChristmas()||Math.random()<0.3;
 
   if(shouldAddDecoration){
     const x=rand(80,W-80);
@@ -316,6 +329,10 @@ function setupDecorations(){
 
     if(isHalloween()){
       decorations.push({type:'pumpkin',x,y,size,hue:rand(25,35),bobPhase,zIndex});
+    }else if(isChristmas()){
+      // 50% kans op huisje, 50% kans op sneeuwpop
+      const decoType = Math.random() < 0.5 ? 'cottage' : 'snowman';
+      decorations.push({type:decoType,x,y,size,bobPhase,zIndex});
     }else{
       decorations.push({type:'castle',x,y,size,hue:rand(200,220),bobPhase,zIndex});
     }
@@ -333,7 +350,18 @@ function setupDecorations(){
     decorations.push({type:'skull',x,y,size,bobPhase,zIndex});
   }
 }
-function lampHueFor(L,time){if(!discoOn)return L.hueBase;const speed=2.5;const range=340;const wave=(Math.sin(time*speed+L.phase)+1)/2;return (L.hueBase+wave*range)%360}
+function lampHueFor(L,time){
+  if(isChristmas()){
+    // Kerst: wissel tussen rood, groen en blauw
+    const christmasColors=[0,120,240]; // Rood, Groen, Blauw
+    const cycleSpeed=1.5;
+    const colorIndex=Math.floor((time*cycleSpeed+L.phase)%3);
+    return christmasColors[colorIndex];
+  }
+  if(!discoOn)return L.hueBase;
+  const speed=2.5;const range=340;const wave=(Math.sin(time*speed+L.phase)+1)/2;
+  return (L.hueBase+wave*range)%360;
+}
 function strobeAlpha(time){if(!discoOn)return 1;const hz=1.5;const duty=0.8;const cycle=(time*hz)%1;return cycle<duty?1:0.75}
 function flickerEffect(L,time){if(!isHalloween())return 1;const baseFlicker=Math.sin(time*8+L.phase)*0.5+0.5;const stutter=Math.random()<0.05?Math.random()*0.3:0;const shortFlash=Math.random()<0.02?0:1;return Math.max(0.3,baseFlicker-stutter)*shortFlash}
 let discoCache={};let lastDiscoTime=0;
@@ -530,39 +558,112 @@ function bounceOffWalls(f){
 function drawLamps(time){
   if(!lightsOn)return;
 
+  // Kerst: hangende kerstlichtjes snoeren ipv normale lampen
+  if(isChristmas()){
+    for(const L of lamps){
+      const x=L.x;
+      const lightCount=12; // Meer lampjes per snoer! (was 8)
+      const spacing=H*0.85/lightCount; // Verticale afstand
+      const lightColors=['#ffbb44','#ffd166','#ffe699','#ffcc55','#ffd580','#fff0aa']; // Meer variatie in warme gele tinten
+
+      // Donkergroen draad/snoer van boven naar beneden
+      ctx.strokeStyle='hsla(140,30%,15%,0.6)';
+      ctx.lineWidth=2;
+      ctx.beginPath();
+      ctx.moveTo(x,0);
+      // Zigzag patroon voor natuurlijke val
+      for(let i=0;i<=lightCount;i++){
+        const ly=i*spacing;
+        const lx=x+Math.sin(i*0.8+L.phase)*8; // Kleine zigzag
+        ctx.lineTo(lx,ly);
+      }
+      ctx.stroke();
+
+      // Kerstlichtjes langs het snoer
+      for(let i=0;i<lightCount;i++){
+        const ly=i*spacing+spacing*0.5;
+        const lx=x+Math.sin(i*0.8+L.phase)*8;
+
+        // Sterk fonkel effect - lampjes gaan af en toe aan en uit met variatie
+        // Elke lamp heeft zijn eigen ritme
+        const twinkleSpeed1 = 0.0025;
+        const twinkleSpeed2 = 0.0018;
+        const twinkleSpeed3 = 0.0032;
+
+        const wave1 = Math.sin(time * twinkleSpeed1 + i * 1.8 + L.phase);
+        const wave2 = Math.sin(time * twinkleSpeed2 + i * 2.3 + L.phase * 1.5);
+        const wave3 = Math.cos(time * twinkleSpeed3 + i * 0.9 + L.phase * 2.1);
+
+        // Combineer golven voor meer dramatisch fonkelen
+        const twinkle = Math.max(0.15, Math.min(1.0, (wave1 * 0.35 + wave2 * 0.35 + wave3 * 0.3 + 0.5)));
+
+        const color=lightColors[i%lightColors.length];
+
+        // Kort draadje naar lampje
+        ctx.strokeStyle='hsla(140,30%,15%,0.5)';
+        ctx.lineWidth=1.5;
+        ctx.beginPath();
+        ctx.moveTo(lx,ly);
+        ctx.lineTo(lx,ly+15);
+        ctx.stroke();
+
+        // Lampje (peervormig)
+        ctx.fillStyle=color;
+        ctx.globalAlpha=twinkle;
+        ctx.beginPath();
+        ctx.ellipse(lx,ly+20,5,7,0,0,Math.PI*2);
+        ctx.fill();
+
+        // Warm glow effect
+        const glowGrad=ctx.createRadialGradient(lx,ly+20,0,lx,ly+20,25);
+        glowGrad.addColorStop(0,color);
+        glowGrad.addColorStop(0.4,`${color}99`);
+        glowGrad.addColorStop(1,'rgba(0,0,0,0)');
+        ctx.fillStyle=glowGrad;
+        ctx.beginPath();
+        ctx.arc(lx,ly+20,25,0,Math.PI*2);
+        ctx.fill();
+
+        ctx.globalAlpha=1;
+      }
+    }
+    return; // Skip normale lampen voor kerst
+  }
+
+  // Normale lampen voor andere thema's
   const stro=strobeAlpha(time);
-  const discoMultiplier=discoOn?1.5:1; // Reduced from 1.8 to 1.5
+  const discoMultiplier=discoOn?1.5:1;
   for(const L of lamps){
     const flicker=flickerEffect(L,time);
     const hue=lampHueFor(L,time);
-    const intensity=L.intensity*(discoOn?1.2:1)*flicker; // Reduced from 1.4 to 1.2, added flicker
+    const intensity=L.intensity*(discoOn?1.2:1)*flicker;
     const topGlow=ctx.createRadialGradient(L.x,0,2,L.x,0,Math.max(40,L.width*0.6*discoMultiplier));
-    topGlow.addColorStop(0,`hsla(${hue},95%,90%,${0.4*intensity*stro})`); // Reduced intensity
+    topGlow.addColorStop(0,`hsla(${hue},95%,90%,${0.4*intensity*stro})`);
     topGlow.addColorStop(1,'rgba(0,0,0,0)');
     ctx.globalCompositeOperation='lighter';
     ctx.fillStyle=topGlow;ctx.beginPath();ctx.arc(L.x,0,Math.max(40,L.width*0.6*discoMultiplier),0,Math.PI*2);ctx.fill();
     ctx.globalCompositeOperation='source-over';
     const hue2=(hue+140)%360;const hue3=(hue+220)%360;
     const beamGrad=ctx.createLinearGradient(L.x,0,L.x,H*0.9);
-    beamGrad.addColorStop(0,`hsla(${hue},95%,78%,${0.2*intensity*stro})`); // Reduced intensity
-    beamGrad.addColorStop(0.35,`hsla(${hue2},95%,72%,${0.14*intensity*stro})`); // Reduced intensity
-    if(discoOn)beamGrad.addColorStop(0.7,`hsla(${hue3},95%,65%,${0.1*intensity*stro})`); // Reduced intensity
+    beamGrad.addColorStop(0,`hsla(${hue},95%,78%,${0.2*intensity*stro})`);
+    beamGrad.addColorStop(0.35,`hsla(${hue2},95%,72%,${0.14*intensity*stro})`);
+    if(discoOn)beamGrad.addColorStop(0.7,`hsla(${hue3},95%,65%,${0.1*intensity*stro})`);
     beamGrad.addColorStop(1,'rgba(0,0,0,0)');
     const wTop=L.width*0.55*discoMultiplier;const wBottom=L.width*1.1*discoMultiplier;const yBottom=H*0.9;
     ctx.fillStyle=beamGrad;ctx.beginPath();ctx.moveTo(L.x-wTop,0);ctx.lineTo(L.x+wTop,0);ctx.lineTo(L.x+wBottom,yBottom);ctx.lineTo(L.x-wBottom,yBottom);ctx.closePath();ctx.fill();
-    const stripes=discoOn?4:3; // Reduced from 6 to 4
+    const stripes=discoOn?4:3;
     for(let i=0;i<stripes;i++){
       const p=i/stripes;const localPhase=L.stripePhase+i*0.9;const stripeX=L.x+(p-0.5)*L.width*0.8*discoMultiplier;
-      const stripeW=L.width*(0.04+0.02*Math.sin(time*(discoOn?2:1.2)+localPhase))*discoMultiplier; // Reduced stripe width
+      const stripeW=L.width*(0.04+0.02*Math.sin(time*(discoOn?2:1.2)+localPhase))*discoMultiplier;
       const stripeGrad=ctx.createLinearGradient(stripeX,0,stripeX,H*0.7);
-      const sh=(hue+(Math.sin(time*(discoOn?2.5:1.5)+localPhase)*(discoOn?200:160)+160))%360; // Slower color change
-      stripeGrad.addColorStop(0,`hsla(${sh},95%,86%,${0.15*intensity*stro})`); // Reduced intensity
+      const sh=(hue+(Math.sin(time*(discoOn?2.5:1.5)+localPhase)*(discoOn?200:160)+160))%360;
+      stripeGrad.addColorStop(0,`hsla(${sh},95%,86%,${0.15*intensity*stro})`);
       stripeGrad.addColorStop(1,'rgba(0,0,0,0)');
       ctx.fillStyle=stripeGrad;ctx.fillRect(stripeX-stripeW*0.5,0,stripeW,H*0.7);
     }
     if(discoOn){
-      const extraGlow=ctx.createRadialGradient(L.x,H*0.2,0,L.x,H*0.2,100); // Reduced size
-      extraGlow.addColorStop(0,`hsla(${(hue+180)%360},100%,75%,${0.12*stro})`); // Reduced intensity
+      const extraGlow=ctx.createRadialGradient(L.x,H*0.2,0,L.x,H*0.2,100);
+      extraGlow.addColorStop(0,`hsla(${(hue+180)%360},100%,75%,${0.12*stro})`);
       extraGlow.addColorStop(1,'rgba(0,0,0,0)');
       ctx.globalCompositeOperation='lighter';
       ctx.fillStyle=extraGlow;ctx.beginPath();ctx.arc(L.x,H*0.2,100,0,Math.PI*2);ctx.fill();
@@ -572,10 +673,16 @@ function drawLamps(time){
 }
 
 function drawStars(time){
-  if(lightsOn)return;
+  // Bij kerst: altijd sterren tonen (ook met licht aan, maar zachter)
+  // Bij andere thema's: alleen met licht uit
+  if(lightsOn && !isChristmas())return;
+
+  const christmasMode = isChristmas();
+  const baseDimming = (lightsOn && christmasMode) ? 0.4 : 1.0; // Dimmer met licht aan bij kerst
+
   for(const star of stars){
     const twinkle=Math.sin(time*star.twinkleSpeed+star.twinklePhase)*0.3+0.7;
-    const alpha=star.brightness*twinkle*0.9;
+    const alpha=star.brightness*twinkle*0.9*baseDimming;
 
     // Kleur per ster type
     let starColor;
@@ -597,6 +704,27 @@ function drawStars(time){
       ctx.fillStyle=starColor.replace(/[\d.]+\)$/,`${alpha*0.3})`);
       ctx.beginPath();
       ctx.arc(star.x,star.y,star.size*1.8,0,Math.PI*2);
+      ctx.fill();
+    }
+  }
+
+  // Extra kerst sparkles (gouden glitters die langzaam bewegen)
+  if(christmasMode){
+    const sparkleCount = 8;
+    for(let i=0;i<sparkleCount;i++){
+      const sparklePhase = i * 3.7 + time * 0.0003;
+      const x = (Math.sin(sparklePhase) * 0.4 + 0.5) * W;
+      const y = (Math.cos(sparklePhase * 0.7) * 0.3 + 0.3) * H;
+      const sparkle = Math.sin(time * 0.005 + i * 2.1) * 0.5 + 0.5;
+      const sparkleAlpha = sparkle * 0.6 * baseDimming;
+
+      // Gouden glitter
+      const sparkleGrad = ctx.createRadialGradient(x,y,0,x,y,4);
+      sparkleGrad.addColorStop(0,`rgba(255,215,100,${sparkleAlpha})`);
+      sparkleGrad.addColorStop(1,`rgba(255,215,100,0)`);
+      ctx.fillStyle = sparkleGrad;
+      ctx.beginPath();
+      ctx.arc(x,y,4,0,Math.PI*2);
       ctx.fill();
     }
   }
@@ -717,20 +845,35 @@ function drawSandBottom(time){
   const sandHeight=70;
   const sandTop=H-sandHeight;
 
-  // Zand gradient (lichter boven, donkerder onder)
-  const sandGrad=ctx.createLinearGradient(0,sandTop,0,H);
-  if(lightsOn){
-    sandGrad.addColorStop(0,'#E5C89A'); // Licht zand boven
-    sandGrad.addColorStop(0.5,'#D4AF7A'); // Midden zand
-    sandGrad.addColorStop(1,'#B89968'); // Donkerder zand onder
+  // Kerst: witte sneeuw ipv zand
+  if(isChristmas()){
+    const snowGrad=ctx.createLinearGradient(0,sandTop,0,H);
+    if(lightsOn){
+      snowGrad.addColorStop(0,'#FFFFFF'); // Wit sneeuw boven
+      snowGrad.addColorStop(0.5,'#F0F8FF'); // Licht blauwige sneeuw
+      snowGrad.addColorStop(1,'#E6F2FF'); // Iets donkerder sneeuw onder
+    } else {
+      snowGrad.addColorStop(0,'#C8D8E8'); // Blauwgrijze sneeuw (nacht)
+      snowGrad.addColorStop(0.5,'#B0C4D8'); // Midden
+      snowGrad.addColorStop(1,'#98B0C8'); // Donkerder (nacht)
+    }
+    ctx.fillStyle=snowGrad;
   } else {
-    sandGrad.addColorStop(0,'#8A7556'); // Donker zand boven (nacht)
-    sandGrad.addColorStop(0.5,'#6D5D45'); // Midden
-    sandGrad.addColorStop(1,'#544736'); // Donkerst (nacht)
+    // Normaal: zand gradient (lichter boven, donkerder onder)
+    const sandGrad=ctx.createLinearGradient(0,sandTop,0,H);
+    if(lightsOn){
+      sandGrad.addColorStop(0,'#E5C89A'); // Licht zand boven
+      sandGrad.addColorStop(0.5,'#D4AF7A'); // Midden zand
+      sandGrad.addColorStop(1,'#B89968'); // Donkerder zand onder
+    } else {
+      sandGrad.addColorStop(0,'#8A7556'); // Donker zand boven (nacht)
+      sandGrad.addColorStop(0.5,'#6D5D45'); // Midden
+      sandGrad.addColorStop(1,'#544736'); // Donkerst (nacht)
+    }
+    ctx.fillStyle=sandGrad;
   }
 
-  // Teken basis zandlaag met golvende bovenkant
-  ctx.fillStyle=sandGrad;
+  // Teken basis zand/sneeuw laag met golvende bovenkant
   ctx.beginPath();
   ctx.moveTo(0,H);
   ctx.lineTo(0,sandTop);
@@ -807,14 +950,47 @@ function drawAmbientGlow(time){
 
 function drawParticles(){
   for(const p of particles){
-    ctx.fillStyle=`rgba(255,255,255,${p.alpha})`;
-    ctx.beginPath();
-    ctx.arc(p.x,p.y,p.size,0,Math.PI*2);
-    ctx.fill();
+    // Kerst: teken sneeuwvlokken
+    if(isChristmas()){
+      ctx.fillStyle=`rgba(255,255,255,${p.alpha*0.9})`;
+      ctx.strokeStyle=`rgba(255,255,255,${p.alpha*0.7})`;
+      ctx.lineWidth=1;
+
+      // Simpele sneeuwvlok (6 armen)
+      const armLength=p.size*1.5;
+      ctx.beginPath();
+      for(let i=0;i<6;i++){
+        const angle=(i*Math.PI/3);
+        const x1=p.x+Math.cos(angle)*p.size*0.3;
+        const y1=p.y+Math.sin(angle)*p.size*0.3;
+        const x2=p.x+Math.cos(angle)*armLength;
+        const y2=p.y+Math.sin(angle)*armLength;
+        ctx.moveTo(x1,y1);
+        ctx.lineTo(x2,y2);
+      }
+      ctx.stroke();
+
+      // Centrum bolletje
+      ctx.beginPath();
+      ctx.arc(p.x,p.y,p.size*0.4,0,Math.PI*2);
+      ctx.fill();
+    } else {
+      // Normaal: gewone particle
+      ctx.fillStyle=`rgba(255,255,255,${p.alpha})`;
+      ctx.beginPath();
+      ctx.arc(p.x,p.y,p.size,0,Math.PI*2);
+      ctx.fill();
+    }
 
     // Update particle position
-    p.x+=p.speedX;
-    p.y+=p.speedY;
+    if(isChristmas()){
+      // Sneeuw valt langzamer en zwiept
+      p.x+=Math.sin(p.y*0.01)*0.3+p.speedX*0.3;
+      p.y+=Math.abs(p.speedY)*0.5; // Alleen naar beneden, langzamer
+    } else {
+      p.x+=p.speedX;
+      p.y+=p.speedY;
+    }
 
     // Wrap around edges
     if(p.x<0)p.x=W;
@@ -920,8 +1096,10 @@ function makePlayBall(){
     return;
   }
 
-  // Random kleur kiezen
-  const ballColors = [
+  // Random kleur kiezen (kerst heeft alleen rood)
+  const ballColors = isChristmas() ? [
+    { light: '#ff4444', mid: '#cc0000', dark: '#990000' }, // Kerst Rood
+  ] : [
     { light: '#ff6b9d', mid: '#ff1493', dark: '#c71585' }, // Magenta/Roze
     { light: '#4ecdc4', mid: '#2eb8b0', dark: '#1a8a85' }, // Turquoise
     { light: '#ffd93d', mid: '#ffb700', dark: '#e89e00' }, // Geel
@@ -1119,6 +1297,52 @@ function drawPlayBalls(){
       ctx.strokeStyle = eyeGlow;
       ctx.stroke();
 
+    } else if(isChristmas()){
+      // Kerst: echte kerstbal met kroontje
+      const lightMul = lightsOn ? 1 : 0.7;
+
+      // Metalen kroontje bovenop de bal
+      const capHeight = ball.radius * 0.25;
+      const capWidth = ball.radius * 0.4;
+      const capGrad = ctx.createLinearGradient(
+        ball.x - capWidth/2, ball.y - ball.radius,
+        ball.x + capWidth/2, ball.y - ball.radius
+      );
+      capGrad.addColorStop(0, `rgba(180,180,180,${lightMul})`);
+      capGrad.addColorStop(0.5, `rgba(220,220,220,${lightMul})`);
+      capGrad.addColorStop(1, `rgba(180,180,180,${lightMul})`);
+      ctx.fillStyle = capGrad;
+      ctx.fillRect(ball.x - capWidth/2, ball.y - ball.radius - capHeight, capWidth, capHeight);
+
+      // Glanzende kerstbal met vaste kleur per bal
+      const ornamentGrad = ctx.createRadialGradient(
+        ball.x - ball.radius * 0.3,
+        ball.y - ball.radius * 0.3,
+        0,
+        ball.x,
+        ball.y,
+        ball.radius
+      );
+      ornamentGrad.addColorStop(0, ball.color.light);
+      ornamentGrad.addColorStop(0.6, ball.color.mid);
+      ornamentGrad.addColorStop(1, ball.color.dark);
+      ctx.fillStyle = ornamentGrad;
+      ctx.beginPath();
+      ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Extra glanzend wit highlight spotje (kerstballen zijn extra glanzend)
+      ctx.fillStyle = `rgba(255,255,255,${0.85*lightMul})`;
+      ctx.beginPath();
+      ctx.arc(ball.x - ball.radius * 0.35, ball.y - ball.radius * 0.35, ball.radius * 0.35, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Klein tweede highlight voor extra glans
+      ctx.fillStyle = `rgba(255,255,255,${0.4*lightMul})`;
+      ctx.beginPath();
+      ctx.arc(ball.x + ball.radius * 0.25, ball.y + ball.radius * 0.25, ball.radius * 0.15, 0, Math.PI * 2);
+      ctx.fill();
+
     } else {
       // Normaal: gekleurde bal
       const gradient = ctx.createRadialGradient(
@@ -1168,7 +1392,140 @@ function drawPlant(plant,time){
   const swayAmount=Math.sin(time*0.015+plant.swayPhase)*3;
   const moveAmount=Math.sin(time*0.008+plant.movePhase)*2;
 
-  if(plant.type==='seaweed' || plant.type==='kelp'){
+  // Kerst: teken vrolijke kerstboom ipv normale plant
+  if(isChristmas()){
+    // Proportionele verhouding: hoogte bepaalt breedte voor betere boom-vorm
+    const treeHeight = Math.max(180, plant.height * 1.2); // Minimale hoogte voor kleine bomen
+    const baseWidth = treeHeight * 0.45; // Basis breedte: 45% van hoogte
+    const widthVariation = (plant.width / 80) * (treeHeight * 0.15); // Max 15% variatie
+    const treeWidth = Math.min(180, baseWidth + widthVariation); // Max 180 pixels breed
+    const alpha = (lightsOn ? 1 : 0.7) * fadeAlpha;
+
+    // Vrolijke bruine stam met texture
+    const trunkWidth = treeWidth * 0.18;
+    const trunkHeight = treeHeight * 0.2;
+    const trunkGrad = ctx.createLinearGradient(plant.x - trunkWidth/2, plant.y, plant.x + trunkWidth/2, plant.y);
+    trunkGrad.addColorStop(0, `hsla(25,50%,${35*lightMul}%,${alpha})`);
+    trunkGrad.addColorStop(0.5, `hsla(25,55%,${45*lightMul}%,${alpha})`);
+    trunkGrad.addColorStop(1, `hsla(25,50%,${35*lightMul}%,${alpha})`);
+    ctx.fillStyle = trunkGrad;
+    ctx.fillRect(plant.x - trunkWidth/2, plant.y - trunkHeight, trunkWidth, trunkHeight);
+
+    // Donkergroene kerstboom (4 lagen voor voller effect)
+    const greenHue = 140; // Iets meer naar blauwgroen voor donkerder effect
+
+    // Onderste laag (grootste en donkerste)
+    const bottomY = plant.y - trunkHeight;
+    const bottomWidth = treeWidth;
+    const layerHeight = treeHeight * 0.22;
+    ctx.fillStyle = `hsla(${greenHue},65%,${28*lightMul}%,${alpha})`; // Veel donkerder
+    ctx.beginPath();
+    ctx.moveTo(plant.x - bottomWidth/2, bottomY);
+    ctx.lineTo(plant.x + bottomWidth/2, bottomY);
+    ctx.lineTo(plant.x, bottomY - layerHeight);
+    ctx.fill();
+
+    // Tweede laag (iets lichter)
+    const layer2Y = bottomY - layerHeight * 0.65;
+    const layer2Width = treeWidth * 0.8;
+    ctx.fillStyle = `hsla(${greenHue},68%,${32*lightMul}%,${alpha})`;
+    ctx.beginPath();
+    ctx.moveTo(plant.x - layer2Width/2, layer2Y);
+    ctx.lineTo(plant.x + layer2Width/2, layer2Y);
+    ctx.lineTo(plant.x, layer2Y - layerHeight);
+    ctx.fill();
+
+    // Derde laag
+    const layer3Y = layer2Y - layerHeight * 0.65;
+    const layer3Width = treeWidth * 0.6;
+    ctx.fillStyle = `hsla(${greenHue},70%,${35*lightMul}%,${alpha})`;
+    ctx.beginPath();
+    ctx.moveTo(plant.x - layer3Width/2, layer3Y);
+    ctx.lineTo(plant.x + layer3Width/2, layer3Y);
+    ctx.lineTo(plant.x, layer3Y - layerHeight);
+    ctx.fill();
+
+    // Bovenste laag (lichtste punt voor diepte)
+    const topY = layer3Y - layerHeight * 0.65;
+    const topWidth = treeWidth * 0.4;
+    ctx.fillStyle = `hsla(${greenHue},72%,${38*lightMul}%,${alpha})`;
+    ctx.beginPath();
+    ctx.moveTo(plant.x - topWidth/2, topY);
+    ctx.lineTo(plant.x + topWidth/2, topY);
+    ctx.lineTo(plant.x, topY - layerHeight);
+    ctx.fill();
+
+    // Klassieke 5-puntige gouden ster bovenop (punt wijst naar boven)
+    const starY = topY - layerHeight + treeWidth * 0.05;
+    const starSize = treeWidth * 0.15; // Iets kleiner voor betere proportie
+    const starGrad = ctx.createRadialGradient(plant.x, starY, 0, plant.x, starY, starSize * 1.2);
+    starGrad.addColorStop(0, `hsla(48,100%,${80*lightMul}%,${alpha})`);
+    starGrad.addColorStop(0.6, `hsla(45,100%,${65*lightMul}%,${alpha})`);
+    starGrad.addColorStop(1, `hsla(42,95%,${55*lightMul}%,${alpha})`);
+    ctx.fillStyle = starGrad;
+    ctx.beginPath();
+
+    // Teken 5-puntige ster: afwisselend buitenpunten en binnenpunten
+    for(let i = 0; i < 10; i++){
+      // Start bij -90 graden (boven) en ga met de klok mee
+      const angle = (i * Math.PI / 5) - Math.PI / 2;
+      const radius = i % 2 === 0 ? starSize : starSize * 0.4; // Buitenpunten vs binnenpunten
+      const x = plant.x + Math.cos(angle) * radius;
+      const y = starY + Math.sin(angle) * radius;
+      if(i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+    ctx.fill();
+
+    // Tijdelijk geen kerstballen in de boom
+    // const ballCount = 5 + Math.floor(plant.width / 12);
+    // const ballColors = [
+    //   {color: '#ff2d55', glow: '#ff6b9d'},  // Vrolijk rood
+    //   {color: '#ffd700', glow: '#ffe066'},  // Goud
+    //   {color: '#00e676', glow: '#69f0ae'},  // Vrolijk groen
+    // ];
+    // for(let i = 0; i < ballCount; i++){
+    //   // Bereken hoogte van bal (0 = onderaan, 1 = bovenaan)
+    //   const heightRatio = (i + 0.5) / ballCount;
+    //   const ballY = plant.y - trunkHeight - heightRatio * treeHeight * 0.7;
+    //
+    //   // Bereken max breedte op deze hoogte (driehoek wordt smaller naar boven)
+    //   // Bottom = treeWidth, top = 0, dus: maxWidth = treeWidth * (1 - heightRatio)
+    //   const maxWidthAtHeight = treeWidth * (1 - heightRatio * 0.85);
+    //
+    //   // Plaats bal random binnen de beschikbare breedte op deze hoogte
+    //   const angle = (i * 2.3) + plant.swayPhase;
+    //   const horizontalOffset = Math.sin(angle) * maxWidthAtHeight * 0.3; // Binnen 30% van max breedte
+    //   const ballX = plant.x + horizontalOffset;
+    //
+    //   const ballRadius = treeWidth * 0.09;
+    //   const colorSet = ballColors[i % ballColors.length];
+    //
+    //   // Glanzende bal met gradient
+    //   const ballGrad = ctx.createRadialGradient(
+    //     ballX - ballRadius*0.3, ballY - ballRadius*0.3, 0,
+    //     ballX, ballY, ballRadius
+    //   );
+    //   ballGrad.addColorStop(0, colorSet.glow);
+    //   ballGrad.addColorStop(0.7, colorSet.color);
+    //   ballGrad.addColorStop(1, colorSet.color);
+    //
+    //   ctx.fillStyle = ballGrad;
+    //   ctx.globalAlpha = alpha;
+    //   ctx.beginPath();
+    //   ctx.arc(ballX, ballY, ballRadius, 0, Math.PI * 2);
+    //   ctx.fill();
+    //
+    //   // Wit highlight spotje
+    //   ctx.fillStyle = `rgba(255,255,255,${0.6*lightMul})`;
+    //   ctx.beginPath();
+    //   ctx.arc(ballX - ballRadius*0.35, ballY - ballRadius*0.35, ballRadius*0.3, 0, Math.PI * 2);
+    //   ctx.fill();
+    //   ctx.globalAlpha = 1;
+    // }
+  }
+  else if(plant.type==='seaweed' || plant.type==='kelp'){
     const segmentHeight=plant.height/plant.segments;
     const swayMultiplier=plant.type==='kelp'?1.5:1;
 
@@ -1566,6 +1923,321 @@ function drawDecoration(deco,time){
       ctx.fillRect(teethX,y+skullHeight*0.2,teethWidth*0.8,skullHeight*0.12);
     }
   }
+  else if(deco.type==='snowman'){
+    const x=deco.x;
+    const y=deco.y+bobAmount;
+    const snowmanWidth=deco.size*0.7;
+    const snowmanHeight=deco.size*1.1;
+
+    // Sneeuwpop lichaam (3 sneeuwballen gestapeld)
+    const snowGrad=ctx.createRadialGradient(x-snowmanWidth*0.2,y-snowmanHeight*0.2,0,x,y,snowmanWidth*0.5);
+    snowGrad.addColorStop(0,`hsla(200,20%,${95*lightMul}%,${fadeAlpha})`); // Wit met blauwe tint
+    snowGrad.addColorStop(1,`hsla(200,15%,${85*lightMul}%,${fadeAlpha})`); // Licht grijs
+
+    // Onderste bal (grootste)
+    ctx.fillStyle=snowGrad;
+    ctx.beginPath();
+    ctx.ellipse(x,y,snowmanWidth*0.5,snowmanWidth*0.45,0,0,Math.PI*2);
+    ctx.fill();
+
+    // Middelste bal
+    const middleY=y-snowmanHeight*0.35;
+    ctx.beginPath();
+    ctx.ellipse(x,middleY,snowmanWidth*0.4,snowmanWidth*0.36,0,0,Math.PI*2);
+    ctx.fill();
+
+    // Bovenste bal (hoofd)
+    const headY=y-snowmanHeight*0.65;
+    ctx.beginPath();
+    ctx.ellipse(x,headY,snowmanWidth*0.3,snowmanWidth*0.27,0,0,Math.PI*2);
+    ctx.fill();
+
+    // Wortel neus (oranje driehoek) - iets hoger
+    ctx.fillStyle=`hsla(30,90%,${55*lightMul}%,${fadeAlpha})`;
+    ctx.beginPath();
+    const noseY = headY - snowmanWidth*0.03; // Iets hoger
+    ctx.moveTo(x,noseY);
+    ctx.lineTo(x+snowmanWidth*0.25,noseY);
+    ctx.lineTo(x,noseY+snowmanWidth*0.08);
+    ctx.fill();
+
+    // Ogen (zwarte kolen)
+    ctx.fillStyle=`hsla(0,0%,${10*lightMul}%,${fadeAlpha})`;
+    ctx.beginPath();
+    ctx.arc(x-snowmanWidth*0.12,headY-snowmanWidth*0.1,snowmanWidth*0.06,0,Math.PI*2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(x+snowmanWidth*0.12,headY-snowmanWidth*0.1,snowmanWidth*0.06,0,Math.PI*2);
+    ctx.fill();
+
+    // Glimlach (gebogen naar boven voor blije sneeuwpop, binnen het hoofd)
+    for(let i=0;i<5;i++){
+      const smileX=x+(i-2)*snowmanWidth*0.08;
+      // Blije glimlach: middelste punten lager (min), buitenste punten hoger
+      const smileY=headY+snowmanWidth*0.12-Math.abs(i-2)*snowmanWidth*0.025;
+      ctx.beginPath();
+      ctx.arc(smileX,smileY,snowmanWidth*0.04,0,Math.PI*2);
+      ctx.fill();
+    }
+
+    // Kolen knoppen op lichaam
+    const buttonY1=middleY-snowmanWidth*0.15;
+    const buttonY2=middleY;
+    const buttonY3=middleY+snowmanWidth*0.15;
+    ctx.beginPath();
+    ctx.arc(x,buttonY1,snowmanWidth*0.06,0,Math.PI*2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(x,buttonY2,snowmanWidth*0.06,0,Math.PI*2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(x,buttonY3,snowmanWidth*0.06,0,Math.PI*2);
+    ctx.fill();
+
+    // Rode sjaal (tussen hoofd en middelste bal)
+    ctx.fillStyle=`hsla(0,80%,${50*lightMul}%,${fadeAlpha})`;
+    const scarfY = middleY - snowmanWidth*0.3; // Iets hoger
+    const scarfHeight = snowmanWidth*0.12; // Normale breedte
+    ctx.fillRect(x-snowmanWidth*0.35,scarfY,snowmanWidth*0.7,scarfHeight);
+    // Sjaal einde (hangt naar beneden)
+    ctx.fillRect(x+snowmanWidth*0.25,scarfY+scarfHeight,snowmanWidth*0.15,snowmanWidth*0.35);
+
+    // Zwarte hoge hoed (cilindervorm) - beetje hoger zodat ogen vrij zijn
+    const hatY = headY - snowmanWidth*0.2; // Iets hoger dan voorheen (was 0.15)
+    const hatWidth = snowmanWidth*0.35;
+    const hatHeight = snowmanWidth*0.5;
+    const brimWidth = snowmanWidth*0.52;
+    const brimHeight = snowmanWidth*0.08;
+
+    // Hoed rand (brim) - ligt nu op afstand van het hoofd
+    ctx.fillStyle=`hsla(0,0%,${8*lightMul}%,${fadeAlpha})`;
+    ctx.beginPath();
+    ctx.ellipse(x,hatY,brimWidth,brimHeight,0,0,Math.PI*2);
+    ctx.fill();
+
+    // Hoed cilinder
+    ctx.fillRect(x-hatWidth,hatY-hatHeight,hatWidth*2,hatHeight);
+
+    // Hoed top (ovaal)
+    ctx.beginPath();
+    ctx.ellipse(x,hatY-hatHeight,hatWidth,brimHeight,0,0,Math.PI*2);
+    ctx.fill();
+
+    // Rode band om de hoed
+    ctx.fillStyle=`hsla(0,80%,${50*lightMul}%,${fadeAlpha})`;
+    ctx.fillRect(x-hatWidth*1.05,hatY-hatHeight*0.3,hatWidth*2.1,brimHeight*1.5);
+  }
+  else if(deco.type==='cottage'){
+    // Cartoonachtig houten hutje met zichtbare boomstammen
+    const x=deco.x;
+    const y=deco.y+bobAmount;
+    const cottageWidth=deco.size*0.9;
+    const cottageHeight=deco.size*0.7;
+    const roofHeight=deco.size*0.4;
+
+    // Achtergrond (donkerbruine vulling tussen de stammen)
+    ctx.fillStyle=`hsla(30,35%,${25*lightMul}%,${fadeAlpha})`;
+    ctx.fillRect(x-cottageWidth/2,y-cottageHeight/2,cottageWidth,cottageHeight);
+
+    // Horizontale boomstammen (dikke rondhout balken)
+    const logCount=4;
+    const logHeight=cottageHeight/logCount;
+    for(let i=0;i<logCount;i++){
+      const logY=y-cottageHeight/2+i*logHeight;
+
+      // Basis boomstam kleur (variatie per stam)
+      const logHue=25+Math.sin(i*2.3)*5;
+      const logLight=38+Math.sin(i*1.7)*5;
+
+      // Boomstam met gradient voor 3D effect
+      const logGrad=ctx.createLinearGradient(x-cottageWidth/2,logY,x+cottageWidth/2,logY);
+      logGrad.addColorStop(0,`hsla(${logHue},40%,${(logLight-5)*lightMul}%,${fadeAlpha})`);
+      logGrad.addColorStop(0.3,`hsla(${logHue},50%,${logLight*lightMul}%,${fadeAlpha})`);
+      logGrad.addColorStop(0.7,`hsla(${logHue},50%,${logLight*lightMul}%,${fadeAlpha})`);
+      logGrad.addColorStop(1,`hsla(${logHue},40%,${(logLight-5)*lightMul}%,${fadeAlpha})`);
+
+      ctx.fillStyle=logGrad;
+      // Ronding boven en onder voor cartoon effect
+      ctx.beginPath();
+      ctx.moveTo(x-cottageWidth/2,logY+logHeight*0.15);
+      ctx.lineTo(x-cottageWidth/2,logY+logHeight*0.85);
+      ctx.quadraticCurveTo(x-cottageWidth/2,logY+logHeight,x-cottageWidth/2+5,logY+logHeight);
+      ctx.lineTo(x+cottageWidth/2-5,logY+logHeight);
+      ctx.quadraticCurveTo(x+cottageWidth/2,logY+logHeight,x+cottageWidth/2,logY+logHeight*0.85);
+      ctx.lineTo(x+cottageWidth/2,logY+logHeight*0.15);
+      ctx.quadraticCurveTo(x+cottageWidth/2,logY,x+cottageWidth/2-5,logY);
+      ctx.lineTo(x-cottageWidth/2+5,logY);
+      ctx.quadraticCurveTo(x-cottageWidth/2,logY,x-cottageWidth/2,logY+logHeight*0.15);
+      ctx.fill();
+
+      // Donkere lijn tussen stammen
+      ctx.strokeStyle=`hsla(30,30%,${15*lightMul}%,${fadeAlpha*0.6})`;
+      ctx.lineWidth=3;
+      ctx.beginPath();
+      ctx.moveTo(x-cottageWidth/2,logY+logHeight);
+      ctx.lineTo(x+cottageWidth/2,logY+logHeight);
+      ctx.stroke();
+
+      // Jaarringen op de uiteinden (cartoon stijl)
+      // Links
+      ctx.strokeStyle=`hsla(${logHue},35%,${(logLight-15)*lightMul}%,${fadeAlpha*0.5})`;
+      ctx.lineWidth=1.5;
+      ctx.beginPath();
+      ctx.arc(x-cottageWidth/2+8,logY+logHeight/2,logHeight*0.2,0,Math.PI*2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(x-cottageWidth/2+8,logY+logHeight/2,logHeight*0.35,0,Math.PI*2);
+      ctx.stroke();
+      // Rechts
+      ctx.beginPath();
+      ctx.arc(x+cottageWidth/2-8,logY+logHeight/2,logHeight*0.2,0,Math.PI*2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(x+cottageWidth/2-8,logY+logHeight/2,logHeight*0.35,0,Math.PI*2);
+      ctx.stroke();
+    }
+
+    // Donkerrood/bruin driehoekig dak
+    ctx.fillStyle=`hsla(10,50%,${30*lightMul}%,${fadeAlpha})`;
+    ctx.beginPath();
+    ctx.moveTo(x-cottageWidth/2-10,y-cottageHeight/2);
+    ctx.lineTo(x,y-cottageHeight/2-roofHeight);
+    ctx.lineTo(x+cottageWidth/2+10,y-cottageHeight/2);
+    ctx.closePath();
+    ctx.fill();
+
+    // Sneeuw op het dak (witte laag)
+    ctx.fillStyle=`hsla(200,20%,${95*lightMul}%,${fadeAlpha})`;
+    ctx.beginPath();
+    ctx.moveTo(x-cottageWidth/2-10,y-cottageHeight/2);
+    ctx.quadraticCurveTo(x-cottageWidth/4,y-cottageHeight/2-5,x,y-cottageHeight/2-8);
+    ctx.quadraticCurveTo(x+cottageWidth/4,y-cottageHeight/2-5,x+cottageWidth/2+10,y-cottageHeight/2);
+    ctx.lineTo(x+cottageWidth/2+10,y-cottageHeight/2+8);
+    ctx.quadraticCurveTo(x+cottageWidth/4,y-cottageHeight/2+3,x,y-cottageHeight/2);
+    ctx.quadraticCurveTo(x-cottageWidth/4,y-cottageHeight/2+3,x-cottageWidth/2-10,y-cottageHeight/2+8);
+    ctx.closePath();
+    ctx.fill();
+
+    // Raampje (warm geel licht)
+    const windowSize=cottageWidth*0.25;
+    const windowX=x-cottageWidth*0.25;
+    const windowY=y-cottageHeight*0.1;
+    // Raamkozijn (donker hout)
+    ctx.fillStyle=`hsla(25,35%,${20*lightMul}%,${fadeAlpha})`;
+    ctx.fillRect(windowX-windowSize/2-2,windowY-windowSize/2-2,windowSize+4,windowSize+4);
+    // Warm licht van binnen
+    const windowGrad=ctx.createRadialGradient(windowX,windowY,0,windowX,windowY,windowSize/2);
+    windowGrad.addColorStop(0,`hsla(45,100%,${75*lightMul}%,${fadeAlpha})`);
+    windowGrad.addColorStop(1,`hsla(40,90%,${60*lightMul}%,${fadeAlpha})`);
+    ctx.fillStyle=windowGrad;
+    ctx.fillRect(windowX-windowSize/2,windowY-windowSize/2,windowSize,windowSize);
+    // Kruis in het raam
+    ctx.strokeStyle=`hsla(25,35%,${20*lightMul}%,${fadeAlpha})`;
+    ctx.lineWidth=2;
+    ctx.beginPath();
+    ctx.moveTo(windowX,windowY-windowSize/2);
+    ctx.lineTo(windowX,windowY+windowSize/2);
+    ctx.moveTo(windowX-windowSize/2,windowY);
+    ctx.lineTo(windowX+windowSize/2,windowY);
+    ctx.stroke();
+
+    // Deurtje (donker hout)
+    const doorWidth=cottageWidth*0.2;
+    const doorHeight=cottageHeight*0.45;
+    const doorX=x+cottageWidth*0.2;
+    const doorY=y+cottageHeight/2-doorHeight;
+    ctx.fillStyle=`hsla(20,40%,${25*lightMul}%,${fadeAlpha})`;
+    ctx.fillRect(doorX-doorWidth/2,doorY,doorWidth,doorHeight);
+    // Deurknop (gouden)
+    ctx.fillStyle=`hsla(45,70%,${55*lightMul}%,${fadeAlpha})`;
+    ctx.beginPath();
+    ctx.arc(doorX+doorWidth/3,doorY+doorHeight/2,doorWidth*0.08,0,Math.PI*2);
+    ctx.fill();
+
+    // Schoorsteen (uit het dak)
+    const chimneyWidth=cottageWidth*0.15;
+    const chimneyHeight=roofHeight*0.4;
+    const chimneyX=x+cottageWidth*0.25;
+    const chimneyY=y-cottageHeight/2-roofHeight*0.6;
+    ctx.fillStyle=`hsla(0,15%,${35*lightMul}%,${fadeAlpha})`; // Grijze steen
+    ctx.fillRect(chimneyX-chimneyWidth/2,chimneyY,chimneyWidth,chimneyHeight);
+    // Sneeuw op schoorsteen
+    ctx.fillStyle=`hsla(200,20%,${95*lightMul}%,${fadeAlpha})`;
+    ctx.fillRect(chimneyX-chimneyWidth/2,chimneyY,chimneyWidth,chimneyHeight*0.2);
+
+    // Rustige rookwolkjes (subtiel, langzaam bewegend)
+    const smokeTime = time * 0.0008; // Heel langzame animatie
+    const smoke1Y = chimneyY - 8 + Math.sin(smokeTime) * 3;
+    const smoke2Y = chimneyY - 18 + Math.cos(smokeTime * 1.3) * 4;
+    const smokeOpacity = (Math.sin(smokeTime * 0.5) * 0.15 + 0.25) * fadeAlpha;
+
+    ctx.fillStyle=`hsla(0,0%,${75*lightMul}%,${smokeOpacity})`;
+    ctx.beginPath();
+    ctx.arc(chimneyX,smoke1Y,chimneyWidth*0.35,0,Math.PI*2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(chimneyX+chimneyWidth*0.2,smoke2Y,chimneyWidth*0.3,0,Math.PI*2);
+    ctx.fill();
+  }
+  else if(deco.type==='christmaslights'){
+    // Gezellige kerstlichtjes snoer - horizontaal over het scherm
+    const x=deco.x;
+    const y=deco.y+bobAmount;
+    const wireLength=deco.size*4; // Langer snoer
+    const lightCount=15; // Meer lampjes!
+    const spacing=wireLength/lightCount;
+
+    // Donkergroen draad/snoer
+    ctx.strokeStyle=`hsla(140,30%,${15*lightMul}%,${fadeAlpha})`;
+    ctx.lineWidth=2.5;
+    ctx.beginPath();
+    ctx.moveTo(x-wireLength/2,y);
+    // Maak golvende lijn voor het snoer
+    for(let i=0;i<=lightCount;i++){
+      const lx=x-wireLength/2+i*spacing;
+      const ly=y+Math.sin(i*0.6)*12; // Meer golving voor gezellige hangende look
+      ctx.lineTo(lx,ly);
+    }
+    ctx.stroke();
+
+    // Vrolijke kerstlichtjes (alleen rood, groen, goud)
+    const lightColors=['#ff2d55','#00e676','#ffd700'];
+    for(let i=0;i<lightCount;i++){
+      const lx=x-wireLength/2+i*spacing;
+      const ly=y+Math.sin(i*0.6)*12;
+
+      // Subtiele twinkle (niet te wild)
+      const twinkle=Math.sin(time*0.003+i)*0.15+0.85; // 0.7-1
+      const color=lightColors[i%lightColors.length];
+
+      // Draad naar lampje
+      ctx.strokeStyle=`hsla(140,30%,${15*lightMul}%,${fadeAlpha*0.7})`;
+      ctx.lineWidth=1.5;
+      ctx.beginPath();
+      ctx.moveTo(lx,ly);
+      ctx.lineTo(lx,ly+18);
+      ctx.stroke();
+
+      // Lampje (peervormig)
+      ctx.fillStyle=color;
+      ctx.globalAlpha=fadeAlpha*twinkle;
+      ctx.beginPath();
+      ctx.ellipse(lx,ly+25,5,7,0,0,Math.PI*2); // Peervorm
+      ctx.fill();
+
+      // Warm glow effect rond lampje
+      const glowGrad=ctx.createRadialGradient(lx,ly+25,0,lx,ly+25,16);
+      glowGrad.addColorStop(0,color);
+      glowGrad.addColorStop(0.5,`${color}99`); // 60% opacity
+      glowGrad.addColorStop(1,'rgba(0,0,0,0)');
+      ctx.fillStyle=glowGrad;
+      ctx.beginPath();
+      ctx.arc(lx,ly+25,16,0,Math.PI*2);
+      ctx.fill();
+
+      ctx.globalAlpha=1;
+    }
+  }
   else if(deco.type==='chest'){
     const x=deco.x;
     const y=deco.y+bobAmount;
@@ -1678,6 +2350,32 @@ function drawFish(f,t,now){
       ctx.fill();
     }
   }
+
+  // Kerstmutsje voor de visjes - tijdelijk uitgeschakeld
+  // if(isChristmas()){
+  //   const hatX = s*0.5; // Bovenop het hoofd
+  //   const hatY = -s*0.4;
+  //   const hatWidth = s*0.4;
+  //   const hatHeight = s*0.5;
+
+  //   // Rode muts (driehoek)
+  //   ctx.fillStyle = `hsla(0,85%,${50*lightMul}%,1)`;
+  //   ctx.beginPath();
+  //   ctx.moveTo(hatX - hatWidth*0.5, hatY); // Links onder
+  //   ctx.lineTo(hatX + hatWidth*0.5, hatY); // Rechts onder
+  //   ctx.lineTo(hatX + hatWidth*0.2, hatY - hatHeight); // Punt (iets naar rechts)
+  //   ctx.closePath();
+  //   ctx.fill();
+
+  //   // Witte rand onderaan
+  //   ctx.fillStyle = `hsla(0,0%,${95*lightMul}%,1)`;
+  //   ctx.fillRect(hatX - hatWidth*0.5, hatY - s*0.08, hatWidth, s*0.08);
+
+  //   // Wit bolletje op de punt
+  //   ctx.beginPath();
+  //   ctx.arc(hatX + hatWidth*0.2, hatY - hatHeight, s*0.12, 0, Math.PI*2);
+  //   ctx.fill();
+  // }
 
   ctx.restore();
   // hp already calculated above - reuse it for label and health bar

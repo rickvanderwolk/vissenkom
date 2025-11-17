@@ -19,7 +19,8 @@
             'winter': { name: 'Winter', emoji: '❄️' },
             'tropical': { name: 'Tropisch', emoji: '🌴' },
             'arctic': { name: 'Arctisch', emoji: '🧊' },
-            'halloween': { name: 'Halloween', emoji: '🎃' }
+            'halloween': { name: 'Halloween', emoji: '🎃' },
+            'christmas': { name: 'Kerst', emoji: '🎄' }
         };
 
         // DOM elements

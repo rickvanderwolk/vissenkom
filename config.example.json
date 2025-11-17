@@ -1,5 +1,6 @@
 {
   "theme": null,
+  "// theme options": "null (auto), 'normal', 'spring', 'summer', 'autumn', 'winter', 'tropical', 'arctic', 'halloween', 'christmas'",
   "showFooter": true,
   "footerLink": "https://github.com/rickvanderwolk/vissenkom",
   "footerLinkText": "View on GitHub",
