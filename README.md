@@ -34,3 +34,8 @@ cp config.example.json config.json
 Beschikbare opties:
 - `footerText`: Tekst in de footer (bijv. "Powered by Vissenkom")
 - `footerLink`: URL waar de footer naartoe linkt (optioneel)
+
+## Credits
+
+Geluidseffecten:
+- Bell notification sound via [Pixabay](https://pixabay.com/sound-effects/bell-notification-337658/)

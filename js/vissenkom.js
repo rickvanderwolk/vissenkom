@@ -78,6 +78,8 @@ const plants=[];const decorations=[];const stars=[];const particles=[];const alg
 const playBalls=[]; // Speelballen voor vissen
 const spiderWebs=[]; // Halloween spinnenwebben (statisch)
 let recentActivity=[];
+let playedAudioEvents=new Set(); // Track welke events al audio hebben afgespeeld
+let plingAudio=null; // Herbruikbaar audio object voor pling geluid
 let lastFed=0;let lastMedicine=0;let feedCooldown=60*60*1000;let medicineCooldown=24*60*60*1000;let fishCounter=1;let lastT=Date.now();let TOP_N=3;let lastSeenSeq=0;
 let lightsOn=true;let discoOn=false;let pumpOn=false;let heatingOn=true;const pumpPos={x:0,y:0};let pumpJustOnUntil=0;
 let waterGreenness=0;let waterGreennessTarget=0;
@@ -3547,6 +3549,17 @@ function drawActivityList(){
       case 'controller_access':
         emoji='🎮';
         label=`Controller verbonden · ${timeStr}`;
+        // Speel pling geluid af bij nieuwe controller connectie
+        const eventId=event.timestamp+'_'+event.type;
+        if(!playedAudioEvents.has(eventId)){
+          playedAudioEvents.add(eventId);
+          // Hergebruik audio object of maak nieuwe aan
+          if(!plingAudio){
+            plingAudio=new Audio('pling.mp3');
+          }
+          plingAudio.currentTime=0; // Reset naar begin voor hergebruik
+          plingAudio.play().catch(err=>console.log('Audio afspelen mislukt:',err));
+        }
         break;
       case 'access_code_generated':
         emoji='🔑';

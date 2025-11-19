@@ -138,6 +138,9 @@ const server = http.createServer((req, res) => {
         filePath = path.join(__dirname, 'index.html');
     } else if (pathname === '/controller' || pathname === '/controller.html') {
         filePath = path.join(__dirname, 'controller.html');
+    } else if (pathname === '/pling.mp3') {
+        // Serve pling audio file
+        filePath = path.join(__dirname, 'pling.mp3');
     } else if (pathname.startsWith('/node_modules/')) {
         // Serve npm packages from node_modules
         filePath = path.join(__dirname, pathname);
@@ -165,6 +168,8 @@ const server = http.createServer((req, res) => {
             contentType = 'application/javascript';
         } else if (ext === '.css') {
             contentType = 'text/css';
+        } else if (ext === '.mp3') {
+            contentType = 'audio/mpeg';
         }
 
         res.writeHead(200, { 'Content-Type': contentType });
