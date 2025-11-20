@@ -55,7 +55,7 @@ function resize(){
   W=fullW-(viewportConfig.offsetLeft+viewportConfig.offsetRight);
   H=fullH-(viewportConfig.offsetTop+viewportConfig.offsetBottom);
   updateUIPositions();
-  setupLamps();setupPlants();setupDecorations();setupStars();setupParticles();setupSpiderWebs();
+  setupLamps();setupDiscoBall();setupPlants();setupDecorations();setupStars();setupParticles();setupSpiderWebs();
   updateLayerCache();
   drawQR();
 }
@@ -82,6 +82,7 @@ let playedAudioEvents=new Set(); // Track welke events al audio hebben afgespeel
 let plingAudio=null; // Herbruikbaar audio object voor pling geluid
 let lastFed=0;let lastMedicine=0;let feedCooldown=60*60*1000;let medicineCooldown=24*60*60*1000;let fishCounter=1;let lastT=Date.now();let TOP_N=3;let lastSeenSeq=0;
 let lightsOn=true;let discoOn=false;let pumpOn=false;let heatingOn=true;const pumpPos={x:0,y:0};let pumpJustOnUntil=0;
+let discoBall={x:0,y:0,targetY:0,rotation:0,deployed:false,deployStart:0,deployDuration:2500,undeploying:false,undeployStart:0};
 let waterGreenness=0;let waterGreennessTarget=0;
 let currentTemperature=24;
 let currentTheme='normal'; // Current theme (loaded from server)
@@ -187,6 +188,15 @@ const THEMES={
 };
 
 function setupLamps(){const n=4;const baseWidth=180;const spread=0.12;const hue=48;const margin=W*0.08;const step=(W-2*margin)/Math.max(1,n-1);lamps=[];for(let i=0;i<n;i++){const x=margin+i*step+rand(-step*spread,step*spread);const intensity=rand(0.55,0.8);const width=baseWidth*rand(0.9,1.1);const phase=rand(0,Math.PI*2);const stripePhase=rand(0,Math.PI*2);lamps.push({x,width,intensity,hueBase:hue,phase,stripePhase})}}
+
+function setupDiscoBall(){
+  discoBall.x=W/2;
+  discoBall.y=-150; // Start boven scherm
+  discoBall.targetY=H*0.30; // Zweeft hoger in de kom (30% van hoogte)
+  discoBall.rotation=0;
+  discoBall.deployed=false;
+  discoBall.deployStart=0;
+}
 
 function setupStars(){
   stars.length=0;
@@ -360,15 +370,29 @@ function lampHueFor(L,time){
     const colorIndex=Math.floor((time*cycleSpeed+L.phase)%3);
     return christmasColors[colorIndex];
   }
-  if(!discoOn)return L.hueBase;
-  const speed=2.5;const range=340;const wave=(Math.sin(time*speed+L.phase)+1)/2;
+  // Blijf disco kleuren tonen als disco aan is OF ball aan het undeployen is
+  if(!discoOn&&!discoBall.undeploying)return L.hueBase;
+  const speed=7.5;const range=340;const wave=(Math.sin(time*speed+L.phase)+1)/2; // 3x sneller!
+  // Synchronisatie momenten: alle lampen soms dezelfde kleur
+  const syncPulse=Math.sin(time*0.5);
+  if(syncPulse>0.9){
+    return (time*100)%360; // Alle lampen sync'd
+  }
   return (L.hueBase+wave*range)%360;
 }
-function strobeAlpha(time){if(!discoOn)return 1;const hz=1.5;const duty=0.8;const cycle=(time*hz)%1;return cycle<duty?1:0.75}
+function strobeAlpha(time){if(!discoOn&&!discoBall.undeploying)return 1;const hz=1.5;const duty=0.8;const cycle=(time*hz)%1;return cycle<duty?1:0.75}
 function flickerEffect(L,time){if(!isHalloween())return 1;const baseFlicker=Math.sin(time*8+L.phase)*0.5+0.5;const stutter=Math.random()<0.05?Math.random()*0.3:0;const shortFlash=Math.random()<0.02?0:1;return Math.max(0.3,baseFlicker-stutter)*shortFlash}
 let discoCache={};let lastDiscoTime=0;
+
 function discoEffects(time){
-  if(!discoOn)return;
+  // Blijf effecten tonen zolang disco aan is OF ball aan het undeployen is
+  if(!discoOn&&!discoBall.undeploying)return;
+
+  // Deploy disco ball on first frame
+  if(!discoBall.deployed){
+    discoBall.deployed=true;
+    discoBall.deployStart=Date.now();
+  }
 
   // Reduce frame rate for disco effects to improve performance
   if(time-lastDiscoTime<0.15)return;
@@ -376,19 +400,27 @@ function discoEffects(time){
 
   const pulse=Math.sin(time*2)*0.5+0.5;
   ctx.globalCompositeOperation='lighter';
-  const spots=4; // Reduced from 6 to 4 for better performance
+
+  // Performance-based effect scaling
+  const qualityMult=performanceProfile.quality==='high'?1:
+                     performanceProfile.quality==='medium'?0.7:
+                     performanceProfile.quality==='low'?0.5:0.3;
+
+  // === MOVING SPOTLIGHTS (12-15 spots) ===
+  const maxSpots=Math.floor(15*qualityMult);
+  const spots=Math.max(4,maxSpots);
   for(let i=0;i<spots;i++){
-    const spotTime=time*0.7+i*0.8;
-    const x=(W/spots)*i+W/(spots*2)+Math.sin(spotTime*1.2)*40; // Reduced movement range
-    const y=H*0.3+Math.sin(spotTime*0.8+i)*H*0.3; // Reduced movement range
-    const hue=(time*20+i*45)%360; // Slower color change
-    const spotOn=Math.sin(spotTime*0.5+i)>0.4; // Less frequent flashing
+    const spotTime=time*0.9+i*0.6;
+    const x=(W/spots)*i+W/(spots*2)+Math.sin(spotTime*1.3)*60;
+    const y=H*0.3+Math.sin(spotTime*0.9+i)*H*0.35;
+    const hue=(time*40+i*30)%360;
+    const spotOn=Math.sin(spotTime*0.7+i)>0.3;
     if(spotOn){
-      const alpha=0.08*(0.7+pulse*0.3); // Reduced intensity
-      const size=30+Math.sin(spotTime*1.5+i)*10; // Smaller size variation
+      const alpha=0.12*(0.7+pulse*0.3);
+      const size=35+Math.sin(spotTime*1.8+i)*15;
       const grad=ctx.createRadialGradient(x,y,0,x,y,size);
-      grad.addColorStop(0,`hsla(${hue},100%,75%,${alpha})`);
-      grad.addColorStop(0.6,`hsla(${(hue+60)%360},90%,65%,${alpha*0.5})`);
+      grad.addColorStop(0,`hsla(${hue},100%,80%,${alpha})`);
+      grad.addColorStop(0.5,`hsla(${(hue+40)%360},95%,70%,${alpha*0.6})`);
       grad.addColorStop(1,'rgba(0,0,0,0)');
       ctx.fillStyle=grad;
       ctx.beginPath();
@@ -396,6 +428,344 @@ function discoEffects(time){
       ctx.fill();
     }
   }
+
+  // === SIDE-LIGHTS (vanaf zijkanten) ===
+  const sideSpots=Math.floor(4*qualityMult);
+  for(let i=0;i<sideSpots;i++){
+    const spotTime=time*1.1+i*1.2;
+    const fromLeft=i%2===0;
+    const xStart=fromLeft?0:W;
+    const xEnd=fromLeft?W*0.6:W*0.4;
+    const x=xStart+Math.sin(spotTime*0.8)*(xEnd-xStart);
+    const y=H*0.4+Math.sin(spotTime*0.5+i)*H*0.4;
+    const hue=(time*50+i*90)%360;
+    const spotOn=Math.sin(spotTime*0.6+i)>0.2;
+    if(spotOn){
+      const alpha=0.1*(0.6+pulse*0.4);
+      const size=45+Math.sin(spotTime*1.4)*12;
+      const grad=ctx.createRadialGradient(x,y,0,x,y,size*1.5);
+      grad.addColorStop(0,`hsla(${hue},100%,75%,${alpha})`);
+      grad.addColorStop(0.7,`hsla(${(hue+30)%360},90%,65%,${alpha*0.4})`);
+      grad.addColorStop(1,'rgba(0,0,0,0)');
+      ctx.fillStyle=grad;
+      ctx.beginPath();
+      ctx.ellipse(x,y,size*1.5,size*0.8,fromLeft?0.3:-0.3,0,Math.PI*2);
+      ctx.fill();
+    }
+  }
+
+  // === LASER BEAMS (performance-aware) ===
+  if(qualityMult>=0.5){ // Alleen op medium+ performance
+    const maxLasers=Math.floor(8*qualityMult);
+    const lasers=Math.max(3,maxLasers);
+    ctx.lineWidth=2;
+    ctx.lineCap='round';
+    for(let i=0;i<lasers;i++){
+      const laserTime=time*2.5+i*1.5;
+      const angle=laserTime*0.8+i*Math.PI*0.4;
+      const x1=W*0.5+Math.cos(angle)*W*0.3;
+      const y1=H*0.2+Math.sin(angle+0.5)*H*0.2;
+      const x2=W*0.5+Math.cos(angle+Math.PI)*W*0.5;
+      const y2=H*0.5+Math.sin(angle+Math.PI+0.3)*H*0.4;
+      const hue=(time*80+i*45)%360;
+      const laserOn=Math.sin(laserTime*1.2+i)>0.1;
+      if(laserOn){
+        const alpha=0.25+Math.sin(laserTime*3)*0.15;
+        ctx.strokeStyle=`hsla(${hue},100%,70%,${alpha})`;
+        ctx.beginPath();
+        ctx.moveTo(x1,y1);
+        ctx.lineTo(x2,y2);
+        ctx.stroke();
+        // Extra glow
+        ctx.strokeStyle=`hsla(${hue},100%,85%,${alpha*0.4})`;
+        ctx.lineWidth=4;
+        ctx.stroke();
+        ctx.lineWidth=2;
+      }
+    }
+  }
+
+  ctx.globalCompositeOperation='source-over';
+}
+
+function drawDiscoFog(time){
+  // Blijf fog tonen zolang disco aan is OF ball aan het undeployen is
+  if(!discoOn&&!discoBall.undeploying)return;
+
+  // Skip fog op low/verylow performance
+  if(performanceProfile.quality==='low'||performanceProfile.quality==='verylow')return;
+
+  // Subtiele rook/nevel onderaan voor club sfeer
+  ctx.globalCompositeOperation='lighter';
+
+  const baseFogClouds=8;
+  const numFogClouds=performanceProfile.quality==='medium'?6:baseFogClouds;
+  const fogHeight=H*0.3; // Onderste 30%
+
+  for(let i=0;i<numFogClouds;i++){
+    const fogTime=time*0.2+i*1.5;
+    const x=(i/numFogClouds)*W+Math.sin(fogTime*0.6)*W*0.15;
+    const y=H-fogHeight*0.5+Math.sin(fogTime*0.4+i)*fogHeight*0.3;
+    const size=W*0.25+Math.sin(fogTime*0.5)*W*0.1;
+
+    // Kleur van de nevel (beetje gekleurd door disco lights)
+    const hue=(time*30+i*45)%360;
+    const alpha=0.08+Math.sin(fogTime*0.8)*0.04;
+
+    const fogGrad=ctx.createRadialGradient(x,y,0,x,y,size);
+    fogGrad.addColorStop(0,`hsla(${hue},60%,70%,${alpha})`);
+    fogGrad.addColorStop(0.4,`hsla(${(hue+40)%360},50%,65%,${alpha*0.6})`);
+    fogGrad.addColorStop(0.7,`hsla(${(hue+80)%360},40%,60%,${alpha*0.3})`);
+    fogGrad.addColorStop(1,'rgba(0,0,0,0)');
+
+    ctx.fillStyle=fogGrad;
+    ctx.beginPath();
+    ctx.arc(x,y,size,0,Math.PI*2);
+    ctx.fill();
+  }
+
+  ctx.globalCompositeOperation='source-over';
+}
+
+function drawDiscoBall(time){
+  // Render als disco aan is, of als ball undeploying is
+  if(!discoOn&&!discoBall.undeploying)return;
+  if(!discoBall.deployed&&!discoBall.undeploying)return;
+
+  const now=Date.now();
+
+  let currentY;
+
+  // Check if undeploying
+  if(discoBall.undeploying){
+    const undeployProgress=Math.min(1,(now-discoBall.undeployStart)/discoBall.deployDuration);
+    const easeProgress=1-Math.pow(1-undeployProgress,3); // Ease-out cubic
+    // Start from targetY, go to -150
+    currentY=discoBall.targetY+((-150)-discoBall.targetY)*easeProgress;
+
+    if(undeployProgress>=1){
+      // Undeploy klaar - reset state
+      discoBall.undeploying=false;
+      discoBall.deployed=false;
+      discoBall.y=-150;
+      return; // Stop rendering
+    }
+  }else{
+    // Normal deploy animation
+    const deployProgress=Math.min(1,(now-discoBall.deployStart)/discoBall.deployDuration);
+    const easeProgress=1-Math.pow(1-deployProgress,3); // Ease-out cubic
+    currentY=discoBall.y+(discoBall.targetY-discoBall.y)*easeProgress;
+  }
+
+  // Zweven (kleine op/neer beweging) - alleen als niet undeploying
+  const hoverOffset=discoBall.undeploying?0:Math.sin(time*0.8)*10;
+  const finalY=currentY+hoverOffset;
+
+  // Rotatie
+  discoBall.rotation=(discoBall.rotation+0.5)%360;
+  const rot=discoBall.rotation*Math.PI/180;
+
+  const ballSize=95; // Nog groter!
+  const cx=discoBall.x;
+  const cy=finalY;
+
+  // Teken ketting/kabel van boven naar discobal
+  ctx.strokeStyle='#606060';
+  ctx.lineWidth=3;
+  ctx.lineCap='round';
+  ctx.beginPath();
+  ctx.moveTo(cx,viewportConfig.offsetTop);
+  // Lichte curve/sag in de ketting
+  const controlY=viewportConfig.offsetTop+(cy-viewportConfig.offsetTop)*0.5;
+  const sag=Math.sin(time*0.8)*3; // Lichte beweging
+  ctx.quadraticCurveTo(cx+sag,controlY,cx,cy-ballSize);
+  ctx.stroke();
+
+  // Metalen glans op ketting
+  ctx.strokeStyle='#808080';
+  ctx.lineWidth=1.5;
+  ctx.beginPath();
+  ctx.moveTo(cx-1,viewportConfig.offsetTop);
+  ctx.quadraticCurveTo(cx+sag-1,controlY,cx-1,cy-ballSize);
+  ctx.stroke();
+
+  // Bevestigingspunt bovenaan (plafondbevestiging)
+  ctx.fillStyle='#505050';
+  ctx.beginPath();
+  ctx.arc(cx,viewportConfig.offsetTop,6,0,Math.PI*2);
+  ctx.fill();
+  ctx.fillStyle='#707070';
+  ctx.beginPath();
+  ctx.arc(cx-1,viewportConfig.offsetTop-1,3,0,Math.PI*2);
+  ctx.fill();
+
+  ctx.save();
+  ctx.translate(cx,cy);
+
+  // HELE spiegelbol bedekt met vakjes - 3D rotatie om verticale as
+  const tileSize=6.5; // Kleine vierkante spiegeltegeltjes
+  const numLatitudes=Math.floor(ballSize*2/tileSize); // Rijen (van boven naar beneden)
+  const numLongitudes=Math.floor(ballSize*2/tileSize)*1.5; // Kolommen (rond de bol)
+
+  // Eerst achterste helft, dan voorste helft (voor correcte z-ordering)
+  for(let pass=0;pass<2;pass++){
+    for(let lat=0;lat<numLatitudes;lat++){
+      // Y positie (van top naar bottom)
+      const ty=(lat-numLatitudes/2)*tileSize;
+      if(Math.abs(ty)>ballSize)continue;
+
+      // Bereken radius op deze latitude
+      const radiusAtLat=Math.sqrt(ballSize*ballSize-ty*ty);
+      const tilesAtLat=Math.floor(radiusAtLat*2*Math.PI/tileSize);
+
+      for(let lon=0;lon<tilesAtLat;lon++){
+        // Hoek rond de bol (0 to 2π)
+        const theta=lon*Math.PI*2/tilesAtLat+rot; // Rotatie rond verticale as!
+
+        // 3D positie op sphere
+        const x3d=Math.cos(theta)*radiusAtLat;
+        const z3d=Math.sin(theta)*radiusAtLat; // Diepte
+        const y3d=ty;
+
+        // Alleen tekenen als aan juiste kant (front/back pass)
+        const isFront=z3d>0;
+        if((pass===0&&isFront)||(pass===1&&!isFront))continue;
+
+        // Project naar 2D (simple orthographic projection)
+        const tx=x3d;
+        const ty2d=y3d;
+
+        const tileId=lat*numLongitudes+lon;
+
+        // Helderheid op basis van facing en diepte
+        const normalZ=z3d/ballSize; // -1 tot 1
+        const facingFactor=Math.max(0,normalZ); // Alleen voorkant krijgt extra licht
+        const depthFactor=Math.abs(normalZ); // Voor algemene helderheid
+
+        const baseBrightness=40+depthFactor*30;
+        const frontBoost=facingFactor*25;
+        const flicker=Math.sin(time*3+tileId*0.3)*5;
+        const brightness=Math.max(15,baseBrightness+frontBoost+flicker);
+
+        ctx.fillStyle=`hsl(0,0%,${brightness}%)`;
+        ctx.fillRect(tx-tileSize/2,ty2d-tileSize/2,tileSize-0.5,tileSize-0.5);
+
+        // Witte highlights alleen op voorkant vakjes
+        if(facingFactor>0.5&&Math.sin(time*4+tileId*0.7)>0.6){
+          const highlightAlpha=facingFactor*0.7;
+          ctx.fillStyle=`rgba(255,255,255,${highlightAlpha})`;
+          const highlightSize=tileSize*0.3;
+          ctx.fillRect(tx-tileSize/2+1,ty2d-tileSize/2+1,highlightSize,highlightSize);
+        }
+
+        // Subtiele randen voor diepte
+        if(facingFactor>0.1){
+          ctx.strokeStyle=`rgba(0,0,0,${0.25})`;
+          ctx.lineWidth=0.5;
+          ctx.strokeRect(tx-tileSize/2,ty2d-tileSize/2,tileSize-0.5,tileSize-0.5);
+        }
+
+        // Extra glinsteren - sommige vakjes flikkeren fel op
+        const glitterChance=Math.sin(time*8+tileId*0.3)*0.5+0.5;
+        if(facingFactor>0.4&&glitterChance>0.92){ // ~8% van vakjes glinster
+          const glitterAlpha=Math.sin(time*12+tileId)*0.5+0.5;
+          const glitterSize=tileSize*0.6;
+          const glitterGrad=ctx.createRadialGradient(tx,ty2d,0,tx,ty2d,glitterSize);
+          glitterGrad.addColorStop(0,`rgba(255,255,255,${glitterAlpha*0.9})`);
+          glitterGrad.addColorStop(0.5,`rgba(255,255,255,${glitterAlpha*0.5})`);
+          glitterGrad.addColorStop(1,'rgba(255,255,255,0)');
+          ctx.fillStyle=glitterGrad;
+          ctx.beginPath();
+          ctx.arc(tx,ty2d,glitterSize,0,Math.PI*2);
+          ctx.fill();
+        }
+      }
+    }
+  }
+
+  ctx.restore();
+
+  // Lichtstralen vanuit discobal - stralen vanaf baloppervlak
+  ctx.globalCompositeOperation='lighter';
+
+  const numRays=12;
+  const rayEndPoints=[]; // Sla eindpunten op voor lichtspots
+
+  for(let i=0;i<numRays;i++){
+    // Positie op de bal (spherical) - draait mee met bal
+    const rayTime=time*0.4+i*1.8;
+    const theta=rot+i*(Math.PI*2/numRays); // Rond de bal (horizontaal)
+    const phi=Math.sin(rayTime)*0.7; // Verticale hoek (-0.7 tot 0.7 rad)
+
+    // 3D punt OP de bal waar straal begint
+    const rx=Math.cos(phi)*Math.cos(theta)*ballSize;
+    const ry=Math.sin(phi)*ballSize;
+    const rz=Math.cos(phi)*Math.sin(theta)*ballSize;
+
+    // Skip stralen aan achterkant
+    if(rz<-ballSize*0.5)continue;
+
+    // Startpunt: OP de bal
+    const sx=cx+rx;
+    const sy=cy+ry;
+
+    // Richting van de straal (radiaal naar buiten + variatie)
+    const outDirX=rx/ballSize;
+    const outDirY=ry/ballSize+Math.sin(rayTime*1.2)*0.3; // Beetje buigen
+    const outDirZ=rz/ballSize;
+
+    // Normaliseer richting
+    const dirLen=Math.sqrt(outDirX*outDirX+outDirY*outDirY);
+    const normDirX=outDirX/dirLen;
+    const normDirY=outDirY/dirLen;
+
+    // Eindpunt van straal
+    const rayLength=W*0.55+Math.sin(rayTime*0.9)*W*0.1;
+    const ex=sx+normDirX*rayLength;
+    const ey=sy+normDirY*rayLength;
+
+    // Helderheid (voorkant helderder)
+    const facingFactor=Math.max(0,rz/ballSize);
+    const alpha=0.16+facingFactor*0.08+Math.sin(time*2.8+i)*0.06;
+
+    // Kleur
+    const hue=(time*50+i*30+rx*0.5)%360;
+
+    // Gradient: helder bij bal, vervaagt
+    const grad=ctx.createLinearGradient(sx,sy,ex,ey);
+    grad.addColorStop(0,`hsla(${hue},100%,80%,${alpha*1.3})`);
+    grad.addColorStop(0.2,`hsla(${(hue+50)%360},100%,75%,${alpha})`);
+    grad.addColorStop(0.5,`hsla(${(hue+100)%360},95%,70%,${alpha*0.6})`);
+    grad.addColorStop(1,'rgba(0,0,0,0)');
+
+    ctx.strokeStyle=grad;
+    ctx.lineWidth=28+facingFactor*12+Math.sin(time*3.5+i)*8;
+    ctx.lineCap='round';
+    ctx.beginPath();
+    ctx.moveTo(sx,sy);
+    ctx.lineTo(ex,ey);
+    ctx.stroke();
+
+    // Bewaar eindpunt voor lichtspot op bodem
+    rayEndPoints.push({x:ex,y:ey,hue,alpha});
+  }
+
+  // Lichtspots op bodem/objecten waar stralen landen
+  for(const point of rayEndPoints){
+    // Alleen teken spot als straal naar beneden gaat
+    if(point.y>cy){
+      const spotSize=40+Math.sin(time*3)*15;
+      const spotGrad=ctx.createRadialGradient(point.x,point.y,0,point.x,point.y,spotSize);
+      spotGrad.addColorStop(0,`hsla(${point.hue},100%,70%,${point.alpha*0.4})`);
+      spotGrad.addColorStop(0.5,`hsla(${(point.hue+30)%360},90%,65%,${point.alpha*0.2})`);
+      spotGrad.addColorStop(1,'rgba(0,0,0,0)');
+      ctx.fillStyle=spotGrad;
+      ctx.beginPath();
+      ctx.arc(point.x,point.y,spotSize,0,Math.PI*2);
+      ctx.fill();
+    }
+  }
+
   ctx.globalCompositeOperation='source-over';
 }
 
@@ -634,11 +1004,13 @@ function drawLamps(time){
 
   // Normale lampen voor andere thema's
   const stro=strobeAlpha(time);
-  const discoMultiplier=discoOn?1.5:1;
+  // Disco effecten blijven actief zolang disco aan is OF ball aan het undeployen is
+  const discoActive=discoOn||discoBall.undeploying;
+  const discoMultiplier=discoActive?2.0:1; // 2x groter in disco mode!
   for(const L of lamps){
     const flicker=flickerEffect(L,time);
     const hue=lampHueFor(L,time);
-    const intensity=L.intensity*(discoOn?1.2:1)*flicker;
+    const intensity=L.intensity*(discoActive?1.6:1)*flicker; // 1.6x helderder!
     const topGlow=ctx.createRadialGradient(L.x,0,2,L.x,0,Math.max(40,L.width*0.6*discoMultiplier));
     topGlow.addColorStop(0,`hsla(${hue},95%,90%,${0.4*intensity*stro})`);
     topGlow.addColorStop(1,'rgba(0,0,0,0)');
@@ -647,23 +1019,24 @@ function drawLamps(time){
     ctx.globalCompositeOperation='source-over';
     const hue2=(hue+140)%360;const hue3=(hue+220)%360;
     const beamGrad=ctx.createLinearGradient(L.x,0,L.x,H*0.9);
-    beamGrad.addColorStop(0,`hsla(${hue},95%,78%,${0.2*intensity*stro})`);
-    beamGrad.addColorStop(0.35,`hsla(${hue2},95%,72%,${0.14*intensity*stro})`);
-    if(discoOn)beamGrad.addColorStop(0.7,`hsla(${hue3},95%,65%,${0.1*intensity*stro})`);
+    const alphaBoost=discoActive?1.4:1; // Meer alpha in disco mode
+    beamGrad.addColorStop(0,`hsla(${hue},95%,78%,${0.2*intensity*stro*alphaBoost})`);
+    beamGrad.addColorStop(0.35,`hsla(${hue2},95%,72%,${0.14*intensity*stro*alphaBoost})`);
+    if(discoActive)beamGrad.addColorStop(0.7,`hsla(${hue3},95%,65%,${0.1*intensity*stro*alphaBoost})`);
     beamGrad.addColorStop(1,'rgba(0,0,0,0)');
     const wTop=L.width*0.55*discoMultiplier;const wBottom=L.width*1.1*discoMultiplier;const yBottom=H*0.9;
     ctx.fillStyle=beamGrad;ctx.beginPath();ctx.moveTo(L.x-wTop,0);ctx.lineTo(L.x+wTop,0);ctx.lineTo(L.x+wBottom,yBottom);ctx.lineTo(L.x-wBottom,yBottom);ctx.closePath();ctx.fill();
-    const stripes=discoOn?4:3;
+    const stripes=discoActive?6:3; // Meer stripes in disco mode!
     for(let i=0;i<stripes;i++){
       const p=i/stripes;const localPhase=L.stripePhase+i*0.9;const stripeX=L.x+(p-0.5)*L.width*0.8*discoMultiplier;
-      const stripeW=L.width*(0.04+0.02*Math.sin(time*(discoOn?2:1.2)+localPhase))*discoMultiplier;
+      const stripeW=L.width*(0.04+0.02*Math.sin(time*(discoActive?2:1.2)+localPhase))*discoMultiplier;
       const stripeGrad=ctx.createLinearGradient(stripeX,0,stripeX,H*0.7);
-      const sh=(hue+(Math.sin(time*(discoOn?2.5:1.5)+localPhase)*(discoOn?200:160)+160))%360;
+      const sh=(hue+(Math.sin(time*(discoActive?2.5:1.5)+localPhase)*(discoActive?200:160)+160))%360;
       stripeGrad.addColorStop(0,`hsla(${sh},95%,86%,${0.15*intensity*stro})`);
       stripeGrad.addColorStop(1,'rgba(0,0,0,0)');
       ctx.fillStyle=stripeGrad;ctx.fillRect(stripeX-stripeW*0.5,0,stripeW,H*0.7);
     }
-    if(discoOn){
+    if(discoActive){
       const extraGlow=ctx.createRadialGradient(L.x,H*0.2,0,L.x,H*0.2,100);
       extraGlow.addColorStop(0,`hsla(${(hue+180)%360},100%,75%,${0.12*stro})`);
       extraGlow.addColorStop(1,'rgba(0,0,0,0)');
@@ -1056,7 +1429,9 @@ function clearFrame(time){
   drawAmbientGlow(time);
   drawLamps(time);
   drawSpiderWebs();
+  drawDiscoFog(time);
   discoEffects(time);
+  drawDiscoBall(time);
   drawParticles();
   ctx.restore();
 }
@@ -4499,7 +4874,15 @@ function addFish(nameOrData, newCounter){
     }
 }
 function toggleLight(){lightsOn=!lightsOn;updateLightUI()}
-function toggleDisco(){discoOn=!discoOn;updateDiscoUI()}
+function toggleDisco(){
+  discoOn=!discoOn;
+  if(!discoOn&&discoBall.deployed){
+    // Start undeploy animatie (bal gaat omhoog)
+    discoBall.undeploying=true;
+    discoBall.undeployStart=Date.now();
+  }
+  updateDiscoUI();
+}
 function togglePump(){pumpOn=!pumpOn;updatePumpUI()}
 function cleanTank(){
   poops.length=0;
