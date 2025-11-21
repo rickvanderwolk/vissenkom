@@ -2,6 +2,10 @@
 node_modules
 .idea
 events.json
+events-current.jsonl
+events-archive/
+events.json.backup
+events.json.migrated
 gamestate.json
 config.json
 

@@ -182,6 +182,10 @@ const server = http.createServer((req, res) => {
 // State file path
 const STATE_FILE = path.join(__dirname, 'gamestate.json');
 const EVENT_LOG_FILE = path.join(__dirname, 'events.json');
+const EVENT_LOG_FILE_CURRENT = path.join(__dirname, 'events-current.jsonl');
+const EVENT_LOG_ARCHIVE_DIR = path.join(__dirname, 'events-archive');
+const MAX_EVENTS_IN_CURRENT = 1000;
+const RECENT_EVENTS_FOR_UI = 9;
 
 // Store application state
 let appState = {
@@ -638,14 +642,95 @@ function getRoomTemperature() {
 // Event logging system
 let eventLog = [];
 
+// Helper: count lines in JSONL file
+function countLines(filePath) {
+    if (!fs.existsSync(filePath)) return 0;
+    const content = fs.readFileSync(filePath, 'utf8');
+    return content.split('\n').filter(line => line.trim()).length;
+}
+
+// One-time migration from legacy JSON to JSONL (fail-fast)
+function migrateFromLegacyJSON() {
+    if (!fs.existsSync(EVENT_LOG_FILE)) return;
+
+    console.log('🔄 Migrating events.json to JSONL format...');
+
+    // No try-catch - crash if migration fails!
+    fs.copyFileSync(EVENT_LOG_FILE, path.join(__dirname, 'events.json.backup'));
+
+    const data = fs.readFileSync(EVENT_LOG_FILE, 'utf8');
+    const events = JSON.parse(data);
+
+    // Write all events to JSONL format
+    for (const event of events) {
+        fs.appendFileSync(EVENT_LOG_FILE_CURRENT, JSON.stringify(event) + '\n');
+    }
+
+    console.log(`✅ Migrated ${events.length} events successfully`);
+
+    // Rename original (don't delete - keep as backup)
+    fs.renameSync(EVENT_LOG_FILE, path.join(__dirname, 'events.json.migrated'));
+
+    // Check if we need to archive immediately
+    const lineCount = countLines(EVENT_LOG_FILE_CURRENT);
+    if (lineCount > MAX_EVENTS_IN_CURRENT) {
+        console.log(`📦 Archive needed (${lineCount} > ${MAX_EVENTS_IN_CURRENT})`);
+        archiveEvents();
+    }
+}
+
+// Archive old events when current file grows too large
+function archiveEvents() {
+    if (!fs.existsSync(EVENT_LOG_FILE_CURRENT)) return;
+
+    const lines = fs.readFileSync(EVENT_LOG_FILE_CURRENT, 'utf8')
+        .split('\n')
+        .filter(line => line.trim());
+
+    if (lines.length <= MAX_EVENTS_IN_CURRENT) return;
+
+    // Calculate how many to archive and keep
+    const toArchive = lines.slice(0, -MAX_EVENTS_IN_CURRENT);
+    const toKeep = lines.slice(-MAX_EVENTS_IN_CURRENT);
+
+    // Create archive directory
+    fs.mkdirSync(EVENT_LOG_ARCHIVE_DIR, { recursive: true });
+
+    // Generate archive filename with timestamp
+    const timestamp = new Date().toISOString().replace(/:/g, '-').split('.')[0];
+    const archivePath = path.join(EVENT_LOG_ARCHIVE_DIR, `archive-${timestamp}.jsonl`);
+
+    // Write archive file
+    fs.writeFileSync(archivePath, toArchive.join('\n') + '\n');
+
+    // Update current file (atomic write)
+    fs.writeFileSync(EVENT_LOG_FILE_CURRENT, toKeep.join('\n') + '\n');
+
+    console.log(`📦 Archived ${toArchive.length} events to ${path.basename(archivePath)}`);
+    console.log(`   Kept ${toKeep.length} recent events in current file`);
+}
+
 function loadEventLog() {
+    // Trigger migration if legacy events.json exists
+    migrateFromLegacyJSON();
+
+    // Load JSONL format
     try {
-        if (fs.existsSync(EVENT_LOG_FILE)) {
-            const data = fs.readFileSync(EVENT_LOG_FILE, 'utf8');
-            eventLog = JSON.parse(data);
-            console.log(`Event log geladen: ${eventLog.length} events`);
+        if (fs.existsSync(EVENT_LOG_FILE_CURRENT)) {
+            const lines = fs.readFileSync(EVENT_LOG_FILE_CURRENT, 'utf8')
+                .split('\n')
+                .filter(line => line.trim());
+
+            // Parse each line as JSON
+            const allEvents = lines.map(line => JSON.parse(line));
+
+            // Keep only last RECENT_EVENTS_FOR_UI events in memory for UI
+            eventLog = allEvents.slice(-RECENT_EVENTS_FOR_UI);
+
+            console.log(`Event log geladen: ${allEvents.length} total events (${eventLog.length} in memory for UI)`);
         } else {
             console.log('Geen bestaande event log gevonden, start met lege log');
+            eventLog = [];
         }
     } catch (error) {
         console.error('Fout bij laden event log:', error);
@@ -653,9 +738,19 @@ function loadEventLog() {
     }
 }
 
-function saveEventLog() {
+function saveEventLog(event) {
     try {
-        fs.writeFileSync(EVENT_LOG_FILE, JSON.stringify(eventLog, null, 2));
+        // Event is passed directly to avoid race conditions
+        if (!event) return;
+
+        // Append as single line to JSONL file (O(1) operation)
+        fs.appendFileSync(EVENT_LOG_FILE_CURRENT, JSON.stringify(event) + '\n');
+
+        // Check if we need to archive
+        const lineCount = countLines(EVENT_LOG_FILE_CURRENT);
+        if (lineCount > MAX_EVENTS_IN_CURRENT) {
+            archiveEvents();
+        }
     } catch (error) {
         console.error('Fout bij opslaan event log:', error);
     }
@@ -671,8 +766,8 @@ function logEvent(type, data = {}) {
     eventLog.push(event);
     console.log(`Event gelogd: ${type}`, data);
 
-    // Save immediately for important events
-    saveEventLog();
+    // Save immediately - pass event directly to avoid race conditions
+    saveEventLog(event);
 
     // Broadcast updated activity list to all main apps
     broadcastRecentActivity();
