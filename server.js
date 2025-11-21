@@ -792,6 +792,12 @@ function handleCommand(data, fromClient) {
         case 'toggleDisco':
             handleToggleDisco();
             break;
+        case 'castFishingRod':
+            handleCastFishingRod();
+            break;
+        case 'fishCaught':
+            handleFishCaught(data.fishName, data.fishEats);
+            break;
         case 'togglePump':
             handleTogglePump();
             break;
@@ -914,6 +920,27 @@ function handleToggleDisco() {
     broadcastToMainApp({ command: 'toggleDisco' });
     broadcastStatusUpdate(); // This will update all controllers
     saveState(); // Save state immediately for status changes
+}
+
+function handleCastFishingRod() {
+    console.log('🎣 Hengel uitgegooid!');
+
+    // Log event
+    logEvent('fishing_rod_cast', {
+        fishCount: appState.gameState?.fishes?.length || 0
+    });
+
+    broadcastToMainApp({ command: 'castFishingRod' });
+}
+
+function handleFishCaught(fishName, fishEats) {
+    console.log('🎣 Vis gevangen:', fishName, `(${fishEats}x gevoerd)`);
+
+    // Log event
+    logEvent('fish_caught', {
+        name: fishName,
+        eats: fishEats
+    });
 }
 
 function handleTogglePump() {

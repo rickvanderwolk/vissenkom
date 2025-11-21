@@ -31,6 +31,7 @@
         const cleanBtn = document.getElementById('cleanBtn');
         const refreshWaterBtn = document.getElementById('refreshWaterBtn');
         const tapGlassBtn = document.getElementById('tapGlassBtn');
+        const fishingRodBtn = document.getElementById('fishingRodBtn');
         const medicineBtn = document.getElementById('medicineBtn');
         const addFishBtn = document.getElementById('addFishBtn');
         const fishNameInput = document.getElementById('fishNameInput');
@@ -184,7 +185,7 @@
             isConnected = connected;
 
             // Enable/disable controls based on connection
-            const controls = [feedBtn, lightBtn, discoBtn, pumpBtn, cleanBtn, refreshWaterBtn, tapGlassBtn, medicineBtn, addFishBtn, fishNameInput, heatingBtn, playBallBtn]; // themeBtn tijdelijk verwijderd
+            const controls = [feedBtn, lightBtn, discoBtn, pumpBtn, cleanBtn, refreshWaterBtn, tapGlassBtn, fishingRodBtn, medicineBtn, addFishBtn, fishNameInput, heatingBtn, playBallBtn]; // themeBtn tijdelijk verwijderd
             controls.forEach(control => {
                 if (control) {
                     control.disabled = !connected;
@@ -687,6 +688,7 @@
         cleanBtn.addEventListener('click', () => sendCommand('cleanTank'));
         refreshWaterBtn.addEventListener('click', () => sendCommand('refreshWater'));
         tapGlassBtn.addEventListener('click', () => sendCommand('tapGlass'));
+        fishingRodBtn.addEventListener('click', () => sendCommand('castFishingRod'));
         medicineBtn.addEventListener('click', () => sendCommand('addMedicine'));
         heatingBtn.addEventListener('click', () => sendCommand('toggleHeating'));
         playBallBtn.addEventListener('click', () => sendCommand('addPlayBall'));

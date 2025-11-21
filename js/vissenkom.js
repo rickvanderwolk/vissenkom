@@ -55,7 +55,7 @@ function resize(){
   W=fullW-(viewportConfig.offsetLeft+viewportConfig.offsetRight);
   H=fullH-(viewportConfig.offsetTop+viewportConfig.offsetBottom);
   updateUIPositions();
-  setupLamps();setupDiscoBall();setupPlants();setupDecorations();setupStars();setupParticles();setupSpiderWebs();
+  setupLamps();setupDiscoBall();setupFishingRod();setupPlants();setupDecorations();setupStars();setupParticles();setupSpiderWebs();
   updateLayerCache();
   drawQR();
 }
@@ -83,6 +83,7 @@ let plingAudio=null; // Herbruikbaar audio object voor pling geluid
 let lastFed=0;let lastMedicine=0;let feedCooldown=60*60*1000;let medicineCooldown=24*60*60*1000;let fishCounter=1;let lastT=Date.now();let TOP_N=3;let lastSeenSeq=0;
 let lightsOn=true;let discoOn=false;let pumpOn=false;let heatingOn=true;const pumpPos={x:0,y:0};let pumpJustOnUntil=0;
 let discoBall={x:0,y:0,targetY:0,rotation:0,deployed:false,deployStart:0,deployDuration:2500,undeploying:false,undeployStart:0};
+let fishingRod={x:0,y:0,targetY:0,deployed:false,deployStart:0,deployDuration:2000,state:'idle',caughtFish:null,reelingStart:0,showCatchStart:0,baitSwing:0,retractStart:0};
 let waterGreenness=0;let waterGreennessTarget=0;
 let currentTemperature=24;
 let currentTheme='normal'; // Current theme (loaded from server)
@@ -196,6 +197,20 @@ function setupDiscoBall(){
   discoBall.rotation=0;
   discoBall.deployed=false;
   discoBall.deployStart=0;
+}
+
+function setupFishingRod(){
+  fishingRod.x=W/2;
+  fishingRod.y=viewportConfig.offsetTop; // Start vanaf bovenkant scherm
+  fishingRod.targetY=H*0.65; // Aas hangt op 65% van hoogte
+  fishingRod.deployed=false;
+  fishingRod.deployStart=0;
+  fishingRod.state='idle'; // States: idle, deploying, waiting, reeling, showing, releasing, retracting
+  fishingRod.caughtFish=null;
+  fishingRod.reelingStart=0;
+  fishingRod.showCatchStart=0;
+  fishingRod.baitSwing=Math.random()*Math.PI*2; // Random start phase voor swing
+  fishingRod.retractStart=0;
 }
 
 function setupStars(){
@@ -767,6 +782,332 @@ function drawDiscoBall(time){
   }
 
   ctx.globalCompositeOperation='source-over';
+}
+
+function drawFishingRod(time){
+  if(fishingRod.state==='idle')return; // Geen hengel als niet actief
+  if(fishingRod.state==='showing')return; // Verberg hengel/aas tijdens popup
+
+  const now=Date.now();
+  let baitY=fishingRod.y;
+
+  // Bereken huidige positie obv state
+  if(fishingRod.state==='deploying'){
+    const deployProgress=Math.min(1,(now-fishingRod.deployStart)/fishingRod.deployDuration);
+    const easeProgress=1-Math.pow(1-deployProgress,3); // Ease-out cubic
+    baitY=fishingRod.y+(fishingRod.targetY-fishingRod.y)*easeProgress;
+  }else if(fishingRod.state==='waiting'){
+    // Hangt op target positie met lichte swing
+    fishingRod.baitSwing+=0.02;
+    const swing=Math.sin(fishingRod.baitSwing)*8;
+    baitY=fishingRod.targetY+Math.sin(time*0.5)*3; // Lichte op/neer
+    fishingRod.x=W/2+swing; // Zijwaartse swing
+  }else if(fishingRod.state==='reeling'){
+    // Vis wordt opgehaald naar boven - gaat helemaal uit beeld
+    const reelingProgress=Math.min(1,(now-fishingRod.reelingStart)/1500); // 1.5 sec
+    const easeProgress=1-Math.pow(1-reelingProgress,3);
+    const targetYOffScreen=viewportConfig.offsetTop-300; // Ver buiten beeld (extra ver voor grote vissen)
+    baitY=fishingRod.targetY+(targetYOffScreen-fishingRod.targetY)*easeProgress;
+
+    // Als vis gevangen is, beweeg vis mee EN zet verticaal
+    if(fishingRod.caughtFish){
+      fishingRod.caughtFish.x=fishingRod.x;
+      fishingRod.caughtFish.y=baitY;
+      fishingRod.caughtFish.caughtVertical=true; // Markeer als verticaal gevangen
+      // Vis blijft zichtbaar tijdens reeling, wordt pas verborgen bij 'showing' state
+    }
+  }else if(fishingRod.state==='releasing'){
+    // Vis komt terug van boven
+    const releaseProgress=Math.min(1,(now-fishingRod.reelingStart)/2000); // 2 sec
+    const easeProgress=1-Math.pow(1-releaseProgress,3);
+    if(fishingRod.caughtFish){
+      fishingRod.caughtFish.x=fishingRod.x+(fishingRod.caughtFish.releaseTargetX-fishingRod.x)*easeProgress;
+      fishingRod.caughtFish.y=viewportConfig.offsetTop-50+(fishingRod.caughtFish.releaseTargetY-(viewportConfig.offsetTop-50))*easeProgress;
+    }
+    return; // Geen lijn tijdens release
+  }else if(fishingRod.state==='retracting'){
+    // Hengel gaat terug omhoog
+    const retractProgress=Math.min(1,(now-fishingRod.retractStart)/1000); // 1 sec
+    const easeProgress=1-Math.pow(1-retractProgress,3); // Ease-out cubic
+    baitY=fishingRod.targetY+(fishingRod.y-fishingRod.targetY)*easeProgress; // Van targetY naar y (boven)
+  }
+
+  // Teken lijn vanaf bovenkant naar aas
+  ctx.strokeStyle='#8b6f47'; // Bruin touw
+  ctx.lineWidth=2;
+  ctx.lineCap='round';
+  ctx.beginPath();
+  ctx.moveTo(fishingRod.x,viewportConfig.offsetTop);
+
+  // Lichte curve in lijn (sag)
+  const controlY=viewportConfig.offsetTop+(baitY-viewportConfig.offsetTop)*0.5;
+  const sag=Math.sin(time*0.8)*2;
+  ctx.quadraticCurveTo(fishingRod.x+sag,controlY,fishingRod.x,baitY-8);
+  ctx.stroke();
+
+  // Teken haakje
+  ctx.strokeStyle='#c0c0c0'; // Zilver
+  ctx.lineWidth=2;
+  ctx.beginPath();
+  ctx.arc(fishingRod.x,baitY-12,8,Math.PI*0.3,Math.PI*1.7);
+  ctx.stroke();
+
+  // Teken aas/voer aan haakje
+  const theme=getThemeConfig();
+  const foodColor=theme.foodColors[0]||'#ffb37a';
+  ctx.fillStyle=foodColor;
+  ctx.beginPath();
+  ctx.arc(fishingRod.x,baitY,15,0,Math.PI*2);
+  ctx.fill();
+
+  // Subtiele gloed om aas (trekt vissen aan)
+  if(fishingRod.state==='waiting'){
+    const glowSize=20+Math.sin(time*2)*5;
+    const grad=ctx.createRadialGradient(fishingRod.x,baitY,0,fishingRod.x,baitY,glowSize);
+    grad.addColorStop(0,'rgba(255,200,100,0.3)');
+    grad.addColorStop(1,'rgba(255,200,100,0)');
+    ctx.fillStyle=grad;
+    ctx.beginPath();
+    ctx.arc(fishingRod.x,baitY,glowSize,0,Math.PI*2);
+    ctx.fill();
+  }
+}
+
+function drawCatchPopup(time){
+  if(fishingRod.state!=='showing')return;
+  if(!fishingRod.caughtFish)return;
+
+  const fish=fishingRod.caughtFish;
+  const now=Date.now();
+  const elapsed=now-fishingRod.showCatchStart;
+
+  // Fade in/out animatie
+  let alpha=1;
+  if(elapsed<300){ // Fade in eerste 300ms
+    alpha=elapsed/300;
+  }else if(elapsed>9700){ // Fade out laatste 300ms
+    alpha=(10000-elapsed)/300;
+  }
+
+  ctx.save();
+  ctx.globalAlpha=alpha;
+
+  // Popup box (centered) - in stijl van side panelen
+  const boxW=Math.min(480,W*0.7);
+  const boxH=240;
+  const boxX=(cv.width-boxW)/2;
+  const boxY=(cv.height-boxH)/2;
+  const pad=18; // Padding boven/onder voor balans
+
+  // Subtiele schaduw zoals panelen
+  ctx.fillStyle='rgba(0,0,0,0.25)';
+  ctx.beginPath();
+  ctx.roundRect(boxX+4,boxY+4,boxW,boxH,10);
+  ctx.fill();
+
+  // Main box - achtergrond zoals panelen (licht/donker afhankelijk van lightsOn)
+  ctx.fillStyle=lightsOn?'rgba(255,255,255,0.7)':'rgba(0,0,0,0.35)';
+  ctx.beginPath();
+  ctx.roundRect(boxX,boxY,boxW,boxH,10);
+  ctx.fill();
+
+  // Titel bovenaan gecentreerd - tekstkleur ook afhankelijk van lightsOn
+  ctx.fillStyle=lightsOn?'#0b1e2d':'#e9f1f7';
+  ctx.font='700 20px system-ui,Segoe UI,Roboto,Arial';
+  ctx.textAlign='center';
+  ctx.textBaseline='top';
+  ctx.fillText(`🏆 ${fish.name} Gevangen!`,boxX+boxW/2,boxY+pad);
+
+  // Teken de ECHTE vis gecentreerd in de banner
+  ctx.save();
+  const visX=boxX+boxW/2; // Gecentreerd
+  const visY=boxY+120; // Precies gebalanceerd tussen titel en gewicht
+
+  // Tijdelijk vis eigenschappen aanpassen voor tekenen in banner
+  const originalX=fish.x;
+  const originalY=fish.y;
+  const originalVx=fish.vx;
+  const originalVy=fish.vy;
+  const originalBaseSize=fish.baseSize;
+
+  fish.x=visX;
+  fish.y=visY;
+  fish.vx=-1; // Hoofd naar links
+  fish.vy=0;
+  fish.baseSize=fish.baseSize*2.5; // 2.5x groter in banner
+  fish.hideLabel=true; // Verberg label
+  fish.hideShadow=true; // Verberg schaduw in banner
+
+  // Gebruik de echte drawFish functie - zo is het gegarandeerd dezelfde vis!
+  drawFish(fish,elapsed,now);
+
+  // Restore originele waardes
+  fish.x=originalX;
+  fish.y=originalY;
+  fish.vx=originalVx;
+  fish.vy=originalVy;
+  fish.baseSize=originalBaseSize;
+  fish.hideLabel=false;
+  fish.hideShadow=false;
+
+  ctx.restore();
+
+  // Vis info gecentreerd onder vis - simpel en clean
+  ctx.textAlign='center';
+  ctx.textBaseline='top';
+  const centerX=boxX+boxW/2;
+
+  // Gewicht
+  const eatsCount=fish.eats||0;
+  const baseWeight=fish.baseSize||20;
+  const growthFromEating=eatsCount*2;
+  const ageDays=Math.floor((now-fish.bornAt)/(1000*60*60*24));
+  const growthFromAge=ageDays*0.5;
+  const totalWeight=Math.round(baseWeight+growthFromEating+growthFromAge);
+
+  ctx.globalAlpha=alpha*0.85;
+  ctx.fillStyle=lightsOn?'#0b1e2d':'#e9f1f7';
+  ctx.font='500 14px system-ui,Segoe UI,Roboto,Arial';
+  ctx.fillText(`${totalWeight} gram`,centerX,boxY+boxH-pad-16); // 20px vanaf onderkant (16px tekst + 4px ruimte)
+
+  ctx.globalAlpha=alpha; // Reset
+
+  ctx.restore();
+}
+
+function updateFishingRod(time){
+  if(fishingRod.state==='idle')return;
+
+  const now=Date.now();
+
+  // State: deploying → waiting
+  if(fishingRod.state==='deploying'){
+    const deployProgress=(now-fishingRod.deployStart)/fishingRod.deployDuration;
+    if(deployProgress>=1){
+      fishingRod.state='waiting';
+      fishingRod.deployStart=now; // Start waiting timer
+    }
+  }
+
+  // State: waiting → check for bite or timeout
+  else if(fishingRod.state==='waiting'){
+    checkFishBite();
+
+    // Timeout na 15 seconden als geen vis bijt - trek hengel terug
+    if(now-fishingRod.deployStart>15000){
+      fishingRod.state='retracting';
+      fishingRod.retractStart=now;
+    }
+  }
+
+  // State: reeling → showing
+  else if(fishingRod.state==='reeling'){
+    const reelingProgress=(now-fishingRod.reelingStart)/1500;
+    if(reelingProgress>=1){
+      // Vis is boven scherm, toon popup
+      fishingRod.state='showing';
+      fishingRod.showCatchStart=now;
+
+      // Log vis gevangen event naar server
+      if(fishingRod.caughtFish&&ws&&ws.readyState===WebSocket.OPEN){
+        ws.send(JSON.stringify({
+          command:'fishCaught',
+          fishName:fishingRod.caughtFish.name,
+          fishEats:fishingRod.caughtFish.eats||0
+        }));
+      }
+      // Vis wordt pas verborgen na popup fade-in (zie 'showing' state)
+    }
+  }
+
+  // State: showing → releasing
+  else if(fishingRod.state==='showing'){
+    const elapsed=now-fishingRod.showCatchStart;
+
+    // Verberg vis na fade-in (300ms)
+    if(elapsed>300&&fishingRod.caughtFish&&fishingRod.caughtFish.x!==-1000){
+      fishingRod.caughtFish.x=-1000;
+      fishingRod.caughtFish.y=-1000;
+      fishingRod.caughtFish.caughtVertical=false;
+    }
+
+    // Laat vis weer zien voor fade-out (bij 9700ms)
+    if(elapsed>9700&&fishingRod.caughtFish&&fishingRod.caughtFish.x===-1000){
+      fishingRod.caughtFish.x=fishingRod.x;
+      fishingRod.caughtFish.y=viewportConfig.offsetTop-50;
+    }
+
+    // Transition naar releasing na 10 seconden
+    if(elapsed>10000){ // 10 seconden popup
+      // Start release animatie
+      fishingRod.state='releasing';
+      fishingRod.reelingStart=now; // Hergebruik timer voor release
+
+      // Bepaal waar vis terug komt
+      if(fishingRod.caughtFish){
+        fishingRod.caughtFish.releaseTargetX=rand(W*0.2,W*0.8);
+        fishingRod.caughtFish.releaseTargetY=rand(H*0.3,H*0.6);
+        fishingRod.caughtFish.x=fishingRod.x;
+        fishingRod.caughtFish.y=viewportConfig.offsetTop-50;
+      }
+    }
+  }
+
+  // State: releasing → idle (hengel is al opgehaald tijdens vangen)
+  else if(fishingRod.state==='releasing'){
+    const releaseProgress=(now-fishingRod.reelingStart)/2000;
+    if(releaseProgress>=1){
+      // Vis is terug, klaar!
+      if(fishingRod.caughtFish){
+        fishingRod.caughtFish.x=fishingRod.caughtFish.releaseTargetX;
+        fishingRod.caughtFish.y=fishingRod.caughtFish.releaseTargetY;
+        fishingRod.caughtFish.caughtVertical=false; // Reset verticale oriëntatie
+        fishingRod.caughtFish=null;
+      }
+      fishingRod.state='idle';
+      fishingRod.deployed=false;
+    }
+  }
+
+  // State: retracting → idle
+  else if(fishingRod.state==='retracting'){
+    const retractProgress=(now-fishingRod.retractStart)/1000;
+    if(retractProgress>=1){
+      // Hengel is ingetrokken, klaar
+      fishingRod.state='idle';
+      fishingRod.deployed=false;
+    }
+  }
+}
+
+function checkFishBite(){
+  if(fishingRod.state!=='waiting')return;
+  if(!fishingRod.deployed)return;
+
+  const BITE_DISTANCE=20; // pixels - vis moet dichterbij komen
+  let closestFish=null;
+  let closestDist=BITE_DISTANCE;
+
+  // Bereken huidige aas positie
+  const baitX=fishingRod.x;
+  const baitY=fishingRod.targetY;
+
+  // Zoek dichtstbijzijnde vis
+  for(const fish of fishes){
+    const dist=Math.hypot(fish.x-baitX,fish.y-baitY);
+    if(dist<closestDist){
+      closestDist=dist;
+      closestFish=fish;
+    }
+  }
+
+  // Als vis dichtbij is, kleine kans om te bijten (2% per frame - moeilijker)
+  if(closestFish&&Math.random()<0.02){
+    // Vis bijt!
+    fishingRod.state='reeling';
+    fishingRod.reelingStart=Date.now();
+    fishingRod.caughtFish=closestFish;
+  }
 }
 
 function makeFish(x=rand(50,W-50),y=rand(50,H-50),name){const base=rand(18,30);let hue=Math.floor(rand(0,360));if(isNaN(hue))hue=0;const initialVx=rand(-2.5,2.5);const initialVy=rand(-.3,.3);const f={x,y,vx:initialVx,vy:initialVy,speed:rand(1.5,3.0),baseSize:base,hue,dir:Math.random()*Math.PI*2,turnTimer:Math.floor(rand(600,1800)),blink:0,name:name||`Vis ${fishCounter++}`,lastEat:Date.now(),bornAt:Date.now(),eats:0,sickTop:Math.random()<0.5,hungerWindow:DAY*rand(0.9,1.1),behaviorState:'normal',behaviorTimer:0,wallFollowTarget:null,lastPoop:Date.now(),targetVx:initialVx,targetVy:initialVy,ballApproachSide:Math.random()<0.5?-1:1};fishes.push(f)}
@@ -1432,6 +1773,7 @@ function clearFrame(time){
   drawDiscoFog(time);
   discoEffects(time);
   drawDiscoBall(time);
+  drawFishingRod(time);
   drawParticles();
   ctx.restore();
 }
@@ -2655,10 +2997,12 @@ function ageLabelMS(ms){const s=Math.floor(ms/1000);if(s<60)return s+'s';const m
 function ageLabel(f,now){return ageLabelMS(now-f.bornAt)}
 
 function drawFish(f,t,now){
-  const s=fishSize(f,now);const a=Math.atan2(f.vy,f.vx);
+  const s=fishSize(f,now);
+  // Als vis gevangen is, verticale oriëntatie (hoofd naar boven)
+  const a=f.caughtVertical?-Math.PI/2:Math.atan2(f.vy,f.vx);
 
-  // Subtiele schaduw onder de vis voor diepte-effect (skip on low performance)
-  if(lightsOn&&performanceProfile.quality!=='verylow'){
+  // Subtiele schaduw onder de vis voor diepte-effect (skip on low performance, niet bij gevangen vis of in banner)
+  if(lightsOn&&performanceProfile.quality!=='verylow'&&!f.caughtVertical&&!f.hideShadow){
     ctx.globalAlpha=0.15;
     ctx.fillStyle='#000';
     ctx.beginPath();
@@ -2755,6 +3099,10 @@ function drawFish(f,t,now){
   // }
 
   ctx.restore();
+
+  // Verberg label als hideLabel flag gezet is (voor banner display)
+  if(f.hideLabel)return;
+
   // hp already calculated above - reuse it for label and health bar
   // Sick emoji is always shown, behavior emoji only if enabled
   const sickEmoji=getSickEmoji(f);
@@ -3439,6 +3787,24 @@ function updateFish(f,dt,now){
       f.wallFollowTarget = null;
     }
   }
+  // High priority: fishing bait attraction (when rod is waiting)
+  else if(fishingRod.state==='waiting'&&fishingRod.deployed){
+    // Vis wordt aangetrokken tot aas (net als voer)
+    const baitX=fishingRod.x;
+    const baitY=fishingRod.targetY;
+    const distToBait=Math.hypot(f.x-baitX,f.y-baitY);
+
+    // Binnen 120px wordt vis aangetrokken (moeilijker - was 200px)
+    if(distToBait<120){
+      steerTowards(f,baitX,baitY,0.06); // Iets sterker dan voer
+      // Reset to normal behavior
+      if(f.behaviorState !== 'normal') {
+        f.behaviorState = 'normal';
+        f.behaviorTimer = 0;
+        f.wallFollowTarget = null;
+      }
+    }
+  }
   // Medium-High priority: play with ball (if available and fish is interested)
   else if(playBalls.length > 0 && Math.random() < 0.7) {
     // 70% chance vis is geïnteresseerd in bal als er een is (was 40%)
@@ -3888,6 +4254,15 @@ function drawActivityList(){
       case 'play_ball_added':
         emoji='🎾';
         label=`Speelbal gegooid · ${timeStr}`;
+        break;
+      case 'fishing_rod_cast':
+        emoji='🎣';
+        label=`Hengel uitgegooid · ${timeStr}`;
+        break;
+      case 'fish_caught':
+        emoji='🏆';
+        const caughtFishName=event.data.name||'Vis';
+        label=`${caughtFishName} gevangen · ${timeStr}`;
         break;
       case 'tank_cleaned':
         emoji='💩';
@@ -4363,6 +4738,9 @@ function handleRemoteCommand(data) {
                     break;
                 case 'toggleDisco':
                     toggleDisco();
+                    break;
+                case 'castFishingRod':
+                    castFishingRod();
                     break;
                 case 'togglePump':
                     togglePump();
@@ -4883,6 +5261,24 @@ function toggleDisco(){
   }
   updateDiscoUI();
 }
+
+function castFishingRod(){
+  // Kan alleen vissen als er geen hengel actief is
+  if(fishingRod.deployed||fishingRod.state!=='idle')return;
+
+  // Kan alleen vissen als er vissen zijn
+  if(fishes.length===0)return;
+
+  // Start deploy animatie
+  fishingRod.deployed=true;
+  fishingRod.state='deploying';
+  fishingRod.deployStart=Date.now();
+  fishingRod.x=W/2;
+  fishingRod.y=viewportConfig.offsetTop;
+
+  console.log('🎣 Fishing rod cast!');
+}
+
 function togglePump(){pumpOn=!pumpOn;updatePumpUI()}
 function cleanTank(){
   poops.length=0;
@@ -5091,6 +5487,9 @@ for(let i=0;i<fishes.length;i++){
 // Play balls - update and draw (above fish, below front plants)
 updatePlayBalls();drawPlayBalls();
 
+// Fishing rod - update state machine
+updateFishingRod(t);
+
 // Foreground layer
 for(let i=0;i<frontPlants.length;i++){drawPlant(frontPlants[i],t)}
 for(let i=0;i<frontDecorations.length;i++){drawDecoration(frontDecorations[i],t)}
@@ -5101,6 +5500,9 @@ drawAlgenParticles();
 drawWaterGreenness();
 
 ctx.restore();
+
+// Draw catch popup overlay (boven alles, full screen)
+drawCatchPopup(t);
 
 for(let i=fishes.length-1;i>=0;i--){if(fishes[i].dead){const deadFish={name:fishes[i].name,bornAt:fishes[i].bornAt,diedAt:Date.now()};deadLog.push(deadFish);fishes.splice(i,1);sendToServer({command:'fishDied',fish:deadFish})}}
 
