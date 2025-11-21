@@ -184,7 +184,8 @@ const STATE_FILE = path.join(__dirname, 'gamestate.json');
 const EVENT_LOG_FILE = path.join(__dirname, 'events.json');
 const EVENT_LOG_FILE_CURRENT = path.join(__dirname, 'events-current.jsonl');
 const EVENT_LOG_ARCHIVE_DIR = path.join(__dirname, 'events-archive');
-const MAX_EVENTS_IN_CURRENT = 1000;
+const MAX_EVENTS_IN_CURRENT = 5000; // Keep 5000 events in current file
+const ARCHIVE_BUFFER = 1000; // Archive when we have 1000+ extra events
 const RECENT_EVENTS_FOR_UI = 9;
 
 // Store application state
@@ -738,6 +739,10 @@ function loadEventLog() {
     }
 }
 
+// Track when we last checked archive status to avoid checking on every event
+let lastArchiveCheck = 0;
+const ARCHIVE_CHECK_INTERVAL = 5 * 60 * 1000; // Check every 5 minutes
+
 function saveEventLog(event) {
     try {
         // Event is passed directly to avoid race conditions
@@ -746,10 +751,18 @@ function saveEventLog(event) {
         // Append as single line to JSONL file (O(1) operation)
         fs.appendFileSync(EVENT_LOG_FILE_CURRENT, JSON.stringify(event) + '\n');
 
-        // Check if we need to archive
-        const lineCount = countLines(EVENT_LOG_FILE_CURRENT);
-        if (lineCount > MAX_EVENTS_IN_CURRENT) {
-            archiveEvents();
+        // Only check for archiving periodically, not on every event
+        const now = Date.now();
+        if (now - lastArchiveCheck > ARCHIVE_CHECK_INTERVAL) {
+            lastArchiveCheck = now;
+
+            const lineCount = countLines(EVENT_LOG_FILE_CURRENT);
+            const ARCHIVE_THRESHOLD = MAX_EVENTS_IN_CURRENT + ARCHIVE_BUFFER;
+
+            if (lineCount > ARCHIVE_THRESHOLD) {
+                console.log(`📦 Archive triggered: ${lineCount} events (threshold: ${ARCHIVE_THRESHOLD})`);
+                archiveEvents();
+            }
         }
     } catch (error) {
         console.error('Fout bij opslaan event log:', error);
