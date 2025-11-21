@@ -1137,10 +1137,10 @@ function makeFishBubble(fx,fy){
 
 // Unified health system - always use fish.health from server (managed by hunger, disease, temp)
 function healthPct(f,now){
-  // If fish has health property from server, use it (unified health)
+  // Always use unified health from server
   if(f.health !== undefined) return clamp(f.health, 0, 100);
-  // Fallback for backwards compatibility (shouldn't happen with new system)
-  return clamp(100*(1-((now-f.lastEat)/f.hungerWindow)),0,100);
+  // Fallback for very old fish data (shouldn't happen)
+  return 0;
 }
 function fishSize(f,now){const ageDays=(now-f.bornAt)/DAY;const growth=1+Math.log(1+ageDays*0.15)*0.35+Math.log(1+f.eats*0.5)*0.25;return f.baseSize*growth}
 function steerTowards(f,tx,ty,str){
@@ -4131,8 +4131,6 @@ function updateFish(f,dt,now){
       sendToServer({ command: 'reportPoop', poopCount: poops.length });
     }
   }
-
-  if(Date.now()-f.lastEat>=f.hungerWindow) f.dead=true;
 }
 
 function updateListItems(listEl,items){
@@ -5187,7 +5185,6 @@ function makeFishFromData(serverFish) {
         baseSize: baseSize,
         hue: hue,
         sickTop: serverFish.sickTop !== undefined ? serverFish.sickTop : (Math.random() < 0.5),
-        hungerWindow: serverFish.hungerWindow !== undefined ? serverFish.hungerWindow : (DAY * rand(0.9, 1.1)),
         // Movement properties (still random each time)
         dir: Math.random() * Math.PI * 2,
         turnTimer: Math.floor(rand(600, 1800)),
