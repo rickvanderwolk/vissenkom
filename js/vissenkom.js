@@ -892,9 +892,19 @@ function drawCatchPopup(time){
   ctx.save();
   ctx.globalAlpha=alpha;
 
-  // Popup box (centered) - in stijl van side panelen
+  // Bereken vis-grootte vooraf om banner dynamisch te maken
+  const visGrootte=fishSize(fish,now);
+  const visBannerGrootte=Math.min(visGrootte*2.5,160); // Cap op 160px max, 2.5x schaling
+
+  // Popup box (centered) - dynamische hoogte op basis van vis-grootte
   const boxW=Math.min(480,W*0.7);
-  const boxH=240;
+  const minBoxH=240; // Minimum hoogte voor kleine vissen
+  const maxBoxH=400; // Maximum hoogte voor zeer grote vissen
+
+  // Bereken benodigde hoogte: pad + titel(~30) + vis + ruimte + gewicht(~30) + pad
+  const neededH=18+30+visBannerGrootte+20+30+18;
+  const boxH=Math.max(minBoxH,Math.min(maxBoxH,neededH));
+
   const boxX=(cv.width-boxW)/2;
   const boxY=(cv.height-boxH)/2;
   const pad=18; // Padding boven/onder voor balans
@@ -920,8 +930,8 @@ function drawCatchPopup(time){
 
   // Teken de ECHTE vis gecentreerd in de banner
   ctx.save();
-  const visX=boxX+boxW/2; // Gecentreerd
-  const visY=boxY+120; // Precies gebalanceerd tussen titel en gewicht
+  const visX=boxX+boxW/2; // Gecentreerd horizontaal
+  const visY=boxY+boxH/2; // Gecentreerd verticaal in dynamische banner
 
   // Tijdelijk vis eigenschappen aanpassen voor tekenen in banner
   const originalX=fish.x;
@@ -934,7 +944,9 @@ function drawCatchPopup(time){
   fish.y=visY;
   fish.vx=-1; // Hoofd naar links
   fish.vy=0;
-  fish.baseSize=fish.baseSize*2.5; // 2.5x groter in banner
+  // Gebruik gecapte grootte: max 160px na 2.5x schaling
+  const scaleFactor=Math.min(2.5,160/visGrootte);
+  fish.baseSize=fish.baseSize*scaleFactor;
   fish.hideLabel=true; // Verberg label
   fish.hideShadow=true; // Verberg schaduw in banner
 
@@ -968,7 +980,7 @@ function drawCatchPopup(time){
   ctx.globalAlpha=alpha*0.85;
   ctx.fillStyle=lightsOn?'#0b1e2d':'#e9f1f7';
   ctx.font='500 14px system-ui,Segoe UI,Roboto,Arial';
-  ctx.fillText(`${totalWeight} gram`,centerX,boxY+boxH-pad-16); // 20px vanaf onderkant (16px tekst + 4px ruimte)
+  ctx.fillText(`${totalWeight} gram`,centerX,boxY+boxH-pad-16); // Dynamisch onderaan banner
 
   ctx.globalAlpha=alpha; // Reset
 
@@ -4389,7 +4401,13 @@ function drawQR(){
 
 function updateQRWithCode(accessCode) {
   const el = document.getElementById('qr');
+  const qrLink = document.getElementById('qrLink');
   const controllerUrl = `${window.location.protocol}//${window.location.host}/controller?code=${accessCode}`;
+
+  // Update link href
+  if (qrLink) {
+    qrLink.href = controllerUrl;
+  }
 
   console.log('📱 Generating local QR code for URL:', controllerUrl);
 
