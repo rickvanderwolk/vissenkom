@@ -1309,11 +1309,16 @@ function handleAddFish(name, fromClient) {
     }
 
     // Generate visual properties (same ranges as original client code)
+    const now = Date.now();
+
+    // 10% chance new fish arrives sick
+    const arrivesSick = Math.random() < 0.10;
+
     const fishData = {
         name: fishName,
-        addedAt: Date.now(),
-        bornAt: Date.now(),
-        lastEat: Date.now(),
+        addedAt: now,
+        bornAt: now,
+        lastEat: now,
         eats: 0,
         // Visual properties
         baseSize: Math.floor(Math.random() * (30 - 18 + 1)) + 18, // 18-30
@@ -1321,20 +1326,21 @@ function handleAddFish(name, fromClient) {
         speed: Math.random() * (3.0 - 1.5) + 1.5, // 1.5-3.0 (meer variatie!)
         sickTop: Math.random() < 0.5,
         // Disease properties
-        sick: false,
-        sickStartedAt: null,
+        sick: arrivesSick,
+        sickStartedAt: arrivesSick ? now : null,
         medicated: false,
         medicatedAt: null,
-        health: 100
+        health: arrivesSick ? 90 : 100 // Sick fish start with slightly lower health
     };
 
     appState.fishes.push(fishData);
     appState.fishCounter++;
 
-    console.log('Vis toegevoegd:', fishName, 'met eigenschappen:', {
+    console.log(`Vis toegevoegd: ${fishName}${arrivesSick ? ' (ZIEK!)' : ''} met eigenschappen:`, {
         baseSize: fishData.baseSize,
         hue: fishData.hue,
-        speed: fishData.speed
+        speed: fishData.speed,
+        sick: arrivesSick
     });
 
     // Log event
@@ -1343,8 +1349,18 @@ function handleAddFish(name, fromClient) {
         baseSize: fishData.baseSize,
         hue: fishData.hue,
         speed: fishData.speed,
-        fishCounter: appState.fishCounter
+        fishCounter: appState.fishCounter,
+        arrivedSick: arrivesSick
     });
+
+    // Log separate event if fish arrived sick
+    if (arrivesSick) {
+        console.log(`🦠 ${fishName} is ziek!`);
+        logEvent('fish_infected_arrival', {
+            name: fishName,
+            health: fishData.health
+        });
+    }
 
     // Send success message to the client that added the fish
     if (fromClient) {
@@ -1762,6 +1778,17 @@ function updateFishHealth() {
     const temp = appState.temperature;
     let healthChanged = false;
 
+    // Pump filtering: remove poop when pump is running
+    const poopFiltered = gameLogic.calculatePumpPoopFiltering(appState.pumpOn);
+    if (poopFiltered > 0 && appState.poopCount > 0) {
+        const oldPoopCount = appState.poopCount;
+        appState.poopCount = Math.max(0, appState.poopCount - poopFiltered);
+        if (appState.poopCount < oldPoopCount) {
+            console.log(`🔄 Pomp filtert poep: ${oldPoopCount} → ${appState.poopCount}`);
+            broadcastToMainApp({ command: 'updatePoopCount', poopCount: appState.poopCount });
+        }
+    }
+
     // Process all fish health updates sequentially to prevent race conditions
     const updates = appState.fishes.map(fish => {
         return updateFishState(fish.name, (fish) => {
@@ -1856,7 +1883,7 @@ function updateDiseaseSpread() {
             }
 
             // Contact infection - use new game logic function
-            const contactChance = gameLogic.calculateContactInfectionChance(sickFish.length, temp);
+            const contactChance = gameLogic.calculateContactInfectionChance(sickFish.length, temp, appState.pumpOn);
 
             if (contactChance > 0 && !fish.sick && gameLogic.shouldGetInfected(contactChance)) {
                 fish.sick = true;

@@ -89,16 +89,19 @@ export function calculateEnvironmentalInfectionChance(poopCount, waterGreenness,
  * Calculate contact infection chance
  * @param {number} sickFishCount - Number of sick, unmedicated fish
  * @param {number} temperature - Current temperature
+ * @param {boolean} pumpOn - Whether the pump is running (fish gather near pump)
  * @returns {number} - Infection chance (0-1 probability)
  */
-export function calculateContactInfectionChance(sickFishCount, temperature) {
+export function calculateContactInfectionChance(sickFishCount, temperature, pumpOn = false) {
     if (sickFishCount === 0) {
         return 0;
     }
 
     const baseChance = 0.03;
     const tempMultiplier = calculateTemperatureMultiplier(temperature);
-    return (sickFishCount * baseChance) * tempMultiplier;
+    // Pump on = fish gather together = 1.5x contact spread
+    const pumpMultiplier = pumpOn ? 1.5 : 1.0;
+    return (sickFishCount * baseChance) * tempMultiplier * pumpMultiplier;
 }
 
 /**
@@ -119,4 +122,14 @@ export function shouldGetInfected(chance, randomValue = null) {
  */
 export function determineDeathCause(fish) {
     return fish.sick ? 'disease' : 'hunger';
+}
+
+/**
+ * Calculate poop filtered by pump per tick (10 minutes)
+ * @param {boolean} pumpOn - Whether the pump/filter is running
+ * @returns {number} - Amount of poop to remove
+ */
+export function calculatePumpPoopFiltering(pumpOn) {
+    // Pump filters 1 poop per 10 minutes when running
+    return pumpOn ? 1 : 0;
 }

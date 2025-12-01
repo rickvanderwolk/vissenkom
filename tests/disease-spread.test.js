@@ -91,6 +91,19 @@ describe('Disease Spread System', () => {
             const chance = calculateContactInfectionChance(10, 24);
             expect(chance).toBeCloseTo(0.3, 4);
         });
+
+        it('should multiply by 1.5 when pump is on', () => {
+            const chanceOff = calculateContactInfectionChance(2, 24, false);
+            const chanceOn = calculateContactInfectionChance(2, 24, true);
+            expect(chanceOn).toBeCloseTo(chanceOff * 1.5, 4);
+            expect(chanceOn).toBeCloseTo(0.09, 4); // 2 * 0.03 * 1.5
+        });
+
+        it('should combine pump and temperature multipliers', () => {
+            // Hot temp (2x) + pump on (1.5x) = 3x total
+            const chance = calculateContactInfectionChance(2, 32, true);
+            expect(chance).toBeCloseTo(0.03 * 2 * 2.0 * 1.5, 4); // 0.18
+        });
     });
 
     describe('shouldGetInfected', () => {

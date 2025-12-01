@@ -2,7 +2,8 @@ import { describe, it, expect } from 'vitest';
 import {
     calculateTemperatureDamage,
     calculateHealthChange,
-    determineDeathCause
+    determineDeathCause,
+    calculatePumpPoopFiltering
 } from '../src/gameLogic.js';
 
 describe('Health System', () => {
@@ -155,6 +156,16 @@ describe('Health System', () => {
         it('should return "hunger" when fish is not sick', () => {
             const fish = { sick: false };
             expect(determineDeathCause(fish)).toBe('hunger');
+        });
+    });
+
+    describe('calculatePumpPoopFiltering', () => {
+        it('should return 1 when pump is on', () => {
+            expect(calculatePumpPoopFiltering(true)).toBe(1);
+        });
+
+        it('should return 0 when pump is off', () => {
+            expect(calculatePumpPoopFiltering(false)).toBe(0);
         });
     });
 });

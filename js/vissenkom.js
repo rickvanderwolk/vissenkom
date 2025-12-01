@@ -3155,6 +3155,16 @@ function getSickEmoji(fish) {
 
 // Behavior emoji mapping
 function getBehaviorEmoji(behaviorState, fish) {
+  // Food chasing takes highest priority
+  if(fish && fish.chasingFood) {
+    return '🍽️';
+  }
+
+  // Pump interest takes priority (if active)
+  if(fish && fish.pumpInterest && pumpOn) {
+    return '🫧';
+  }
+
   switch(behaviorState) {
     case 'bottom_dwelling': return '⬇️';
     case 'wall_following': return '🧱';
@@ -3386,16 +3396,9 @@ function handleLazy(f) {
 }
 
 function handleCurious(f) {
-  // Find something to investigate: decorations, plants, other fish, or the pump
+  // Find something to investigate: decorations, plants, other fish
   if(!f.curiousTarget || Math.random() < 0.02) {
     const options = [];
-
-    // If pump is on, add it as a high-priority target (add multiple times to increase chance)
-    if(pumpOn) {
-      for(let i = 0; i < 3; i++) {
-        options.push({x: pumpPos.x, y: H - 30});
-      }
-    }
 
     // Add decorations as targets
     decorations.forEach(d => options.push({x: d.x, y: d.y}));
@@ -3776,6 +3779,9 @@ function updateFish(f,dt,now){
   let target=null;let best=1e9;for(const p of foods){const d=(p.x-f.x)**2+(p.y-f.y)**2;if(d<best){best=d;target=p}}
   const hp=healthPct(f,now);
 
+  // Track if fish is chasing food (for emoji display)
+  f.chasingFood = target !== null;
+
   // Af en toe een bubbeltje bij de vis (2% kans per frame als gezond)
   if(hp>30 && Math.random()<0.02){makeFishBubble(f.x,f.y)}
 
@@ -3817,56 +3823,63 @@ function updateFish(f,dt,now){
       }
     }
   }
-  // Medium-High priority: play with ball (if available and fish is interested)
-  else if(playBalls.length > 0 && Math.random() < 0.7) {
-    // 70% chance vis is geïnteresseerd in bal als er een is (was 40%)
-    // Zoek dichtsbijzijnde bal
-    let closestBall = null;
-    let closestDist = Infinity;
-    for(const ball of playBalls) {
-      const dx = ball.x - f.x;
-      const dy = ball.y - f.y;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-      if(dist < closestDist) {
-        closestDist = dist;
-        closestBall = ball;
+  // Medium-High priority: play with ball (if available and fish is playing or interested)
+  else if(playBalls.length > 0 && (f.behaviorState === 'playing' || Math.random() < 0.7)) {
+    if(f.behaviorState === 'playing') {
+      // Already playing - call handlePlaying to steer towards ball
+      handlePlaying(f);
+    } else {
+      // New fish considering playing - check distance
+      let closestBall = null;
+      let closestDist = Infinity;
+      for(const ball of playBalls) {
+        const dx = ball.x - f.x;
+        const dy = ball.y - f.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if(dist < closestDist) {
+          closestDist = dist;
+          closestBall = ball;
+        }
       }
-    }
 
-    // Als bal dichtbij genoeg, ga spelen
-    if(closestBall && closestDist < 400) { // Binnen 400px (was 200px)
-      if(f.behaviorState !== 'playing') {
+      // Start playing if ball is close enough
+      if(closestBall && closestDist < 400) {
         f.behaviorState = 'playing';
-        f.behaviorTimer = Math.floor(rand(300, 600)); // Speel 5-10 seconden
+        f.behaviorTimer = Math.floor(rand(1800, 3600)); // Speel 30-60 seconden
       }
     }
   }
-  // Medium priority: pump attraction (existing behavior)
-  else if(pumpOn || now<pumpJustOnUntil){
-    if(pumpOn){steerTowards(f,pumpPos.x,H-30,0.006)}
-    if(now<pumpJustOnUntil){steerTowards(f,pumpPos.x,H-30,0.045)}
-    // Reset to normal behavior when near pump
-    if(f.behaviorState !== 'normal') {
-      f.behaviorState = 'normal';
-      f.behaviorTimer = 0;
-      f.wallFollowTarget = null;
+  // Medium priority: pump attraction (interest-based)
+  else if((pumpOn || now<pumpJustOnUntil) && f.pumpInterest){
+    // Check if interest has expired
+    if(now > f.pumpInterestUntil) {
+      f.pumpInterest = false;
+    } else {
+      // Still interested - steer towards pump
+      if(pumpOn){steerTowards(f,pumpPos.x,H-30,0.006)}
+      if(now<pumpJustOnUntil){steerTowards(f,pumpPos.x,H-30,0.045)}
     }
   }
   // Low priority: special behaviors or normal wandering
   else {
+    // Chance to regain pump interest (~35% per minute per fish)
+    // Only if fish is near the pump (within 200px)
+    if(pumpOn && !f.pumpInterest) {
+      const distToPump = Math.hypot(f.x - pumpPos.x, f.y - (H - 30));
+      if(distToPump < 200 && Math.random() < 0.0001) {
+        f.pumpInterest = true;
+        f.pumpInterestUntil = now + rand(20000, 40000); // 20-40 seconds interest
+      }
+    }
+
     // Check if behavior timer expired, switch to new behavior
     if(f.behaviorTimer <= 0) {
       const randVal = Math.random();
 
-      // Adjust probabilities based on pump and disco state
+      // Adjust probabilities based on disco state
       let curiousThreshold = 0.65; // Base: 9% curious (56-65%)
       let dancingThreshold = 0.71; // Base: 6% dancing (65-71%)
       let restingThreshold = 0.19; // Base: 6% resting (13-19%)
-
-      // When pump is on, increase curious behavior chance
-      if(pumpOn) {
-        curiousThreshold = 0.75; // Increase curious range to 19% (56-75%)
-      }
 
       // When disco is on, increase dancing behavior chance
       if(discoOn) {
@@ -4356,6 +4369,11 @@ function drawActivityList(){
         const contactFishName=event.data.name||'Vis';
         label=`${contactFishName} geïnfecteerd (contact) · ${timeStr}`;
         break;
+      case 'fish_infected_arrival':
+        emoji='🦠';
+        const arrivalFishName=event.data.name||'Vis';
+        label=`${arrivalFishName} is ziek! · ${timeStr}`;
+        break;
       default:
         emoji='📝';
         label=`${event.type} · ${timeStr}`;
@@ -4763,6 +4781,17 @@ function handleRemoteCommand(data) {
                     break;
                 case 'cleanTank':
                     cleanTank();
+                    break;
+                case 'updatePoopCount':
+                    // Pump filtering - sync poop count from server
+                    if (typeof data.poopCount === 'number') {
+                        const targetCount = data.poopCount;
+                        // Remove excess poops to match server count
+                        while (poops.length > targetCount) {
+                            poops.pop();
+                        }
+                        console.log(`🔄 Poep gefilterd door pomp: ${poops.length} poep over`);
+                    }
                     break;
                 case 'refreshWater':
                     refreshWater();
@@ -5224,7 +5253,12 @@ function makeFishFromData(serverFish) {
         behaviorTimer: 0,
         wallFollowTarget: null,
         // Ball approach preference (random per fish)
-        ballApproachSide: Math.random() < 0.5 ? -1 : 1
+        ballApproachSide: Math.random() < 0.5 ? -1 : 1,
+        // Pump interest (timer-based attraction)
+        pumpInterest: false,
+        pumpInterestUntil: 0,
+        // Food chasing (for emoji display)
+        chasingFood: false
     };
     return f;
 }
@@ -5248,6 +5282,15 @@ function updatePumpUI() {
     if (pumpOn) {
         pumpPos.x = W - 70;
         pumpJustOnUntil = Date.now() + 3000;
+
+        // When pump turns on: 60% of fish get initial interest (30-60 sec)
+        const now = Date.now();
+        fishes.forEach(f => {
+            if (Math.random() < 0.6) {
+                f.pumpInterest = true;
+                f.pumpInterestUntil = now + rand(30000, 60000); // 30-60 seconds
+            }
+        });
     }
 }
 
