@@ -1940,7 +1940,7 @@ function drawNewYearText(time){
   ctx.textAlign='center';
   ctx.textBaseline='middle';
 
-  if(month===11&&day>=28){ // 28-31 december: countdown naar middernacht 1 jan
+  if(!(month===0&&day<=6)){ // Countdown tonen behalve 1-6 januari
     // Bereken tijd tot middernacht 1 januari
     const newYear=new Date(now.getFullYear()+1,0,1,0,0,0);
     const diff=newYear-now;
