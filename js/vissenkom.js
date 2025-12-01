@@ -4372,7 +4372,7 @@ function drawActivityList(){
       case 'fish_infected_arrival':
         emoji='🦠';
         const arrivalFishName=event.data.name||'Vis';
-        label=`${arrivalFishName} is ziek! · ${timeStr}`;
+        label=`${arrivalFishName} is ziek · ${timeStr}`;
         break;
       default:
         emoji='📝';
