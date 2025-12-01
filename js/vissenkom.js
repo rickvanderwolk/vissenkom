@@ -1841,15 +1841,15 @@ function updateFireworks(){
         const numSparks=Math.floor(rand(fw.sparkRange[0],fw.sparkRange[1]));
         for(let j=0;j<numSparks;j++){
           const angle=rand(0,Math.PI*2);
-          const speed=rand(2,6);
+          const speed=rand(3,9); // Grotere explosie radius
           fw.sparks.push({
             x:fw.x,
             y:fw.y,
             vx:Math.cos(angle)*speed,
             vy:Math.sin(angle)*speed,
             alpha:1,
-            size:rand(2,4),
-            decay:rand(0.012,0.022)
+            size:rand(2.5,5), // Grotere sparks
+            decay:rand(0.010,0.018) // Iets langzamer uitdoven
           });
         }
         fw.trail=[];
@@ -1929,53 +1929,68 @@ function drawNewYearText(time){
   if(!isNewYear())return;
 
   const now=new Date();
-  const month=now.getMonth(); // 0-11
+  const month=now.getMonth();
   const day=now.getDate();
 
-  // Bepaal welke tekst te tonen
-  let mainText,subText;
-  if(month===11&&day>=29){ // 29-31 december
-    mainText='2024 → 2025';
-    subText='';
-  }else{ // 1-2 januari
-    mainText='2025';
-    subText='Gelukkig Nieuwjaar!';
-  }
-
   const centerX=W/2;
-  const centerY=H*0.45; // Midden van het scherm
-
-  // Gouden glow effect
+  const centerY=H*0.45;
   const glowPulse=0.7+Math.sin(time*0.002)*0.3;
 
-  // Main year text
   ctx.save();
   ctx.textAlign='center';
   ctx.textBaseline='middle';
 
-  // Glow laag
-  ctx.shadowColor='#ffd700';
-  ctx.shadowBlur=25*glowPulse;
-  ctx.font=`bold ${Math.floor(W*0.1)}px Arial, sans-serif`;
-  ctx.fillStyle=`rgba(255,215,0,${0.85*glowPulse})`;
-  ctx.fillText(mainText,centerX,centerY);
+  if(month===11&&day>=28){ // 28-31 december: countdown naar middernacht 1 jan
+    // Bereken tijd tot middernacht 1 januari
+    const newYear=new Date(now.getFullYear()+1,0,1,0,0,0);
+    const diff=newYear-now;
 
-  // Scherpe tekst bovenop
-  ctx.shadowBlur=0;
-  ctx.fillStyle='#fff8dc'; // Cornsilk - warm wit
-  ctx.fillText(mainText,centerX,centerY);
+    const days=Math.floor(diff/(1000*60*60*24));
+    const hours=Math.floor((diff%(1000*60*60*24))/(1000*60*60));
+    const minutes=Math.floor((diff%(1000*60*60))/(1000*60));
+    const seconds=Math.floor((diff%(1000*60))/1000);
 
-  // Subtekst (alleen na nieuwjaar) - eronder
-  if(subText){
+    // Countdown tekst
+    let countdownText;
+    if(days>=1){
+      // 29-30 dec: "Nog X dagen"
+      countdownText=days===1?'1 dag':`${days} dagen`;
+    }else{
+      // 31 dec: live countdown
+      countdownText=`${hours.toString().padStart(2,'0')}:${minutes.toString().padStart(2,'0')}:${seconds.toString().padStart(2,'0')}`;
+    }
+
+    // Countdown groot
+    ctx.font=`bold ${Math.floor(W*0.10)}px Arial, sans-serif`;
+    ctx.shadowColor='#ffd700';
+    ctx.shadowBlur=25*glowPulse;
+    ctx.fillStyle=`rgba(255,215,0,${0.85*glowPulse})`;
+    ctx.fillText(countdownText,centerX,centerY);
+    ctx.shadowBlur=0;
+    ctx.fillStyle='#fff8dc';
+    ctx.fillText(countdownText,centerX,centerY);
+
+
+  }else{ // 1-6 januari: feestelijk
+    // 2025 groot
+    ctx.font=`bold ${Math.floor(W*0.12)}px Arial, sans-serif`;
+    ctx.shadowColor='#ffd700';
+    ctx.shadowBlur=25*glowPulse;
+    ctx.fillStyle=`rgba(255,215,0,${0.85*glowPulse})`;
+    ctx.fillText('2025',centerX,centerY);
+    ctx.shadowBlur=0;
+    ctx.fillStyle='#fff8dc';
+    ctx.fillText('2025',centerX,centerY);
+
+    // Gelukkig Nieuwjaar eronder
     ctx.font=`bold ${Math.floor(W*0.04)}px Arial, sans-serif`;
     ctx.shadowColor='#ffd700';
     ctx.shadowBlur=15*glowPulse;
     ctx.fillStyle=`rgba(255,215,0,${0.8*glowPulse})`;
-    ctx.fillText(subText,centerX,centerY+W*0.08);
-
+    ctx.fillText('Gelukkig Nieuwjaar!',centerX,centerY+W*0.09);
     ctx.shadowBlur=0;
     ctx.fillStyle='#fffacd';
-    ctx.fillText(subText,centerX,centerY+W*0.08);
+    ctx.fillText('Gelukkig Nieuwjaar!',centerX,centerY+W*0.09);
   }
 
   ctx.restore();
@@ -2104,8 +2119,12 @@ function clearFrame(time){
 
   drawStars(time);
   drawHalloweenMoon();
-  updateFireworks();
-  drawFireworks();
+  // Vuurwerk alleen na nieuwjaar (1-6 januari)
+  const nowDate=new Date();
+  if(isNewYear()&&nowDate.getMonth()===0&&nowDate.getDate()<=6){
+    updateFireworks();
+    drawFireworks();
+  }
   drawNewYearText(time);
   drawAmbientGlow(time);
   drawLamps(time);

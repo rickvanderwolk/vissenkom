@@ -101,8 +101,8 @@ function getCurrentTheme() {
         return 'christmas';
     }
 
-    // New Year: December 29 - January 2 (inclusive)
-    if ((month === 11 && day >= 29) || (month === 0 && day <= 2)) {
+    // New Year: December 28 - January 6 (inclusive)
+    if ((month === 11 && day >= 28) || (month === 0 && day <= 6)) {
         return 'newyear';
     }
 
