@@ -54,6 +54,7 @@ function resize(){
   cv.height=fullH;
   W=fullW-(viewportConfig.offsetLeft+viewportConfig.offsetRight);
   H=fullH-(viewportConfig.offsetTop+viewportConfig.offsetBottom);
+  pumpPos.x=W-70; // Altijd initialiseren voor champagnefles
   updateUIPositions();
   setupLamps();setupDiscoBall();setupFishingRod();setupPlants();setupDecorations();setupStars();setupParticles();setupSpiderWebs();
   updateLayerCache();
@@ -77,6 +78,7 @@ const fishes=[];const foods=[];const deadLog=[];const bubbles=[];const poops=[];
 const plants=[];const decorations=[];const stars=[];const particles=[];const algenParticles=[];
 const playBalls=[]; // Speelballen voor vissen
 const spiderWebs=[]; // Halloween spinnenwebben (statisch)
+const fireworks=[]; // Nieuwjaar vuurwerk
 let recentActivity=[];
 let playedAudioEvents=new Set(); // Track welke events al audio hebben afgespeeld
 let plingAudio=null; // Herbruikbaar audio object voor pling geluid
@@ -92,6 +94,7 @@ let currentTheme='normal'; // Current theme (loaded from server)
 function getThemeConfig(){return THEMES[currentTheme]||THEMES.normal}
 function isHalloween(){return currentTheme==='halloween'}
 function isChristmas(){return currentTheme==='christmas'}
+function isNewYear(){return currentTheme==='newyear'}
 function hasDecoration(type){return getThemeConfig().decorations.includes(type)}
 
 // Theme configurations
@@ -185,6 +188,16 @@ const THEMES={
     foodColors:['#ff2d55','#00e676','#ffd700','#ffb3ba','#8b6f47'],
     bubbleColor:'#e6f7ff',
     decorations:['christmastree','snowman','christmaslights','snowflake']
+  },
+  newyear:{
+    name:'Nieuwjaar',
+    emoji:'🎆',
+    bgLight:['#0a0a1a','#101028','#0d0d20','#080818'], // Donkere nachtlucht
+    bgDark:['#050510','#080818','#040410','#020208'], // Diep donkerblauw/zwart
+    vignette:0.30,
+    foodColors:['#ffd700','#ffdf00','#f0e68c','#daa520'], // Gouden champagne kleuren
+    bubbleColor:'#fffacd', // Champagne bubbels
+    decorations:['oliebollen']
   }
 };
 
@@ -341,13 +354,14 @@ function setupDecorations(){
   // Theme-based decoration or normal castle
   // In Halloween mode: altijd minimaal 1 pompoen
   // In Christmas mode: altijd huisje OF sneeuwpop
+  // In NewYear mode: oliebollen
   // Anders: 30% kans op kasteel
-  const shouldAddDecoration=isHalloween()||isChristmas()||Math.random()<0.3;
+  const shouldAddDecoration=isHalloween()||isChristmas()||isNewYear()||Math.random()<0.3;
 
   if(shouldAddDecoration){
     const x=rand(80,W-80);
     // Pompoen kan groter zijn dan kasteel: 80-280 (soms 2x zo groot)
-    const size=isHalloween()?rand(80,280):rand(80,140);
+    const size=isHalloween()?rand(80,280):isNewYear()?rand(120,240):rand(80,140);
     const bobPhase=rand(0,Math.PI*2);
     const zIndex=Math.random()<0.7?'back':'front';
     const minY=H-size/2;
@@ -360,6 +374,8 @@ function setupDecorations(){
       // 50% kans op huisje, 50% kans op sneeuwpop
       const decoType = Math.random() < 0.5 ? 'cottage' : 'snowman';
       decorations.push({type:decoType,x,y,size,bobPhase,zIndex});
+    }else if(isNewYear()){
+      decorations.push({type:'oliebollen',x,y,size,bobPhase,zIndex});
     }else{
       decorations.push({type:'castle',x,y,size,hue:rand(200,220),bobPhase,zIndex});
     }
@@ -375,6 +391,18 @@ function setupDecorations(){
     const maxY=H-sandHeight+10;
     const y=rand(minY,maxY);
     decorations.push({type:'skull',x,y,size,bobPhase,zIndex});
+  }
+
+  // Nieuwjaar: grote champagnefles erbij
+  if(isNewYear()){
+    const x=rand(100,W-100);
+    const size=rand(160,220); // Veel groter!
+    const bobPhase=rand(0,Math.PI*2);
+    const zIndex='back'; // Altijd achter de vissen
+    const minY=H-size*0.4;
+    const maxY=H-sandHeight+20;
+    const y=rand(minY,maxY);
+    decorations.push({type:'champagne',x,y,size,bobPhase,zIndex});
   }
 }
 function lampHueFor(L,time){
@@ -1128,8 +1156,15 @@ function makeFish(x=rand(50,W-50),y=rand(50,H-50),name){const base=rand(18,30);l
 function makeFood(){const n=Math.max(8,fishes.length);const theme=getThemeConfig();const foodColors=theme.foodColors;for(let i=0;i<n;i++){const color=foodColors[Math.floor(Math.random()*foodColors.length)];foods.push({x:rand(40,W-40),y:50+rand(0,30),vy:rand(0.7,1.5),r:7,ttl:6000,color})}}
 function makeBubble(){
   const b=getBubble();
-  b.x=pumpPos.x+rand(-6,6);
-  b.y=H-30;
+  // Bij nieuwjaar: bubbels uit champagnefles opening
+  if(isNewYear()){
+    // Fles opening positie (na rotatie van -1.1 rad vanaf pumpPos.x, H-60)
+    b.x=pumpPos.x-55+rand(-4,4);
+    b.y=H-88+rand(-4,4);
+  }else{
+    b.x=pumpPos.x+rand(-6,6);
+    b.y=H-30;
+  }
   b.r=rand(2,6);
   b.vy=rand(0.8,1.8);
   b.vx=rand(-0.2,0.2);
@@ -1738,6 +1773,296 @@ function drawAlgenParticles(){
   }
 }
 
+// === NIEUWJAAR VUURWERK ===
+const FIREWORK_COLORS=['#ffd700','#ff6b6b','#4ecdc4','#ff69b4','#7b68ee','#00ff7f','#ff4500','#ffffff','#ff0000','#00ffff'];
+let lastFireworkTime=0;
+
+// Performance-based settings
+function getFireworkSettings(){
+  const q=performanceProfile.quality;
+  if(q==='high')return{interval:800,maxActive:8,sparks:[35,55],trailLen:15};
+  if(q==='medium')return{interval:1200,maxActive:5,sparks:[25,40],trailLen:10};
+  if(q==='low')return{interval:1800,maxActive:3,sparks:[15,25],trailLen:6};
+  return{interval:2500,maxActive:2,sparks:[10,18],trailLen:4}; // verylow
+}
+
+function spawnFirework(){
+  const settings=getFireworkSettings();
+  const color=FIREWORK_COLORS[Math.floor(Math.random()*FIREWORK_COLORS.length)];
+  const x=rand(W*0.1,W*0.9);
+  const targetY=rand(H*0.05,H*0.28); // Explodeert in bovenste deel
+  fireworks.push({
+    x:x,
+    y:H*0.4, // Start onder water niveau
+    targetY:targetY,
+    vy:-rand(4,7), // Snelheid omhoog
+    color:color,
+    phase:'rising', // 'rising' of 'exploding'
+    sparks:[],
+    trail:[],
+    birthTime:Date.now(),
+    sparkRange:settings.sparks,
+    trailLen:settings.trailLen
+  });
+}
+
+function updateFireworks(){
+  if(!isNewYear())return;
+
+  const settings=getFireworkSettings();
+  const now=Date.now();
+
+  // Spawn nieuwe vuurwerk periodiek - meer tegelijk!
+  if(now-lastFireworkTime>settings.interval&&fireworks.length<settings.maxActive){
+    spawnFirework();
+    // 40% kans op dubbel vuurwerk bij high/medium quality
+    if((performanceProfile.quality==='high'||performanceProfile.quality==='medium')&&Math.random()<0.4&&fireworks.length<settings.maxActive-1){
+      spawnFirework();
+    }
+    lastFireworkTime=now;
+  }
+
+  for(let i=fireworks.length-1;i>=0;i--){
+    const fw=fireworks[i];
+
+    if(fw.phase==='rising'){
+      // Voeg trail toe
+      fw.trail.push({x:fw.x,y:fw.y,alpha:1});
+      if(fw.trail.length>fw.trailLen)fw.trail.shift();
+
+      // Beweeg omhoog
+      fw.y+=fw.vy;
+      fw.x+=rand(-0.5,0.5); // Lichte wiggle
+
+      // Check of we doelhoogte bereikt hebben
+      if(fw.y<=fw.targetY){
+        fw.phase='exploding';
+        // Creëer explosie sparks - aantal gebaseerd op performance
+        const numSparks=Math.floor(rand(fw.sparkRange[0],fw.sparkRange[1]));
+        for(let j=0;j<numSparks;j++){
+          const angle=rand(0,Math.PI*2);
+          const speed=rand(2,6);
+          fw.sparks.push({
+            x:fw.x,
+            y:fw.y,
+            vx:Math.cos(angle)*speed,
+            vy:Math.sin(angle)*speed,
+            alpha:1,
+            size:rand(2,4),
+            decay:rand(0.012,0.022)
+          });
+        }
+        fw.trail=[];
+      }
+    }
+    else if(fw.phase==='exploding'){
+      // Update sparks
+      let allDead=true;
+      for(const spark of fw.sparks){
+        spark.x+=spark.vx;
+        spark.y+=spark.vy;
+        spark.vy+=0.08; // Gravity
+        spark.vx*=0.98; // Drag
+        spark.alpha-=spark.decay;
+        if(spark.alpha>0)allDead=false;
+      }
+
+      // Verwijder vuurwerk als alle sparks gedoofd zijn
+      if(allDead){
+        fireworks.splice(i,1);
+      }
+    }
+  }
+}
+
+function drawFireworks(){
+  if(!isNewYear())return;
+
+  for(const fw of fireworks){
+    if(fw.phase==='rising'){
+      // Teken trail
+      for(let i=0;i<fw.trail.length;i++){
+        const t=fw.trail[i];
+        const alpha=(i/fw.trail.length)*0.6;
+        ctx.fillStyle=fw.color.replace(')',`,${alpha})`).replace('rgb','rgba').replace('#',`rgba(${parseInt(fw.color.slice(1,3),16)},${parseInt(fw.color.slice(3,5),16)},${parseInt(fw.color.slice(5,7),16)},`).split('rgba').pop();
+        ctx.globalAlpha=alpha;
+        ctx.beginPath();
+        ctx.arc(t.x,t.y,2,0,Math.PI*2);
+        ctx.fill();
+      }
+      ctx.globalAlpha=1;
+
+      // Teken raket punt
+      ctx.fillStyle=fw.color;
+      ctx.beginPath();
+      ctx.arc(fw.x,fw.y,3,0,Math.PI*2);
+      ctx.fill();
+
+      // Glow effect
+      ctx.shadowColor=fw.color;
+      ctx.shadowBlur=10;
+      ctx.beginPath();
+      ctx.arc(fw.x,fw.y,2,0,Math.PI*2);
+      ctx.fill();
+      ctx.shadowBlur=0;
+    }
+    else if(fw.phase==='exploding'){
+      // Teken sparks
+      for(const spark of fw.sparks){
+        if(spark.alpha<=0)continue;
+        ctx.globalAlpha=spark.alpha;
+        ctx.fillStyle=fw.color;
+        ctx.shadowColor=fw.color;
+        ctx.shadowBlur=spark.alpha*8;
+        ctx.beginPath();
+        ctx.arc(spark.x,spark.y,spark.size*spark.alpha,0,Math.PI*2);
+        ctx.fill();
+      }
+      ctx.shadowBlur=0;
+      ctx.globalAlpha=1;
+    }
+  }
+}
+
+// === NIEUWJAAR JAARCIJFERS ===
+function drawNewYearText(time){
+  if(!isNewYear())return;
+
+  const now=new Date();
+  const month=now.getMonth(); // 0-11
+  const day=now.getDate();
+
+  // Bepaal welke tekst te tonen
+  let mainText,subText;
+  if(month===11&&day>=29){ // 29-31 december
+    mainText='2024 → 2025';
+    subText='';
+  }else{ // 1-2 januari
+    mainText='2025';
+    subText='Gelukkig Nieuwjaar!';
+  }
+
+  const centerX=W/2;
+  const centerY=H*0.45; // Midden van het scherm
+
+  // Gouden glow effect
+  const glowPulse=0.7+Math.sin(time*0.002)*0.3;
+
+  // Main year text
+  ctx.save();
+  ctx.textAlign='center';
+  ctx.textBaseline='middle';
+
+  // Glow laag
+  ctx.shadowColor='#ffd700';
+  ctx.shadowBlur=25*glowPulse;
+  ctx.font=`bold ${Math.floor(W*0.1)}px Arial, sans-serif`;
+  ctx.fillStyle=`rgba(255,215,0,${0.85*glowPulse})`;
+  ctx.fillText(mainText,centerX,centerY);
+
+  // Scherpe tekst bovenop
+  ctx.shadowBlur=0;
+  ctx.fillStyle='#fff8dc'; // Cornsilk - warm wit
+  ctx.fillText(mainText,centerX,centerY);
+
+  // Subtekst (alleen na nieuwjaar) - eronder
+  if(subText){
+    ctx.font=`bold ${Math.floor(W*0.04)}px Arial, sans-serif`;
+    ctx.shadowColor='#ffd700';
+    ctx.shadowBlur=15*glowPulse;
+    ctx.fillStyle=`rgba(255,215,0,${0.8*glowPulse})`;
+    ctx.fillText(subText,centerX,centerY+W*0.08);
+
+    ctx.shadowBlur=0;
+    ctx.fillStyle='#fffacd';
+    ctx.fillText(subText,centerX,centerY+W*0.08);
+  }
+
+  ctx.restore();
+}
+
+// Champagne fles bij de pump - bubbels lijken uit de fles te komen
+function drawPumpChampagne(){
+  if(!isNewYear())return;
+
+  const lightMul=lightsOn?1:0.6;
+  const fadeAlpha=1;
+
+  // Positie: bij de pump, schuin liggend
+  const x=pumpPos.x;
+  const y=H-60;
+  const bottleHeight=120;
+  const bottleWidth=bottleHeight*0.28;
+  const neckWidth=bottleWidth*0.35;
+
+  ctx.save();
+  ctx.translate(x,y);
+  ctx.rotate(-1.1); // ~63 graden schuin
+
+  // Fles body (donkergroen glas)
+  const bodyGrad=ctx.createLinearGradient(-bottleWidth/2,0,bottleWidth/2,0);
+  bodyGrad.addColorStop(0,`hsla(140,45%,${15*lightMul}%,${fadeAlpha})`);
+  bodyGrad.addColorStop(0.3,`hsla(140,40%,${25*lightMul}%,${fadeAlpha})`);
+  bodyGrad.addColorStop(0.7,`hsla(140,40%,${22*lightMul}%,${fadeAlpha})`);
+  bodyGrad.addColorStop(1,`hsla(140,45%,${12*lightMul}%,${fadeAlpha})`);
+  ctx.fillStyle=bodyGrad;
+
+  // Fles body shape
+  ctx.beginPath();
+  ctx.moveTo(-bottleWidth/2,bottleHeight*0.35);
+  ctx.lineTo(-bottleWidth/2,-bottleHeight*0.1);
+  ctx.quadraticCurveTo(-bottleWidth/2,-bottleHeight*0.2,-neckWidth/2,-bottleHeight*0.28);
+  ctx.lineTo(-neckWidth/2,-bottleHeight*0.52);
+  ctx.lineTo(neckWidth/2,-bottleHeight*0.52);
+  ctx.lineTo(neckWidth/2,-bottleHeight*0.28);
+  ctx.quadraticCurveTo(bottleWidth/2,-bottleHeight*0.2,bottleWidth/2,-bottleHeight*0.1);
+  ctx.lineTo(bottleWidth/2,bottleHeight*0.35);
+  ctx.closePath();
+  ctx.fill();
+
+  // Gouden folie rond de nek
+  ctx.fillStyle=`hsla(45,80%,${55*lightMul}%,${fadeAlpha})`;
+  ctx.beginPath();
+  ctx.rect(-neckWidth/2-3,-bottleHeight*0.52,neckWidth+6,bottleHeight*0.12);
+  ctx.fill();
+
+  // Open fles - donkere opening bovenaan
+  ctx.fillStyle=`hsla(140,30%,${8*lightMul}%,${fadeAlpha})`;
+  ctx.beginPath();
+  ctx.ellipse(0,-bottleHeight*0.52,neckWidth/2,neckWidth*0.2,0,0,Math.PI*2);
+  ctx.fill();
+
+  // Gouden rand rond opening
+  ctx.strokeStyle=`hsla(45,70%,${50*lightMul}%,${fadeAlpha})`;
+  ctx.lineWidth=2;
+  ctx.beginPath();
+  ctx.ellipse(0,-bottleHeight*0.52,neckWidth/2+1,neckWidth*0.25,0,0,Math.PI*2);
+  ctx.stroke();
+
+  // Label (crème kleur)
+  ctx.fillStyle=`hsla(40,30%,${85*lightMul}%,${fadeAlpha})`;
+  ctx.beginPath();
+  ctx.rect(-bottleWidth*0.38,-bottleHeight*0.08,bottleWidth*0.76,bottleHeight*0.28);
+  ctx.fill();
+
+  // Label tekst/decoratie (gouden lijnen)
+  ctx.fillStyle=`hsla(45,60%,${50*lightMul}%,${fadeAlpha})`;
+  ctx.beginPath();
+  ctx.rect(-bottleWidth*0.28,bottleHeight*0.0,bottleWidth*0.56,bottleHeight*0.025);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.rect(-bottleWidth*0.28,bottleHeight*0.05,bottleWidth*0.56,bottleHeight*0.025);
+  ctx.fill();
+
+  // Glans op fles
+  ctx.fillStyle=`hsla(0,0%,100%,${fadeAlpha*0.18})`;
+  ctx.beginPath();
+  ctx.ellipse(-bottleWidth*0.22,0,bottleWidth*0.06,bottleHeight*0.22,0,0,Math.PI*2);
+  ctx.fill();
+
+  ctx.restore();
+}
+
 function drawWaterGreenness(){
   if(waterGreenness<=0)return;
   const alpha=(waterGreenness/100)*0.9; // 90% opacity bij 100% greenness
@@ -1779,6 +2104,9 @@ function clearFrame(time){
 
   drawStars(time);
   drawHalloweenMoon();
+  updateFireworks();
+  drawFireworks();
+  drawNewYearText(time);
   drawAmbientGlow(time);
   drawLamps(time);
   drawSpiderWebs();
@@ -2028,6 +2356,64 @@ function drawPlayBalls(){
       ctx.strokeStyle = eyeGlow;
       ctx.stroke();
 
+    } else if(isNewYear()){
+      // Nieuwjaar: oliebol stijl (zoals decoratie)
+      const lightMul = lightsOn ? 1 : 0.6;
+
+      // Oliebol basis (goudbruin)
+      const bolGrad = ctx.createRadialGradient(
+        ball.x - ball.radius * 0.2,
+        ball.y - ball.radius * 0.2,
+        0,
+        ball.x,
+        ball.y,
+        ball.radius
+      );
+      bolGrad.addColorStop(0, `hsla(35,55%,${55*lightMul}%,1)`);
+      bolGrad.addColorStop(0.7, `hsla(30,60%,${40*lightMul}%,1)`);
+      bolGrad.addColorStop(1, `hsla(25,50%,${30*lightMul}%,1)`);
+      ctx.fillStyle = bolGrad;
+      ctx.beginPath();
+      ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Krokante textuur (statische donkere stipjes)
+      ctx.fillStyle = `hsla(25,40%,${25*lightMul}%,0.5)`;
+      for(let i = 0; i < 8; i++){
+        const angle = i * Math.PI / 4;
+        const dist = ball.radius * 0.55;
+        const dotX = ball.x + Math.cos(angle) * dist;
+        const dotY = ball.y + Math.sin(angle) * dist;
+        ctx.beginPath();
+        ctx.arc(dotX, dotY, ball.radius * 0.08, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // Poedersuiker (witte stipjes bovenop)
+      ctx.fillStyle = `hsla(0,0%,${100*lightMul}%,0.95)`;
+      const sugarAngles = [0.3, 0.9, 1.5, 2.1, 2.7, 3.3, 3.9, 4.5, 5.1, 5.7];
+      const sugarDists = [0.3, 0.5, 0.2, 0.6, 0.4, 0.55, 0.35, 0.45, 0.25, 0.5];
+      const sugarSizes = [2.5, 2, 3, 1.5, 2.5, 2, 3, 2, 1.5, 2.5];
+      for(let i = 0; i < 10; i++){
+        const angle = sugarAngles[i];
+        const dist = sugarDists[i] * ball.radius * 0.8;
+        const dotX = ball.x + Math.cos(angle) * dist;
+        const dotY = ball.y - ball.radius * 0.2 + Math.sin(angle) * dist * 0.5;
+        const dotSize = sugarSizes[i];
+        ctx.beginPath();
+        ctx.arc(dotX, dotY, dotSize, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // Extra grote poedersuiker klodders bovenop
+      ctx.fillStyle = `hsla(0,0%,${98*lightMul}%,0.85)`;
+      ctx.beginPath();
+      ctx.arc(ball.x - ball.radius * 0.2, ball.y - ball.radius * 0.5, ball.radius * 0.18, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(ball.x + ball.radius * 0.25, ball.y - ball.radius * 0.4, ball.radius * 0.14, 0, Math.PI * 2);
+      ctx.fill();
+
     } else if(isChristmas()){
       // Kerst: echte kerstbal met kroontje
       const lightMul = lightsOn ? 1 : 0.7;
@@ -2105,7 +2491,7 @@ function drawPlayBalls(){
     // Fade out effect in laatste seconden
     if(ball.ttl < 120){ // Laatste 2 seconden
       ctx.globalAlpha = ball.ttl / 120;
-      ctx.strokeStyle = isHalloween() ? '#ff8c42' : ball.color.light;
+      ctx.strokeStyle = isHalloween() ? '#ff8c42' : isNewYear() ? '#d4a056' : ball.color.light;
       ctx.lineWidth = 3;
       ctx.setLineDash([8, 8]);
       ctx.beginPath();
@@ -2996,6 +3382,168 @@ function drawDecoration(deco,time){
         ctx.fill();
       }
     }
+  }
+  else if(deco.type==='oliebollen'){
+    const x=deco.x;
+    const y=deco.y+bobAmount;
+    const bolSize=deco.size*0.25;
+
+    // Schaaltje/bordje
+    const plateWidth=deco.size*0.9;
+    const plateHeight=deco.size*0.12;
+    const plateGrad=ctx.createLinearGradient(x-plateWidth/2,y+bolSize*0.8,x+plateWidth/2,y+bolSize*0.8+plateHeight);
+    plateGrad.addColorStop(0,`hsla(0,0%,${90*lightMul}%,${fadeAlpha})`);
+    plateGrad.addColorStop(0.5,`hsla(0,0%,${98*lightMul}%,${fadeAlpha})`);
+    plateGrad.addColorStop(1,`hsla(0,0%,${85*lightMul}%,${fadeAlpha})`);
+    ctx.fillStyle=plateGrad;
+    ctx.beginPath();
+    ctx.ellipse(x,y+bolSize*0.9,plateWidth/2,plateHeight,0,0,Math.PI*2);
+    ctx.fill();
+
+    // Oliebollen (4 bollen op een stapeltje) - statische posities
+    const bollen=[
+      {ox:-bolSize*0.7,oy:0},
+      {ox:bolSize*0.7,oy:0},
+      {ox:0,oy:-bolSize*0.3},
+      {ox:0,oy:bolSize*0.5}
+    ];
+
+    // Statische poedersuiker posities per bol (seeded by deco.bobPhase)
+    const sugarSeeds=[
+      [0.2,0.8,1.4,2.1,2.7,3.3,3.9,4.5,5.0,5.6,0.5,1.1,1.7,2.4,3.0],
+      [0.4,1.0,1.6,2.3,2.9,3.5,4.1,4.7,5.2,5.8,0.7,1.3,1.9,2.6,3.2],
+      [0.6,1.2,1.8,2.5,3.1,3.7,4.3,4.9,5.4,0.1,0.9,1.5,2.0,2.8,3.4],
+      [0.3,0.9,1.5,2.2,2.8,3.4,4.0,4.6,5.1,5.7,0.6,1.2,1.8,2.5,3.1]
+    ];
+    const sugarDists=[0.3,0.5,0.2,0.6,0.4,0.55,0.35,0.45,0.25,0.5,0.4,0.3,0.55,0.2,0.6];
+    const sugarSizes=[2,1.5,2.5,1,2,1.5,2,2.5,1,1.5,2,1,2.5,1.5,2];
+
+    for(let bi=0;bi<bollen.length;bi++){
+      const bol=bollen[bi];
+      const bx=x+bol.ox;
+      const by=y+bol.oy;
+
+      // Oliebol basis (goudbruin)
+      const bolGrad=ctx.createRadialGradient(bx-bolSize*0.2,by-bolSize*0.2,0,bx,by,bolSize);
+      bolGrad.addColorStop(0,`hsla(35,55%,${55*lightMul}%,${fadeAlpha})`);
+      bolGrad.addColorStop(0.7,`hsla(30,60%,${40*lightMul}%,${fadeAlpha})`);
+      bolGrad.addColorStop(1,`hsla(25,50%,${30*lightMul}%,${fadeAlpha})`);
+      ctx.fillStyle=bolGrad;
+      ctx.beginPath();
+      ctx.arc(bx,by,bolSize,0,Math.PI*2);
+      ctx.fill();
+
+      // Krokante textuur (statische donkere stipjes)
+      ctx.fillStyle=`hsla(25,40%,${25*lightMul}%,${fadeAlpha*0.5})`;
+      for(let i=0;i<6;i++){
+        const angle=i*Math.PI/3+deco.bobPhase;
+        const dist=bolSize*0.5;
+        const dotX=bx+Math.cos(angle)*dist;
+        const dotY=by+Math.sin(angle)*dist;
+        ctx.beginPath();
+        ctx.arc(dotX,dotY,bolSize*0.08,0,Math.PI*2);
+        ctx.fill();
+      }
+
+      // Poedersuiker (statische witte stipjes - veel meer!)
+      ctx.fillStyle=`hsla(0,0%,${100*lightMul}%,${fadeAlpha*0.95})`;
+      const seeds=sugarSeeds[bi];
+      for(let i=0;i<15;i++){
+        const angle=seeds[i];
+        const dist=sugarDists[i]*bolSize*0.7;
+        const dotX=bx+Math.cos(angle)*dist;
+        const dotY=by-bolSize*0.25+Math.sin(angle)*dist*0.4;
+        const dotSize=sugarSizes[i];
+        ctx.beginPath();
+        ctx.arc(dotX,dotY,dotSize,0,Math.PI*2);
+        ctx.fill();
+      }
+
+      // Extra grote poedersuiker klodders bovenop
+      ctx.fillStyle=`hsla(0,0%,${98*lightMul}%,${fadeAlpha*0.85})`;
+      ctx.beginPath();
+      ctx.arc(bx-bolSize*0.15,by-bolSize*0.4,bolSize*0.15,0,Math.PI*2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(bx+bolSize*0.2,by-bolSize*0.35,bolSize*0.12,0,Math.PI*2);
+      ctx.fill();
+    }
+  }
+  else if(deco.type==='champagne'){
+    const x=deco.x;
+    const y=deco.y+bobAmount;
+    const bottleHeight=deco.size*1.1;
+    const bottleWidth=deco.size*0.28;
+    const neckWidth=bottleWidth*0.35;
+
+    // Schuin kantelen - roteer canvas (richting gebaseerd op bobPhase)
+    ctx.save();
+    ctx.translate(x,y);
+    const tiltDirection=deco.bobPhase>Math.PI?1:-1; // Links of rechts kantelen
+    ctx.rotate(tiltDirection*0.35); // ~20 graden kantelen
+
+    // Fles body (donkergroen glas)
+    const bodyGrad=ctx.createLinearGradient(-bottleWidth/2,0,bottleWidth/2,0);
+    bodyGrad.addColorStop(0,`hsla(140,45%,${15*lightMul}%,${fadeAlpha})`);
+    bodyGrad.addColorStop(0.3,`hsla(140,40%,${25*lightMul}%,${fadeAlpha})`);
+    bodyGrad.addColorStop(0.7,`hsla(140,40%,${22*lightMul}%,${fadeAlpha})`);
+    bodyGrad.addColorStop(1,`hsla(140,45%,${12*lightMul}%,${fadeAlpha})`);
+    ctx.fillStyle=bodyGrad;
+
+    // Fles body shape (relatief aan 0,0)
+    ctx.beginPath();
+    ctx.moveTo(-bottleWidth/2,bottleHeight*0.35); // Links onder
+    ctx.lineTo(-bottleWidth/2,-bottleHeight*0.1); // Links boven body
+    ctx.quadraticCurveTo(-bottleWidth/2,-bottleHeight*0.2,-neckWidth/2,-bottleHeight*0.28); // Shoulder
+    ctx.lineTo(-neckWidth/2,-bottleHeight*0.52); // Nek links
+    ctx.lineTo(neckWidth/2,-bottleHeight*0.52); // Nek rechts
+    ctx.lineTo(neckWidth/2,-bottleHeight*0.28); // Nek onder rechts
+    ctx.quadraticCurveTo(bottleWidth/2,-bottleHeight*0.2,bottleWidth/2,-bottleHeight*0.1); // Shoulder
+    ctx.lineTo(bottleWidth/2,bottleHeight*0.35); // Rechts onder
+    ctx.closePath();
+    ctx.fill();
+
+    // Gouden folie rond de nek
+    ctx.fillStyle=`hsla(45,80%,${55*lightMul}%,${fadeAlpha})`;
+    ctx.beginPath();
+    ctx.rect(-neckWidth/2-3,-bottleHeight*0.52,neckWidth+6,bottleHeight*0.12);
+    ctx.fill();
+
+    // Open fles - donkere opening bovenaan (geen kurk)
+    ctx.fillStyle=`hsla(140,30%,${8*lightMul}%,${fadeAlpha})`;
+    ctx.beginPath();
+    ctx.ellipse(0,-bottleHeight*0.52,neckWidth/2,neckWidth*0.2,0,0,Math.PI*2);
+    ctx.fill();
+
+    // Gouden rand rond opening
+    ctx.strokeStyle=`hsla(45,70%,${50*lightMul}%,${fadeAlpha})`;
+    ctx.lineWidth=2;
+    ctx.beginPath();
+    ctx.ellipse(0,-bottleHeight*0.52,neckWidth/2+1,neckWidth*0.25,0,0,Math.PI*2);
+    ctx.stroke();
+
+    // Label (crème kleur)
+    ctx.fillStyle=`hsla(40,30%,${85*lightMul}%,${fadeAlpha})`;
+    ctx.beginPath();
+    ctx.rect(-bottleWidth*0.38,-bottleHeight*0.08,bottleWidth*0.76,bottleHeight*0.28);
+    ctx.fill();
+
+    // Label tekst/decoratie (gouden lijnen)
+    ctx.fillStyle=`hsla(45,60%,${50*lightMul}%,${fadeAlpha})`;
+    ctx.beginPath();
+    ctx.rect(-bottleWidth*0.28,bottleHeight*0.0,bottleWidth*0.56,bottleHeight*0.025);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.rect(-bottleWidth*0.28,bottleHeight*0.05,bottleWidth*0.56,bottleHeight*0.025);
+    ctx.fill();
+
+    // Glans op fles
+    ctx.fillStyle=`hsla(0,0%,100%,${fadeAlpha*0.18})`;
+    ctx.beginPath();
+    ctx.ellipse(-bottleWidth*0.22,0,bottleWidth*0.06,bottleHeight*0.22,0,0,Math.PI*2);
+    ctx.fill();
+
+    ctx.restore();
   }
 }
 
@@ -5525,6 +6073,7 @@ for(let i=0;i<backPlants.length;i++){drawPlant(backPlants[i],t)}
 for(let i=0;i<backDecorations.length;i++){drawDecoration(backDecorations[i],t)}
 
 if(pumpOn&&Math.random()<0.6*performanceProfile.particleCount){for(let i=0;i<2;i++)makeBubble()}
+drawPumpChampagne(); // Champagne fles bij pump (nieuwjaar)
 drawBubbles();drawFood();drawPoops();
 
 // Fish layer - update and draw with adaptive rate

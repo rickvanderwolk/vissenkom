@@ -101,7 +101,12 @@ function getCurrentTheme() {
         return 'christmas';
     }
 
-    // Automatic seasonal themes disabled - only normal, halloween, and christmas
+    // New Year: December 29 - January 2 (inclusive)
+    if ((month === 11 && day >= 29) || (month === 0 && day <= 2)) {
+        return 'newyear';
+    }
+
+    // Automatic seasonal themes disabled - only normal, halloween, christmas, and newyear
     // // Spring: March 21 - June 20
     // if ((month === 2 && day >= 21) || (month > 2 && month < 5) || (month === 5 && day <= 20)) {
     //     return 'spring';
@@ -1082,7 +1087,7 @@ function handleToggleHeating() {
 
 function handleCycleTheme() {
     // Theme cycle order
-    const themes = ['normal', 'spring', 'summer', 'autumn', 'winter', 'tropical', 'arctic', 'halloween', 'christmas'];
+    const themes = ['normal', 'spring', 'summer', 'autumn', 'winter', 'tropical', 'arctic', 'halloween', 'christmas', 'newyear'];
 
     // Get current theme (from config or auto)
     const oldTheme = getCurrentTheme();
