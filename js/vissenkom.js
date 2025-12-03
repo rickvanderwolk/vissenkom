@@ -5031,6 +5031,9 @@ function drawActivityList(){
         const arrivalFishName=event.data.name||'Vis';
         label=`${arrivalFishName} is ziek · ${timeStr}`;
         break;
+      case 'invalid_access_code':
+        // Niet tonen in activity feed
+        continue;
       default:
         emoji='📝';
         label=`${event.type} · ${timeStr}`;

@@ -1952,7 +1952,12 @@ wss.on('connection', (ws, req) => {
     if (isController) {
         // Validate access code for controller connections
         if (!providedCode || !isValidAccessCode(providedCode)) {
-            console.log('Controller ongeldige code:', providedCode);
+            console.log('⚠️ Controller ongeldige code:', providedCode);
+
+            // Log failed access attempt
+            logEvent('invalid_access_code', {
+                providedCode: providedCode || '(geen)'
+            });
 
             // Send error and close connection
             sendToClient(ws, {
