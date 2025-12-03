@@ -987,6 +987,96 @@ function drawCatchPopup(time){
   ctx.restore();
 }
 
+function drawErrorPopup(){
+  // Bepaal welke error we tonen
+  const isDisconnected=wsConnectedOnce&&!wsConnected;
+  const isAlreadyActive=alreadyActiveError;
+
+  if(!isDisconnected&&!isAlreadyActive)return;
+
+  ctx.save();
+
+  // Donkere overlay over hele canvas
+  ctx.fillStyle='rgba(0,0,0,0.5)';
+  ctx.fillRect(0,0,cv.width,cv.height);
+
+  // Popup box (centered) - zelfde stijl als catch popup
+  const boxW=Math.min(400,W*0.6);
+  const boxH=160;
+  const boxX=(cv.width-boxW)/2;
+  const boxY=(cv.height-boxH)/2;
+  const pad=20;
+
+  // Subtiele schaduw
+  ctx.fillStyle='rgba(0,0,0,0.25)';
+  ctx.beginPath();
+  ctx.roundRect(boxX+4,boxY+4,boxW,boxH,10);
+  ctx.fill();
+
+  // Main box
+  ctx.fillStyle=lightsOn?'rgba(255,255,255,0.85)':'rgba(0,0,0,0.5)';
+  ctx.beginPath();
+  ctx.roundRect(boxX,boxY,boxW,boxH,10);
+  ctx.fill();
+
+  ctx.fillStyle=lightsOn?'#0b1e2d':'#e9f1f7';
+  ctx.font='700 20px system-ui,Segoe UI,Roboto,Arial';
+  ctx.textAlign='center';
+  ctx.textBaseline='top';
+
+  if(isAlreadyActive){
+    // Already active error
+    ctx.fillText('Vissenkom al actief',boxX+boxW/2,boxY+pad);
+
+    ctx.globalAlpha=0.7;
+    ctx.font='400 16px system-ui,Segoe UI,Roboto,Arial';
+    ctx.fillText('Er is al een ander scherm actief',boxX+boxW/2,boxY+pad+32);
+
+    ctx.font='400 14px system-ui,Segoe UI,Roboto,Arial';
+    ctx.fillText('Sluit dat scherm of herlaad deze pagina',boxX+boxW/2,boxY+pad+58);
+  }else{
+    // Disconnected error
+    ctx.fillText('Geen verbinding',boxX+boxW/2,boxY+pad);
+
+    // Status: verbinden of wachten?
+    const now=Date.now();
+    const isConnecting=wsNextRetryAt===0;
+    const secondsUntilRetry=isConnecting?0:Math.max(0,Math.ceil((wsNextRetryAt-now)/1000));
+
+    ctx.globalAlpha=0.7;
+    ctx.font='400 16px system-ui,Segoe UI,Roboto,Arial';
+
+    if(isConnecting){
+      ctx.fillText('Verbinden...',boxX+boxW/2,boxY+pad+32);
+    }else{
+      ctx.fillText(`Volgende poging over ${secondsUntilRetry}s`,boxX+boxW/2,boxY+pad+32);
+    }
+
+    // Poging teller
+    ctx.font='400 14px system-ui,Segoe UI,Roboto,Arial';
+    ctx.fillText(`poging ${wsReconnectAttempts}`,boxX+boxW/2,boxY+pad+58);
+
+    // Animated spinner dots (alleen bij verbinden)
+    if(isConnecting){
+      const dotY=boxY+boxH-pad-10;
+      const dotSpacing=12;
+      const numDots=3;
+      const startX=boxX+boxW/2-(numDots-1)*dotSpacing/2;
+
+      for(let i=0;i<numDots;i++){
+        const phase=(now/300+i)%3;
+        const alpha=phase<1?0.3+0.7*phase:phase<2?1:1-0.7*(phase-2);
+        ctx.globalAlpha=alpha;
+        ctx.beginPath();
+        ctx.arc(startX+i*dotSpacing,dotY,3,0,Math.PI*2);
+        ctx.fill();
+      }
+    }
+  }
+
+  ctx.restore();
+}
+
 function updateFishingRod(time){
   if(fishingRod.state==='idle')return;
 
@@ -4519,6 +4609,9 @@ let gameLoopStarted = false; // Track if game loop has been started
 let wsReconnectAttempts = 0; // Track reconnection attempts
 let wsConnectedOnce = false; // Track if we've successfully connected before
 let wsReconnectTimer = null; // Track reconnection timer for cleanup
+let wsConnected = false; // Track current connection status for UI
+let wsNextRetryAt = 0; // Timestamp when next retry will happen (0 = connecting now)
+let alreadyActiveError = false; // Track if vissenkom is already active elsewhere
 
 // Safe WebSocket send with error handling
 function sendToServer(data) {
@@ -4547,6 +4640,8 @@ function initWebSocket() {
 
         ws.onopen = function() {
             console.log('WebSocket verbonden met server');
+            wsConnected = true;
+            document.body.classList.remove('error-state');
 
             // If this is a reconnection after being connected before, refresh the page
             // This ensures we get fresh data and QR codes after server restart
@@ -4596,7 +4691,9 @@ function initWebSocket() {
         };
 
         ws.onclose = function() {
+            wsConnected = false;
             wsReconnectAttempts++;
+            if(wsConnectedOnce) document.body.classList.add('error-state');
 
             // Clear any existing reconnect timer
             if (wsReconnectTimer) {
@@ -4608,8 +4705,10 @@ function initWebSocket() {
             const delay = Math.min(3000 * Math.pow(2, wsReconnectAttempts - 1), 30000);
             console.log(`WebSocket verbinding gesloten, probeer opnieuw in ${delay/1000}s... (poging ${wsReconnectAttempts})`);
 
+            wsNextRetryAt = Date.now() + delay;
             wsReconnectTimer = setTimeout(() => {
                 wsReconnectTimer = null;
+                wsNextRetryAt = 0;
                 initWebSocket();
             }, delay);
         };
@@ -4620,6 +4719,7 @@ function initWebSocket() {
         };
     } catch (error) {
         console.error('Kan geen WebSocket verbinding maken:', error);
+        wsConnected = false;
         wsReconnectAttempts++;
 
         // Clear any existing reconnect timer
@@ -4628,10 +4728,12 @@ function initWebSocket() {
             wsReconnectTimer = null;
         }
 
-        // Exponential backoff on error
+        // Exponential backoff: 3s, 6s, 12s, 24s, max 30s
         const delay = Math.min(3000 * Math.pow(2, wsReconnectAttempts - 1), 30000);
+        wsNextRetryAt = Date.now() + delay;
         wsReconnectTimer = setTimeout(() => {
             wsReconnectTimer = null;
+            wsNextRetryAt = 0;
             initWebSocket();
         }, delay);
     }
@@ -5521,6 +5623,15 @@ ctx.clip();
 
 // Background layer
 drawSandBottom(t/60);
+
+// Als disconnected of already active: alleen achtergrond tonen, geen vissen/planten/etc
+if((wsConnectedOnce&&!wsConnected)||alreadyActiveError){
+  ctx.restore();
+  drawErrorPopup();
+  requestAnimationFrame(loop);
+  return;
+}
+
 for(let i=0;i<backPlants.length;i++){drawPlant(backPlants[i],t)}
 for(let i=0;i<backDecorations.length;i++){drawDecoration(backDecorations[i],t)}
 
@@ -5561,6 +5672,9 @@ ctx.restore();
 
 // Draw catch popup overlay (boven alles, full screen)
 drawCatchPopup(t);
+
+// Draw error popup overlay (disconnected of already active)
+drawErrorPopup();
 
 for(let i=fishes.length-1;i>=0;i--){if(fishes[i].dead){const deadFish={name:fishes[i].name,bornAt:fishes[i].bornAt,diedAt:Date.now()};deadLog.push(deadFish);fishes.splice(i,1);sendToServer({command:'fishDied',fish:deadFish})}}
 
@@ -5605,69 +5719,20 @@ requestAnimationFrame(loop)}
 
 // Show error when vissenkom is already active elsewhere
 function showVisssenkomAlreadyActiveError(message) {
-    // Stop game loop to prevent resource waste
-    gameLoopStarted = false;
-    console.log('🛑 Game loop stopped due to already active error');
+    console.log('🛑 Vissenkom already active:', message);
 
     // Hide loading indicator if it's still showing
     hideLoadingIndicator();
 
-    // Create error overlay
-    const overlay = document.createElement('div');
-    overlay.id = 'vissenkom-error-overlay';
-    overlay.style.cssText = `
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0, 0, 0, 0.95);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        z-index: 10000;
-        font-family: 'Segoe UI', Arial, sans-serif;
-    `;
+    // Set flag for canvas-based error popup
+    alreadyActiveError = true;
+    document.body.classList.add('error-state');
 
-    // Create error content
-    const content = document.createElement('div');
-    content.style.cssText = `
-        background: white;
-        padding: 40px;
-        border-radius: 12px;
-        text-align: center;
-        max-width: 400px;
-        margin: 20px;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-    `;
-
-    content.innerHTML = `
-        <div style="font-size: 48px; color: #ff6b6b; margin-bottom: 20px;">⚠️</div>
-        <h2 style="color: #333; margin: 0 0 15px 0; font-size: 24px;">Vissenkom al actief</h2>
-        <p style="color: #666; margin: 0 0 25px 0; line-height: 1.5;">${message}</p>
-        <button onclick="location.reload()" style="
-            background: #50e3c2;
-            color: white;
-            border: none;
-            padding: 12px 24px;
-            border-radius: 6px;
-            font-size: 16px;
-            cursor: pointer;
-            transition: background 0.2s;
-        " onmouseover="this.style.background='#45d4b3'" onmouseout="this.style.background='#50e3c2'">
-            Probeer opnieuw
-        </button>
-    `;
-
-    overlay.appendChild(content);
-    document.body.appendChild(overlay);
-
-    // Disable canvas and other interactions
-    const canvas = document.getElementById('canvas');
-    if (canvas) {
-        canvas.style.pointerEvents = 'none';
-        canvas.style.filter = 'blur(3px)';
+    // Start game loop if not already running (needed to show the popup)
+    if (!gameLoopStarted) {
+        gameLoopStarted = true;
+        requestAnimationFrame(loop);
     }
 
-    console.log('🚫 Vissenkom error overlay shown');
+    console.log('🚫 Vissenkom already active error set');
 }

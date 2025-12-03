@@ -1,4 +1,5 @@
 html,body{height:100%;margin:0;overflow:hidden;background:#000}
+body.error-state .side,body.error-state .statusbar,body.error-state .top-banner{display:none}
 body{font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;display:flex;flex-direction:column;transition:color .2s ease, background .2s ease}
 body.dark{background:#000;color:#e9f1f7}
 body.light{background:#000;color:#0b1e2d}
