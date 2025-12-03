@@ -5033,7 +5033,7 @@ function drawActivityList(){
         break;
       case 'invalid_access_code':
         // Niet tonen in activity feed
-        continue;
+        return;
       default:
         emoji='📝';
         label=`${event.type} · ${timeStr}`;
