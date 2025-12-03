@@ -91,18 +91,18 @@ function getCurrentTheme() {
     const month = now.getMonth(); // 0-11 (0=January, 9=October)
     const day = now.getDate(); // 1-31
 
-    // Halloween: October 29 - November 2 (inclusive)
-    if ((month === 9 && day >= 29) || (month === 10 && day <= 2)) {
+    // Halloween: October 25 - November 1 (inclusive)
+    if ((month === 9 && day >= 25) || (month === 10 && day <= 1)) {
         return 'halloween';
     }
 
-    // Christmas: December 22 - December 28 (inclusive)
-    if (month === 11 && day >= 22 && day <= 28) {
+    // Christmas: December 19 - December 26 (inclusive)
+    if (month === 11 && day >= 19 && day <= 26) {
         return 'christmas';
     }
 
-    // New Year: December 28 - January 6 (inclusive)
-    if ((month === 11 && day >= 28) || (month === 0 && day <= 6)) {
+    // New Year: December 27 - January 6 (inclusive)
+    if ((month === 11 && day >= 27) || (month === 0 && day <= 6)) {
         return 'newyear';
     }
 
