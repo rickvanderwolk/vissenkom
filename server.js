@@ -2038,11 +2038,12 @@ wss.on('connection', (ws, req) => {
 });
 
 // Start HTTP server
-server.listen(3000, async () => {
-    console.log('HTTP server luistert op http://localhost:3000');
-    console.log('WebSocket server gestart op dezelfde poort (3000)');
-    console.log('Bezoek http://localhost:3000 voor de vissenkom');
-    console.log('Bezoek http://localhost:3000/controller voor de controller');
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, async () => {
+    console.log(`HTTP server luistert op http://localhost:${PORT}`);
+    console.log(`WebSocket server gestart op dezelfde poort (${PORT})`);
+    console.log(`Bezoek http://localhost:${PORT} voor de vissenkom`);
+    console.log(`Bezoek http://localhost:${PORT}/controller voor de controller`);
 
     // Load game logic functions
     gameLogic = await import('./src/gameLogic.js');

@@ -23,6 +23,12 @@ npm start
 
 Ga naar http://localhost:3000
 
+## Zelf hosten (één klik)
+
+[![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/new/template?template=https://github.com/rickvanderwolk/vissenkom)
+
+Klik op de knop hierboven om je eigen Vissenkom te starten op Railway. Gratis tier beschikbaar (~500 uur/maand).
+
 ## Configuratie (optioneel)
 
 De applicatie werkt direct zonder configuratie. Als je de footer in de controller wilt aanpassen, kopieer dan `config.example.json` naar `config.json` en pas de waarden aan:
