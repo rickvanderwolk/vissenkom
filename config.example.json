@@ -4,8 +4,8 @@
   "showFooter": true,
   "footerLink": "https://github.com/rickvanderwolk/vissenkom",
   "footerLinkText": "View on GitHub",
-  "showBehaviorEmoji": false,
-  "showControllerStatusBlocks": true,
+  "showBehaviorEmoji": true,
+  "showControllerStatusBlocks": false,
   "viewport": {
     "offsetTop": 0,
     "offsetBottom": 0,
