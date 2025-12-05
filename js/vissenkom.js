@@ -96,6 +96,7 @@ function isHalloween(){return currentTheme==='halloween'}
 function isChristmas(){return currentTheme==='christmas'}
 function isNewYear(){return currentTheme==='newyear'}
 function isWinter(){return currentTheme==='winter'}
+function isSummer(){return currentTheme==='summer'}
 function hasDecoration(type){return getThemeConfig().decorations.includes(type)}
 
 // Theme configurations
@@ -128,7 +129,7 @@ const THEMES={
     vignette:0.10,
     foodColors:['#ffb37a','#ff9800','#ffeb3b'],
     bubbleColor:'#81d4fa',
-    decorations:[]
+    decorations:['parasol']
   },
   autumn:{
     name:'Herfst',
@@ -407,6 +408,16 @@ function setupDecorations(){
     const maxY=H-sandHeight+20;
     const y=rand(minY,maxY);
     decorations.push({type:'champagne',x,y,size,bobPhase,zIndex});
+  }
+
+  // Zomer: parasol
+  if(isSummer()){
+    const x=rand(100,W-100);
+    const size=rand(80,120);
+    const bobPhase=rand(0,Math.PI*2);
+    const zIndex='back';
+    const y=H-sandHeight+15;
+    decorations.push({type:'parasol',x,y,size,bobPhase,zIndex});
   }
 }
 function lampHueFor(L,time){
@@ -2527,6 +2538,35 @@ function drawPlayBalls(){
       ctx.arc(ball.x + ball.radius * 0.25, ball.y - ball.radius * 0.4, ball.radius * 0.14, 0, Math.PI * 2);
       ctx.fill();
 
+    } else if(isSummer()){
+      // Zomer: strandbal met rood-witte strepen
+      const lightMul = lightsOn ? 1 : 0.7;
+
+      // Witte basis
+      ctx.fillStyle = `rgba(255,255,255,${lightMul})`;
+      ctx.beginPath();
+      ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Afwisselend rode en witte strepen (3 rood, 3 wit)
+      const numStripes = 6;
+      for(let i = 0; i < numStripes; i++){
+        const startAngle = (i * 2 * Math.PI / numStripes);
+        const endAngle = startAngle + (2 * Math.PI / numStripes);
+        ctx.fillStyle = i % 2 === 0 ? `rgba(220,20,60,${lightMul})` : `rgba(255,255,255,${lightMul})`;
+        ctx.beginPath();
+        ctx.moveTo(ball.x, ball.y);
+        ctx.arc(ball.x, ball.y, ball.radius, startAngle, endAngle);
+        ctx.closePath();
+        ctx.fill();
+      }
+
+      // Witte glans (linksboven)
+      ctx.fillStyle = `rgba(255,255,255,${0.5*lightMul})`;
+      ctx.beginPath();
+      ctx.arc(ball.x - ball.radius * 0.35, ball.y - ball.radius * 0.35, ball.radius * 0.25, 0, Math.PI * 2);
+      ctx.fill();
+
     } else if(isChristmas()){
       // Kerst: echte kerstbal met kroontje
       const lightMul = lightsOn ? 1 : 0.7;
@@ -3658,6 +3698,50 @@ function drawDecoration(deco,time){
     ctx.fill();
 
     ctx.restore();
+  }
+  else if(deco.type==='parasol'){
+    const x=deco.x;
+    const y=deco.y+bobAmount;
+
+    // Stok (houten paal)
+    const poleHeight=deco.size*1.2;
+    const poleWidth=deco.size*0.06;
+    ctx.fillStyle=`hsla(30,40%,${35*lightMul}%,1)`;
+    ctx.fillRect(x-poleWidth/2,y-poleHeight,poleWidth,poleHeight);
+
+    // Parasol scherm (driehoekige kegel met strepen)
+    const umbrellaWidth=deco.size*1.2;
+    const umbrellaHeight=deco.size*0.4;
+    const topY=y-poleHeight-umbrellaHeight;
+    const bottomY=y-poleHeight+umbrellaHeight*0.1;
+
+    // Afwisselend rode en witte strepen (8 segmenten)
+    const numStripes=8;
+    for(let i=0;i<numStripes;i++){
+      const leftX=x-umbrellaWidth/2+(i*umbrellaWidth/numStripes);
+      const rightX=x-umbrellaWidth/2+((i+1)*umbrellaWidth/numStripes);
+      ctx.fillStyle=i%2===0?`rgba(220,20,60,${lightMul})`:`rgba(255,255,255,${lightMul})`;
+      ctx.beginPath();
+      ctx.moveTo(x,topY);
+      ctx.lineTo(leftX,bottomY);
+      ctx.lineTo(rightX,bottomY);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    // Lichte schaduwlijn onderaan voor diepte
+    ctx.strokeStyle=`rgba(150,20,40,${0.5*lightMul})`;
+    ctx.lineWidth=1.5;
+    ctx.beginPath();
+    ctx.moveTo(x-umbrellaWidth/2,bottomY);
+    ctx.lineTo(x+umbrellaWidth/2,bottomY);
+    ctx.stroke();
+
+    // Topje van de parasol
+    ctx.fillStyle=`rgba(220,20,60,${lightMul})`;
+    ctx.beginPath();
+    ctx.arc(x,topY,deco.size*0.06,0,Math.PI*2);
+    ctx.fill();
   }
 }
 
