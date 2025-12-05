@@ -5263,7 +5263,7 @@ function fallbackToExternalQR(canvas, controllerUrl, accessCode) {
 // WebSocket connection for receiving commands
 let ws = null;
 let currentVersion = null; // Store current version to detect changes
-let appConfig = { showBehaviorEmoji: false }; // Store config from server
+let appConfig = { showBehaviorEmoji: true }; // Store config from server
 let gameLoopStarted = false; // Track if game loop has been started
 let wsReconnectAttempts = 0; // Track reconnection attempts
 let wsConnectedOnce = false; // Track if we've successfully connected before
