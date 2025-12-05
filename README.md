@@ -84,7 +84,8 @@ Je kunt een vissenkom op je eigen server draaien. Hiervoor heb je Node en NPM no
 3. (Optioneel) Persistente data: Data blijft standaard niet bewaard bij een nieuwe deploy, waardoor vissen en andere data verloren gaan. Om data tussen (re)deploys te behouden, ga je naar je project canvas, rechtermuisklik op het canvas → **New Volume** → selecteer je service → mount path `/data`
 4. Open de vissenkom: Open de gegenereerde URL in je browser
 
-Gratis tier beschikbaar (~500 uur/maand). Daarna ongeveer $5 per maand om continu te draaien.
+* *Gratis tier beschikbaar (~500 uur/maand). Daarna ongeveer $5 per maand om continu te draaien.*
+
 
 * *Niet geaffilieerd met Railway. Ik zocht een optie waarbij mensen binnen een paar klikken / minuten hun eigen vissenkom online hebben. Dit leek een goede optie. Suggesties of feedback? Altijd welkom!* 
 
