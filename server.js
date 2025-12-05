@@ -2040,10 +2040,13 @@ wss.on('connection', (ws, req) => {
 // Start HTTP server
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, async () => {
-    console.log(`HTTP server luistert op http://localhost:${PORT}`);
-    console.log(`WebSocket server gestart op dezelfde poort (${PORT})`);
-    console.log(`Bezoek http://localhost:${PORT} voor de vissenkom`);
-    console.log(`Bezoek http://localhost:${PORT}/controller voor de controller`);
+    const publicDomain = process.env.RAILWAY_PUBLIC_DOMAIN;
+    const baseUrl = publicDomain ? `https://${publicDomain}` : `http://localhost:${PORT}`;
+
+    console.log(`HTTP server luistert op poort ${PORT}`);
+    console.log(`WebSocket server gestart op dezelfde poort`);
+    console.log(`Bezoek ${baseUrl} voor de vissenkom`);
+    console.log(`Bezoek ${baseUrl}/controller voor de controller`);
 
     // Load game logic functions
     gameLogic = await import('./src/gameLogic.js');
