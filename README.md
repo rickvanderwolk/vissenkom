@@ -86,7 +86,7 @@ Je kunt een vissenkom op je eigen server draaien. Hiervoor heb je Node en NPM no
 
 Gratis tier beschikbaar (~500 uur/maand). Daarna ongeveer $5 per maand om continu te draaien.
 
-* *Niet geaffilieerd met Railway. Ik zocht een optie waarbij mensen binnen een paar minuten hun eigen vissenkom online hebben. Dit leek een goede optie. Suggesties of feedback? Altijd welkom!* 
+* *Niet geaffilieerd met Railway. Ik zocht een optie waarbij mensen binnen een paar klikken / minuten hun eigen vissenkom online hebben. Dit leek een goede optie. Suggesties of feedback? Altijd welkom!* 
 
 ## Configuratie (optioneel)
 
