@@ -14,7 +14,7 @@ Een virtuele vissenkom op je scherm. Voeg vissen toe, geef ze eten, speel met ze
 
 ### Introductie
 
-Vissenkom bestaat uit twee onderdelen: een display (de vissenkom zelf) en een controller (de afstandsbediening). Het display draait op één apparaat en toont de kom met een QR-code. Scan de code met je telefoon om de controller te openen en acties uit te voeren. De QR-code is maximaal één uur geldig — daarna moet je terug naar de kom om hem opnieuw te scannen.
+Vissenkom bestaat uit drie onderdelen: een server (draait op de achtergrond), een display (de vissenkom zelf) en een controller (de afstandsbediening). Het display draait op (maximaal) één apparaat en toont de kom met een QR-code. Scan de code met je telefoon om de controller te openen en acties uit te voeren. De QR-code is maximaal één uur geldig — daarna moet je terug naar de kom om hem opnieuw te scannen.
 
 ### Ecosysteem
 
