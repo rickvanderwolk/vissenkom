@@ -96,15 +96,15 @@ cp config.example.json config.json
 
 Beschikbare opties:
 
-| Optie | Beschrijving | Standaard |
-|-------|-------------|-----------|
-| `theme` | Thema van de vissenkom. Opties: `null` (automatisch op basis van seizoen), `normal`, `spring`, `summer`, `autumn`, `winter`, `tropical`, `arctic`, `halloween`, `christmas` | `null` |
-| `showFooter` | Toon de footer in de controller | `true` |
-| `footerLink` | URL waar de footer naartoe linkt | `https://github.com/rickvanderwolk/vissenkom` |
-| `footerLinkText` | Tekst van de link in de footer | `View on GitHub` |
-| `showBehaviorEmoji` | Toon emoji's bij vissen die hun huidige gedrag weergeven (bijv. dansen, rusten, schooling) | `true` |
-| `showControllerStatusBlocks` | Toon statusblokken in de controller (temperatuur, pomp, etc.) | `false` |
-| `viewport` | Object met `offsetTop`, `offsetBottom`, `offsetLeft`, `offsetRight` om het zichtbare gebied aan te passen (handig voor schermen met randen) | `0` voor alle waarden |
+| Optie | Beschrijving                                                                                                                                                                                                                                      | Standaard |
+|-------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------|
+| `theme` | Thema van de vissenkom. Opties: `null` (automatisch op basis van seizoen, nu alleen `normal`, `halloween`, `christmas` en `newyear`), `normal`, `spring`, `summer`, `autumn`, `winter`, `tropical`, `arctic`, `halloween`, `christmas`, `newyear` | `null` |
+| `showFooter` | Toon de footer in de controller                                                                                                                                                                                                                   | `true` |
+| `footerLink` | URL waar de footer naartoe linkt                                                                                                                                                                                                                  | `https://github.com/rickvanderwolk/vissenkom` |
+| `footerLinkText` | Tekst van de link in de footer                                                                                                                                                                                                                    | `View on GitHub` |
+| `showBehaviorEmoji` | Toon emoji's bij vissen die hun huidige gedrag weergeven (bijv. dansen, rusten, schooling)                                                                                                                                                        | `true` |
+| `showControllerStatusBlocks` | Toon statusblokken in de controller (temperatuur, pomp, etc.)                                                                                                                                                                                     | `false` |
+| `viewport` | Object met `offsetTop`, `offsetBottom`, `offsetLeft`, `offsetRight` om het zichtbare gebied aan te passen (handig voor schermen met randen)                                                                                                       | `0` voor alle waarden |
 
 ## Credits
 
