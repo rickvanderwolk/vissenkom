@@ -1068,7 +1068,7 @@ function handleTogglePump() {
         state: appState.pumpOn ? 'aan' : 'uit'
     });
 
-    broadcastToMainApp({ command: 'togglePump' });
+    broadcastToMainApp({ command: 'togglePump', pumpOn: appState.pumpOn });
     broadcastStatusUpdate(); // This will update all controllers
     saveState(); // Save state immediately for status changes
 }

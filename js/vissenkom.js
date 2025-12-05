@@ -132,12 +132,13 @@ const THEMES={
   autumn:{
     name:'Herfst',
     emoji:'🍂',
-    bgLight:['#8b5a3c','#7a4d34','#6d432d','#5f3825'],
-    bgDark:['#4a2817','#3d2013','#30180f','#23120b'],
+    bgLight:['#0d5168','#094050','#073342','#052530'],
+    bgDark:['#082030','#051520','#030f18','#020a10'],
     vignette:0.15,
     foodColors:['#ff8c42','#ffa07a','#ff6347'],
-    bubbleColor:'#e8b77d',
-    decorations:['leaf']
+    bubbleColor:'#bfeaf5',
+    decorations:['leaf'],
+    plantHueRange:[15,45]
   },
   winter:{
     name:'Winter',
@@ -332,7 +333,9 @@ function setupPlants(){
       zIndex='back';
     }
 
-    const hue=type==='anubias'?rand(100,140):rand(80,160);
+    const theme=getThemeConfig();
+    const hueRange=theme.plantHueRange||[80,160];
+    const hue=type==='anubias'?rand(100,140):rand(hueRange[0],hueRange[1]);
     const swayPhase=rand(0,Math.PI*2);
     const movePhase=rand(0,Math.PI*2);
     const branchiness=rand(0.5,0.9);
@@ -5449,7 +5452,14 @@ function handleRemoteCommand(data) {
                     castFishingRod();
                     break;
                 case 'togglePump':
-                    togglePump();
+                    // Pump state comes from server via status update
+                    // Just run the UI update, don't toggle locally
+                    if (data.pumpOn !== undefined) {
+                        pumpOn = data.pumpOn;
+                    } else {
+                        pumpOn = !pumpOn; // Fallback for backwards compatibility
+                    }
+                    updatePumpUI();
                     break;
                 case 'cleanTank':
                     cleanTank();
