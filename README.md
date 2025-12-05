@@ -37,6 +37,7 @@ Vissen vertonen uiteenlopend gedrag:
 ### Interactie
 
 Via de controller kan je o.a.:
+- **Vissen toevoegen**: voeg nieuwe vissen toe aan de kom
 - **Voer geven**: houd je vissen in leven
 - **Medicijnen toedienen**: genees zieke vissen
 - **Pomp aan- / uitzetten**: regel de watercirculatie
