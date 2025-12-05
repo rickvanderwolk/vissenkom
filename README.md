@@ -25,7 +25,7 @@ Ga naar http://localhost:3000
 
 ## Zelf hosten (één klik)
 
-[![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/new/template?template=https://github.com/rickvanderwolk/vissenkom)
+[![Deploy on Railway](https://railway.app/button.svg)](https://railway.com/deploy/YlW9Ln)
 
 Klik op de knop hierboven om je eigen Vissenkom te starten op Railway. Gratis tier beschikbaar (~500 uur/maand).
 
