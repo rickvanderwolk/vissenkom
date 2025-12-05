@@ -64,9 +64,18 @@ const VERSION = packageInfo.version;
 
 // Load config.json for customizable settings
 let config = {
+    theme: null,
     showFooter: true,
     footerLink: 'https://github.com/rickvanderwolk/vissenkom',
-    footerLinkText: 'View on GitHub'
+    footerLinkText: 'View on GitHub',
+    showBehaviorEmoji: true,
+    showControllerStatusBlocks: false,
+    viewport: {
+        offsetTop: 0,
+        offsetBottom: 0,
+        offsetLeft: 0,
+        offsetRight: 0
+    }
 };
 try {
     const configFile = path.join(__dirname, 'config.json');
