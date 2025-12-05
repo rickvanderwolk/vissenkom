@@ -23,11 +23,15 @@ npm start
 
 Ga naar http://localhost:3000
 
-## Zelf hosten (één klik)
+## Zelf hosten (Railway)
 
 [![Deploy on Railway](https://railway.app/button.svg)](https://railway.com/deploy/YlW9Ln)
 
-Klik op de knop hierboven om je eigen Vissenkom te starten op Railway. Gratis tier beschikbaar (~500 uur/maand).
+1. Klik op de knop hierboven en volg de stappen
+2. Na deployment: ga naar je service → **Settings** → **Networking** → **Generate Domain**
+3. Open de gegenereerde URL in je browser
+
+Gratis tier beschikbaar (~500 uur/maand).
 
 ## Configuratie (optioneel)
 
