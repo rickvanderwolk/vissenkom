@@ -95,6 +95,7 @@ function getThemeConfig(){return THEMES[currentTheme]||THEMES.normal}
 function isHalloween(){return currentTheme==='halloween'}
 function isChristmas(){return currentTheme==='christmas'}
 function isNewYear(){return currentTheme==='newyear'}
+function isWinter(){return currentTheme==='winter'}
 function hasDecoration(type){return getThemeConfig().decorations.includes(type)}
 
 // Theme configurations
@@ -1701,8 +1702,8 @@ function drawSandBottom(time){
   const sandHeight=70;
   const sandTop=H-sandHeight;
 
-  // Kerst: witte sneeuw ipv zand
-  if(isChristmas()){
+  // Winter/Kerst: witte sneeuw ipv zand
+  if(isWinter()||isChristmas()){
     const snowGrad=ctx.createLinearGradient(0,sandTop,0,H);
     if(lightsOn){
       snowGrad.addColorStop(0,'#FFFFFF'); // Wit sneeuw boven
@@ -2897,6 +2898,7 @@ function drawPlant(plant,time){
       ctx.fill();
     }
   }
+
 }
 
 function drawPlants(time){
