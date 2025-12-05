@@ -148,7 +148,7 @@ const THEMES={
     bgDark:['#0a1f2e','#081924','#06131a','#040d10'],
     vignette:0.20,
     foodColors:['#e0f7fa','#b2ebf2','#80deea'],
-    bubbleColor:'#b3e5fc',
+    bubbleColor:'#e6f7ff',
     decorations:['snowflake']
   },
   tropical:{
