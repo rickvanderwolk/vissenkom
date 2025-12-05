@@ -29,7 +29,10 @@ Ga naar http://localhost:3000
 
 1. Klik op de knop hierboven en volg de stappen
 2. Na deployment: ga naar je service → **Settings** → **Networking** → **Generate Domain**
-3. Open de gegenereerde URL in je browser
+3. (Optioneel) Voor persistente data: **Add Volume** → Mount path `/data`
+4. Open de gegenereerde URL in je browser
+
+Zonder volume gaat je data (vissen, events) verloren bij een redeploy. Met volume blijft alles behouden.
 
 Gratis tier beschikbaar (~500 uur/maand).
 

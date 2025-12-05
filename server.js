@@ -184,11 +184,14 @@ const server = http.createServer((req, res) => {
 
 // Create WebSocket server (will be attached to HTTP server later)
 
-// State file path
-const STATE_FILE = path.join(__dirname, 'gamestate.json');
-const EVENT_LOG_FILE = path.join(__dirname, 'events.json');
-const EVENT_LOG_FILE_CURRENT = path.join(__dirname, 'events-current.jsonl');
-const EVENT_LOG_ARCHIVE_DIR = path.join(__dirname, 'events-archive');
+// Data directory: use Railway volume if available, otherwise project root
+const DATA_DIR = process.env.RAILWAY_VOLUME_MOUNT_PATH || __dirname;
+
+// State file paths
+const STATE_FILE = path.join(DATA_DIR, 'gamestate.json');
+const EVENT_LOG_FILE = path.join(DATA_DIR, 'events.json');
+const EVENT_LOG_FILE_CURRENT = path.join(DATA_DIR, 'events-current.jsonl');
+const EVENT_LOG_ARCHIVE_DIR = path.join(DATA_DIR, 'events-archive');
 const MAX_EVENTS_IN_CURRENT = 5000; // Keep 5000 events in current file
 const ARCHIVE_BUFFER = 1000; // Archive when we have 1000+ extra events
 const RECENT_EVENTS_FOR_UI = 9;
@@ -2045,6 +2048,7 @@ server.listen(PORT, async () => {
 
     console.log(`HTTP server luistert op poort ${PORT}`);
     console.log(`WebSocket server gestart op dezelfde poort`);
+    console.log(`Data directory: ${DATA_DIR}`);
     console.log(`Bezoek ${baseUrl} voor de vissenkom`);
     console.log(`Bezoek ${baseUrl}/controller voor de controller`);
 
