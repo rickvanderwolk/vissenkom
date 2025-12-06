@@ -32,6 +32,56 @@ function updatePerformanceProfile(){
   }
 }
 
+// === DEBUG FUNCTIONS ===
+let debugOverlayVisible=false;
+let debugOverlayInterval=null;
+function showStats(){
+  if(debugOverlayVisible){hideStats();return}
+  debugOverlayVisible=true;
+  let overlay=document.getElementById('debug-overlay');
+  if(!overlay){
+    overlay=document.createElement('div');
+    overlay.id='debug-overlay';
+    overlay.style.cssText='position:fixed;top:10px;right:10px;background:rgba(0,0,0,0.85);color:#0f0;font-family:monospace;font-size:12px;padding:10px 15px;border-radius:5px;z-index:9999;min-width:220px;line-height:1.4;';
+    document.body.appendChild(overlay);
+  }
+  overlay.style.display='block';
+  function update(){
+    const avgFPS=fpsHistory.length>0?Math.round(fpsHistory.reduce((a,b)=>a+b,0)/fpsHistory.length):0;
+    const currentFPS=fpsHistory.length>0?fpsHistory[fpsHistory.length-1]:0;
+    const fpsColor=currentFPS>=50?'#0f0':currentFPS>=30?'#ff0':'#f00';
+    const on='<span style="color:#0f0">ON</span>';
+    const off='<span style="color:#f00">OFF</span>';
+    overlay.innerHTML=`
+      <div style="border-bottom:1px solid #0f0;margin-bottom:6px;padding-bottom:4px;font-weight:bold">🐟 Stats</div>
+      <div style="color:#888;font-size:10px;margin-bottom:4px">PERFORMANCE</div>
+      <div>FPS: <span style="color:${fpsColor}">${currentFPS}</span> (avg: ${avgFPS})</div>
+      <div>Quality: <span style="color:#0ff">${performanceProfile.quality}</span></div>
+      <div>Particles: ${Math.round(performanceProfile.particleCount*100)}% | Detail: ${Math.round(performanceProfile.detailLevel*100)}%</div>
+      <div style="color:#888;font-size:10px;margin-top:6px;margin-bottom:4px">VISSENKOM</div>
+      <div>Theme: <span style="color:#ff0">${currentTheme}</span></div>
+      <div>Temp: ${currentTemperature}°C | Algae: ${Math.round(waterGreenness)}%</div>
+      <div>Lights: ${lightsOn?on:off} | Disco: ${discoOn?on:off}</div>
+      <div>Pump: ${pumpOn?on:off} | Heating: ${heatingOn?on:off}</div>
+      <div style="color:#888;font-size:10px;margin-top:6px;margin-bottom:4px">OBJECTS</div>
+      <div>Fish: ${fishes.length} | Food: ${foods.length} | Poop: ${poops.length}</div>
+      <div>Bubbles: ${bubbles.length} | Plants: ${plants.length}</div>
+      <div>Decorations: ${decorations.length} | Stars: ${stars.length}</div>
+      <div>Particles: ${particles.length} | Algae: ${algenParticles.length}</div>
+    `;
+  }
+  update();
+  debugOverlayInterval=setInterval(update,500);
+  console.log('Stats visible. Run showStats() again to hide.');
+}
+function hideStats(){
+  debugOverlayVisible=false;
+  if(debugOverlayInterval){clearInterval(debugOverlayInterval);debugOverlayInterval=null}
+  const overlay=document.getElementById('debug-overlay');
+  if(overlay)overlay.style.display='none';
+}
+window.showStats=showStats;
+
 // === OBJECT POOLING ===
 const bubblePool=[];const particlePool=[];
 function getBubble(){
