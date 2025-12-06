@@ -11,6 +11,7 @@
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
+    "pixi.js": "^8.6.6",
     "qrious": "^4.0.2",
     "ws": "^8.14.2"
   },
