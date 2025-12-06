@@ -47,187 +47,6 @@ function releaseParticle(p){
   particlePool.push(p);
 }
 
-// === PIXI.JS PARTICLE SYSTEM (WebGL) ===
-let pixiApp=null;
-let pixiBubbleContainer=null;
-let pixiBubbleSprites=[];
-let pixiBubbleTexture=null;
-let usePixiBubbles=true; // Toggle: true = WebGL bubbels, false = Canvas bubbels
-
-// FPS display - altijd beschikbaar (ook zonder PixiJS)
-window.showFPS=function(show=true){
-  if(show){
-    if(!window.fpsDisplay){
-      const div=document.createElement('div');
-      div.id='fps-display';
-      div.style.cssText='position:fixed;top:10px;right:10px;background:rgba(0,0,0,0.8);color:#0f0;padding:10px 15px;font-family:monospace;font-size:14px;z-index:9999;border-radius:5px;min-width:200px;';
-      document.body.appendChild(div);
-      window.fpsDisplay=div;
-      window.fpsInterval=setInterval(()=>{
-        const avgFPS=fpsHistory.length?Math.round(fpsHistory.reduce((a,b)=>a+b,0)/fpsHistory.length):0;
-        const mode=usePixiBubbles&&pixiApp?'WebGL':'Canvas2D';
-        const quality=performanceProfile.quality;
-        div.innerHTML=`
-          <div style="color:#0f0;font-weight:bold">FPS: ${avgFPS}</div>
-          <div style="color:#888;font-size:11px;margin-top:5px">
-            Bubbels: ${mode}<br>
-            Quality: ${quality}<br>
-            Bubbles: ${bubbles.length}<br>
-            Fish: ${fishes.length}
-          </div>
-          <div style="color:#666;font-size:10px;margin-top:5px">
-            togglePixiBubbles() to switch
-          </div>
-        `;
-      },500);
-    }
-    window.fpsDisplay.style.display='block';
-  }else if(window.fpsDisplay){
-    window.fpsDisplay.style.display='none';
-  }
-  return show?'FPS display ON':'FPS display OFF';
-};
-
-window.togglePixiBubbles=function(){
-  if(!pixiApp){
-    console.warn('⚠️ PixiJS niet beschikbaar');
-    return false;
-  }
-  usePixiBubbles=!usePixiBubbles;
-  console.log(`🔄 Bubble rendering: ${usePixiBubbles?'WebGL (PixiJS)':'Canvas 2D'}`);
-  if(!usePixiBubbles){
-    for(const b of bubbles){
-      if(b.pixiSprite){
-        releasePixiBubbleSprite(b.pixiSprite);
-        b.pixiSprite=null;
-      }
-    }
-  }
-  return usePixiBubbles;
-};
-
-console.log('💡 Debug: showFPS() voor FPS meter, togglePixiBubbles() om te wisselen');
-
-function initPixi(){
-  // Check of PixiJS beschikbaar is
-  if(typeof PIXI==='undefined'){
-    console.warn('⚠️ PixiJS niet geladen, fallback naar Canvas bubbels');
-    usePixiBubbles=false;
-    return;
-  }
-
-  const pixiCanvas=document.getElementById('pixiCanvas');
-  if(!pixiCanvas){
-    console.warn('⚠️ PixiJS canvas niet gevonden, fallback naar Canvas bubbels');
-    usePixiBubbles=false;
-    return;
-  }
-
-  // PixiJS Application initialiseren
-  (async()=>{
-    try{
-      pixiApp=new PIXI.Application();
-      await pixiApp.init({
-        canvas:pixiCanvas,
-        width:cv.width,
-        height:cv.height,
-        backgroundAlpha:0, // Transparante achtergrond (overlay)
-        antialias:true,
-        resolution:window.devicePixelRatio||1,
-        autoDensity:true,
-        preference:'webgl' // Prefer WebGL, fallback naar Canvas
-      });
-
-      // Check welke renderer wordt gebruikt
-      const rendererType=pixiApp.renderer.type===1?'WebGL':'Canvas';
-      console.log(`✅ PixiJS geïnitialiseerd met ${rendererType} renderer`);
-
-      // Maak bubble texture (simpele cirkel)
-      pixiBubbleTexture=createBubbleTexture();
-
-      // Container voor alle bubbels
-      // PixiJS v8: gebruik gewone Container (ParticleContainer heeft andere API)
-      pixiBubbleContainer=new PIXI.Container();
-      pixiApp.stage.addChild(pixiBubbleContainer);
-
-      console.log('✅ PixiJS bubble system gereed');
-
-      // Extra stats functie
-      window.getPixiStats=function(){
-        return{
-          renderer:pixiApp?.renderer?.type===1?'WebGL':'Canvas',
-          activeBubbles:bubbles.length,
-          pixiSpritesTotal:pixiBubbleSprites.length,
-          pixiSpritesActive:pixiBubbleSprites.filter(s=>s.visible).length,
-          usePixiBubbles
-        };
-      };
-    }catch(e){
-      console.error('❌ PixiJS init error:',e);
-      usePixiBubbles=false;
-    }
-  })();
-}
-
-function createBubbleTexture(){
-  // Maak een bubble texture via Canvas (eenmalig)
-  const size=32;
-  const canvas=document.createElement('canvas');
-  canvas.width=size;
-  canvas.height=size;
-  const ctx2=canvas.getContext('2d');
-
-  // Teken bubble met gradient voor 3D effect
-  const grad=ctx2.createRadialGradient(size*0.35,size*0.35,0,size/2,size/2,size/2);
-  grad.addColorStop(0,'rgba(255,255,255,0.9)');
-  grad.addColorStop(0.3,'rgba(200,240,255,0.7)');
-  grad.addColorStop(0.7,'rgba(150,220,240,0.4)');
-  grad.addColorStop(1,'rgba(100,200,230,0)');
-
-  ctx2.fillStyle=grad;
-  ctx2.beginPath();
-  ctx2.arc(size/2,size/2,size/2-1,0,Math.PI*2);
-  ctx2.fill();
-
-  return PIXI.Texture.from(canvas);
-}
-
-function resizePixi(){
-  if(!pixiApp)return;
-  pixiApp.renderer.resize(cv.width,cv.height);
-}
-
-function hslToRgb(h,s,l){
-  // HSL naar RGB conversie (PixiJS werkt met RGB tints)
-  s/=100;l/=100;
-  const a=s*Math.min(l,1-l);
-  const f=n=>{
-    const k=(n+h/30)%12;
-    return l-a*Math.max(Math.min(k-3,9-k,1),-1);
-  };
-  return(Math.round(f(0)*255)<<16)|(Math.round(f(8)*255)<<8)|Math.round(f(4)*255);
-}
-
-function getPixiBubbleSprite(){
-  // Hergebruik sprites uit pool of maak nieuwe
-  for(let i=0;i<pixiBubbleSprites.length;i++){
-    if(!pixiBubbleSprites[i].visible){
-      pixiBubbleSprites[i].visible=true;
-      return pixiBubbleSprites[i];
-    }
-  }
-  // Maak nieuwe sprite
-  const sprite=new PIXI.Sprite(pixiBubbleTexture);
-  sprite.anchor.set(0.5);
-  pixiBubbleSprites.push(sprite);
-  pixiBubbleContainer.addChild(sprite);
-  return sprite;
-}
-
-function releasePixiBubbleSprite(sprite){
-  sprite.visible=false;
-}
-
 function resize(){
   const fullW=cv.clientWidth;
   const fullH=cv.clientHeight;
@@ -240,7 +59,6 @@ function resize(){
   setupLamps();setupDiscoBall();setupFishingRod();setupPlants();setupDecorations();setupStars();setupParticles();setupSpiderWebs();
   updateLayerCache();
   drawQR();
-  resizePixi(); // Sync PixiJS canvas grootte
 }
 function updateUIPositions(){
   const side=document.querySelector('.side');
@@ -2435,70 +2253,7 @@ function drawFood(){for(let i=foods.length-1;i>=0;i--){const p=foods[i];
   ctx.fillStyle=p.color||'#ffb37a';ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fill();
   // Verwijder alleen als ttl verloopt (niet meer als het de bodem raakt)
   if(p.ttl<=0){foods.splice(i,1)}}}
-function drawBubbles(){
-  const theme=getThemeConfig();
-
-  // PixiJS WebGL rendering (als beschikbaar)
-  if(usePixiBubbles&&pixiApp&&pixiBubbleContainer){
-    drawBubblesPixi(theme);
-    return;
-  }
-
-  // Fallback: Canvas 2D rendering
-  for(let i=bubbles.length-1;i>=0;i--){
-    const b=bubbles[i];
-    b.y-=b.vy;
-    b.x+=b.vx;
-    b.ttl--;
-    ctx.globalAlpha=lightsOn?0.7:0.5;
-    ctx.fillStyle=theme.bubbleColor;
-    ctx.beginPath();
-    ctx.arc(b.x,b.y,b.r,0,Math.PI*2);
-    ctx.fill();
-    ctx.globalAlpha=1;
-    if(b.y<-10||b.ttl<=0){
-      releaseBubble(b);
-      bubbles.splice(i,1);
-    }
-  }
-}
-
-function drawBubblesPixi(theme){
-  // Parse theme bubble color naar RGB tint
-  const bubbleColorHex=theme.bubbleColor||'#bfeaf5';
-  const tint=parseInt(bubbleColorHex.replace('#',''),16);
-
-  // Update/teken elke bubble met PixiJS sprites
-  for(let i=bubbles.length-1;i>=0;i--){
-    const b=bubbles[i];
-
-    // Update positie
-    b.y-=b.vy;
-    b.x+=b.vx;
-    b.ttl--;
-
-    // Krijg of maak sprite voor deze bubble
-    if(!b.pixiSprite){
-      b.pixiSprite=getPixiBubbleSprite();
-    }
-
-    // Update sprite properties
-    const sprite=b.pixiSprite;
-    sprite.x=b.x+viewportConfig.offsetLeft;
-    sprite.y=b.y+viewportConfig.offsetTop;
-    sprite.scale.set(b.r/16); // Texture is 32px, dus /16 voor radius
-    sprite.alpha=lightsOn?0.7:0.5;
-    sprite.tint=tint;
-
-    // Verwijder als buiten scherm of ttl verlopen
-    if(b.y<-10||b.ttl<=0){
-      releasePixiBubbleSprite(sprite);
-      b.pixiSprite=null;
-      releaseBubble(b);
-      bubbles.splice(i,1);
-    }
-  }
-}
+function drawBubbles(){const theme=getThemeConfig();for(let i=bubbles.length-1;i>=0;i--){const b=bubbles[i];b.y-=b.vy;b.x+=b.vx;b.ttl--;ctx.globalAlpha=lightsOn?0.7:0.5;ctx.fillStyle=theme.bubbleColor;ctx.beginPath();ctx.arc(b.x,b.y,b.r,0,Math.PI*2);ctx.fill();ctx.globalAlpha=1;if(b.y<-10||b.ttl<=0){releaseBubble(b);bubbles.splice(i,1)}}}
 
 function drawPoops(){
   for(const p of poops) {
@@ -6500,7 +6255,7 @@ function hideLoadingIndicator() {
     }
 }
 
-function init(){document.getElementById('tank').style.background=BG;document.body.classList.add('dark');document.body.classList.remove('light');lightsOn=true;resize();updateCooldown();updateStatusBar();drawLists();drawActivityList();showLoadingIndicator();initPixi();initWebSocket()}
+function init(){document.getElementById('tank').style.background=BG;document.body.classList.add('dark');document.body.classList.remove('light');lightsOn=true;resize();updateCooldown();updateStatusBar();drawLists();drawActivityList();showLoadingIndicator();initWebSocket()}
 init();
 
 function loop(){
