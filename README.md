@@ -2,7 +2,7 @@
 
 <img src="assets/preview2-optimized.png" width="49%" /> <img src="assets/preview3-optimized.png" width="49%" />
 
-Een virtuele vissenkom op je scherm. Voeg vissen toe, geef ze eten, speel met ze en houd ze in leven. Bedien alles via je telefoon.
+Een virtuele vissenkom op je scherm. Voeg vissen toe, geef ze eten, speel met ze en houd ze in leven. Bedien alles met je telefoon.
 
 - [Hoe werkt het?](#hoe-werkt-het)
 - [Lokaal draaien](#lokaal-draaien)
