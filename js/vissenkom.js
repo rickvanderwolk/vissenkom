@@ -136,6 +136,7 @@ let lastFed=0;let lastMedicine=0;let feedCooldown=60*60*1000;let medicineCooldow
 let lightsOn=true;let discoOn=false;let pumpOn=false;let heatingOn=true;const pumpPos={x:0,y:0};let pumpJustOnUntil=0;
 let discoBall={x:0,y:0,targetY:0,rotation:0,deployed:false,deployStart:0,deployDuration:2500,undeploying:false,undeployStart:0};
 let fishingRod={x:0,y:0,targetY:0,deployed:false,deployStart:0,deployDuration:2000,state:'idle',caughtFish:null,reelingStart:0,showCatchStart:0,baitSwing:0,retractStart:0};
+let race={active:false,fish1:null,fish2:null,startTime:0,duration:15000,startX:0,finishX:0,fish1Speed:0,fish2Speed:0,fish1X:0,fish2X:0,winner:null,spectatorPositions:[],showingWinner:false,winnerFish:null,loserFish:null,winnerShowStart:0};
 let waterGreenness=0;let waterGreennessTarget=0;
 let currentTemperature=24;
 let currentTheme='normal'; // Current theme (loaded from server)
@@ -5170,6 +5171,18 @@ function drawActivityList(){
         const arrivalFishName=event.data.name||'Vis';
         label=`${arrivalFishName} is ziek · ${timeStr}`;
         break;
+      case 'race_started':
+        emoji='🏁';
+        const raceFish1=event.data.fish1||'Vis';
+        const raceFish2=event.data.fish2||'Vis';
+        label=`Race: ${raceFish1} vs ${raceFish2} · ${timeStr}`;
+        break;
+      case 'race_finished':
+        emoji='🏆';
+        const raceWinner=event.data.winner||'Vis';
+        const raceLoser=event.data.loser||'Vis';
+        label=`${raceWinner} wint van ${raceLoser}! · ${timeStr}`;
+        break;
       case 'invalid_access_code':
         // Niet tonen in activity feed
         return;
@@ -5672,6 +5685,9 @@ function handleRemoteCommand(data) {
                             console.log(`💚 Health updated for ${data.fishName}: ${data.health}% (sick: ${fish.sick}, medicated: ${fish.medicated})`);
                         }
                     }
+                    break;
+                case 'startRace':
+                    startRace(data.fish1, data.fish2);
                     break;
                 default:
                     console.log('Onbekend commando:', data.command);
@@ -6184,6 +6200,449 @@ function tapGlass(){
   });
 }
 
+// === RACE SYSTEM ===
+function startRace(fish1Name, fish2Name) {
+  // Find the fish objects
+  const fish1 = fishes.find(f => f.name === fish1Name);
+  const fish2 = fishes.find(f => f.name === fish2Name);
+
+  if (!fish1 || !fish2) {
+    console.log('🏁 Race kan niet starten: vis niet gevonden');
+    return;
+  }
+
+  console.log(`🏁 Race gestart: ${fish1Name} VS ${fish2Name}`);
+
+  // Calculate race speeds based on fish properties + random factor
+  const baseSpeed1 = (fish1.speed || 2) * ((fish1.health || 100) / 100);
+  const baseSpeed2 = (fish2.speed || 2) * ((fish2.health || 100) / 100);
+  const randomFactor1 = 0.7 + Math.random() * 0.6; // 0.7 - 1.3
+  const randomFactor2 = 0.7 + Math.random() * 0.6;
+
+  // Setup race
+  race.active = true;
+  race.fish1 = fish1;
+  race.fish2 = fish2;
+  race.startTime = Date.now();
+  race.duration = 20500; // 5.5s setup + 15s race
+  race.startX = W * 0.15; // Start at 15% from left
+  race.finishX = W * 0.85; // Finish at 85% from left
+  race.fish1Speed = baseSpeed1 * randomFactor1;
+  race.fish2Speed = baseSpeed2 * randomFactor2;
+  race.fish1X = race.startX;
+  race.fish2X = race.startX;
+  race.winner = null;
+
+  // Calculate race Y positions (two lanes)
+  const raceY1 = H * 0.4; // Upper lane
+  const raceY2 = H * 0.6; // Lower lane
+  race.fish1Y = raceY1;
+  race.fish2Y = raceY2;
+
+  // Store original positions and set race flag on fish
+  fish1.preRaceX = fish1.x;
+  fish1.preRaceY = fish1.y;
+  fish1.racing = true;
+  fish1.raceTargetX = race.startX;
+  fish1.raceTargetY = raceY1;
+
+  fish2.preRaceX = fish2.x;
+  fish2.preRaceY = fish2.y;
+  fish2.racing = true;
+  fish2.raceTargetX = race.startX;
+  fish2.raceTargetY = raceY2;
+
+  // Setup spectator positions for other fish
+  race.spectatorPositions = [];
+  fishes.forEach(f => {
+    if (f !== fish1 && f !== fish2) {
+      f.spectating = true;
+      // Spectators move to top or bottom of screen
+      const goTop = Math.random() < 0.5;
+      f.spectatorTargetX = rand(W * 0.2, W * 0.8);
+      f.spectatorTargetY = goTop ? rand(H * 0.08, H * 0.18) : rand(H * 0.82, H * 0.92);
+      f.preSpectateX = f.x;
+      f.preSpectateY = f.y;
+    }
+  });
+}
+
+function updateRace(dt) {
+  if (!race.active) return;
+
+  const elapsed = Date.now() - race.startTime;
+  const raceDistance = race.finishX - race.startX;
+  const setupDuration = 5500; // 2s VS + 3.5s countdown
+
+  // Phase 1: Move fish to starting positions (first 2 seconds)
+  if (elapsed < 2000) {
+    const progress = elapsed / 2000;
+    const easeProgress = 1 - Math.pow(1 - progress, 3); // Ease out cubic
+
+    // Move race fish to start with velocity for swim animation
+    if (race.fish1) {
+      const targetX = race.fish1.preRaceX + (race.startX - race.fish1.preRaceX) * easeProgress;
+      const targetY = race.fish1.preRaceY + (race.fish1Y - race.fish1.preRaceY) * easeProgress;
+      race.fish1.vx = (targetX - race.fish1.x) * 0.1;
+      race.fish1.vy = (targetY - race.fish1.y) * 0.1;
+      race.fish1.x = targetX;
+      race.fish1.y = targetY;
+      race.fish1.dir = 1; // Face right
+    }
+    if (race.fish2) {
+      const targetX = race.fish2.preRaceX + (race.startX - race.fish2.preRaceX) * easeProgress;
+      const targetY = race.fish2.preRaceY + (race.fish2Y - race.fish2.preRaceY) * easeProgress;
+      race.fish2.vx = (targetX - race.fish2.x) * 0.1;
+      race.fish2.vy = (targetY - race.fish2.y) * 0.1;
+      race.fish2.x = targetX;
+      race.fish2.y = targetY;
+      race.fish2.dir = 1; // Face right
+    }
+
+    // Move spectators with velocity
+    fishes.forEach(f => {
+      if (f.spectating) {
+        const targetX = f.preSpectateX + (f.spectatorTargetX - f.preSpectateX) * easeProgress;
+        const targetY = f.preSpectateY + (f.spectatorTargetY - f.preSpectateY) * easeProgress;
+        f.vx = (targetX - f.x) * 0.1;
+        f.vy = (targetY - f.y) * 0.1;
+        f.x = targetX;
+        f.y = targetY;
+      }
+    });
+    return;
+  }
+
+  // Phase 2: Countdown - fish wait at start line (2-5.5 seconds)
+  if (elapsed < setupDuration) {
+    // Fish bob gently at start line
+    const countdownTime = elapsed - 2000;
+    if (race.fish1) {
+      race.fish1.x = race.startX;
+      race.fish1.y = race.fish1Y + Math.sin(countdownTime * 0.005) * 8;
+      race.fish1.vx = 0.5; // Small forward velocity for swim animation
+      race.fish1.vy = Math.sin(countdownTime * 0.008) * 0.5;
+      race.fish1.dir = 1;
+    }
+    if (race.fish2) {
+      race.fish2.x = race.startX;
+      race.fish2.y = race.fish2Y + Math.sin(countdownTime * 0.006 + 1) * 8;
+      race.fish2.vx = 0.5;
+      race.fish2.vy = Math.sin(countdownTime * 0.009 + 1) * 0.5;
+      race.fish2.dir = 1;
+    }
+
+    // Spectators bob while watching
+    fishes.forEach(f => {
+      if (f.spectating) {
+        f.vx = Math.sin(countdownTime * 0.002 + f.spectatorTargetX) * 0.3;
+        f.vy = Math.sin(countdownTime * 0.003 + f.spectatorTargetY) * 0.5;
+        f.x = f.spectatorTargetX + Math.sin(countdownTime * 0.002 + f.spectatorTargetX) * 5;
+        f.y = f.spectatorTargetY + Math.sin(countdownTime * 0.003 + f.spectatorTargetY) * 8;
+      }
+    });
+    return;
+  }
+
+  // Phase 3: Racing (after 5.5 seconds)
+  const raceElapsed = elapsed - setupDuration; // Time since race actually started
+  const raceDuration = race.duration - setupDuration;
+
+  // Add some randomness to speed over time
+  const wobble1 = Math.sin(raceElapsed * 0.003) * 0.15;
+  const wobble2 = Math.sin(raceElapsed * 0.004 + 1) * 0.15;
+
+  // Update fish positions
+  const speed1 = race.fish1Speed * (1 + wobble1);
+  const speed2 = race.fish2Speed * (1 + wobble2);
+
+  // Normalize speeds so race takes roughly the full duration
+  const avgSpeed = (speed1 + speed2) / 2;
+  const normalizedSpeed1 = (speed1 / avgSpeed) * (raceDistance / raceDuration) * 1000;
+  const normalizedSpeed2 = (speed2 / avgSpeed) * (raceDistance / raceDuration) * 1000;
+
+  // Calculate new X positions
+  const newX1 = Math.min(race.finishX, race.fish1X + normalizedSpeed1 * (dt / 1000));
+  const newX2 = Math.min(race.finishX, race.fish2X + normalizedSpeed2 * (dt / 1000));
+
+  // Update fish with velocity for proper swim animation
+  if (race.fish1) {
+    race.fish1.vx = (newX1 - race.fish1X) * 60; // Convert to velocity
+    race.fish1.vy = Math.sin(raceElapsed * 0.008) * 1.5; // Gentle vertical swimming
+    race.fish1.x = newX1;
+    race.fish1.y = race.fish1Y + Math.sin(raceElapsed * 0.006) * 15; // Swimming wave
+    race.fish1.dir = 1;
+    race.fish1X = newX1;
+  }
+  if (race.fish2) {
+    race.fish2.vx = (newX2 - race.fish2X) * 60;
+    race.fish2.vy = Math.sin(raceElapsed * 0.009 + 1) * 1.5;
+    race.fish2.x = newX2;
+    race.fish2.y = race.fish2Y + Math.sin(raceElapsed * 0.007 + 2) * 15;
+    race.fish2.dir = 1;
+    race.fish2X = newX2;
+  }
+
+  // Spectators gently bob while watching
+  fishes.forEach(f => {
+    if (f.spectating) {
+      f.vx = Math.sin(raceElapsed * 0.002 + f.spectatorTargetX) * 0.3;
+      f.vy = Math.sin(raceElapsed * 0.003 + f.spectatorTargetY) * 0.5;
+      f.x = f.spectatorTargetX + Math.sin(raceElapsed * 0.002 + f.spectatorTargetX) * 5;
+      f.y = f.spectatorTargetY + Math.sin(raceElapsed * 0.003 + f.spectatorTargetY) * 8;
+    }
+  });
+
+  // Check for winner
+  if (!race.winner) {
+    if (race.fish1X >= race.finishX) {
+      race.winner = race.fish1.name;
+      endRace(race.fish1.name, race.fish2.name);
+    } else if (race.fish2X >= race.finishX) {
+      race.winner = race.fish2.name;
+      endRace(race.fish2.name, race.fish1.name);
+    }
+  }
+}
+
+function endRace(winnerName, loserName) {
+  console.log(`🏁 Race afgelopen! Winnaar: ${winnerName}`);
+
+  // Notify server
+  sendToServer({ command: 'raceFinished', winner: winnerName, loser: loserName });
+
+  // Store winner/loser fish for popup
+  race.winnerFish = race.fish1.name === winnerName ? race.fish1 : race.fish2;
+  race.loserFish = race.fish1.name === loserName ? race.fish1 : race.fish2;
+
+  // Reset fish states immediately
+  fishes.forEach(f => {
+    f.racing = false;
+    f.spectating = false;
+    delete f.preRaceX;
+    delete f.preRaceY;
+    delete f.raceTargetX;
+    delete f.raceTargetY;
+    delete f.spectatorTargetX;
+    delete f.spectatorTargetY;
+    delete f.preSpectateX;
+    delete f.preSpectateY;
+  });
+
+  // Reset race active state but start showing winner popup
+  race.active = false;
+  race.showingWinner = true;
+  race.winnerShowStart = Date.now();
+
+  // Hide popup after 5 seconds
+  setTimeout(() => {
+    race.showingWinner = false;
+    race.winnerFish = null;
+    race.loserFish = null;
+    race.fish1 = null;
+    race.fish2 = null;
+    race.winner = null;
+  }, 5000);
+}
+
+function drawRaceOverlay(ctx) {
+  if (!race.active) return;
+
+  const elapsed = Date.now() - race.startTime;
+
+  // Draw start line (dashed vertical line)
+  ctx.save();
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+  ctx.lineWidth = 3;
+  ctx.setLineDash([10, 10]);
+  ctx.beginPath();
+  ctx.moveTo(race.startX, H * 0.25);
+  ctx.lineTo(race.startX, H * 0.75);
+  ctx.stroke();
+
+  // Draw finish line (same style as start line)
+  ctx.beginPath();
+  ctx.moveTo(race.finishX, H * 0.25);
+  ctx.lineTo(race.finishX, H * 0.75);
+  ctx.stroke();
+
+  ctx.restore();
+
+  // Timeline:
+  // 0-2000ms: VS screen with names, fish moving to start
+  // 2000-3000ms: "3"
+  // 3000-4000ms: "2"
+  // 4000-5000ms: "1"
+  // 5000-5500ms: "GO!"
+  // 5500ms+: racing
+
+  // Draw "VS" text during setup phase (first 2 seconds)
+  if (elapsed < 2000) {
+    ctx.save();
+
+    // Semi-transparent overlay for better readability
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+    ctx.fillRect(W * 0.2, H * 0.25, W * 0.6, H * 0.5);
+
+    // VS text
+    ctx.font = 'bold 64px Arial';
+    ctx.fillStyle = '#ffd700';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+    ctx.shadowBlur = 10;
+    ctx.fillText('VS', W / 2, H / 2);
+
+    // Fish names
+    ctx.font = 'bold 28px Arial';
+    ctx.fillStyle = '#fff';
+    if (race.fish1) ctx.fillText(race.fish1.name, W / 2, H * 0.35);
+    if (race.fish2) ctx.fillText(race.fish2.name, W / 2, H * 0.65);
+
+    ctx.restore();
+  }
+
+  // Draw countdown: 3, 2, 1, GO!
+  if (elapsed >= 2000 && elapsed < 5500) {
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+    ctx.shadowBlur = 15;
+
+    let countText = '';
+    let textColor = '#fff';
+    let fontSize = 120;
+
+    if (elapsed < 3000) {
+      countText = '3';
+      textColor = '#ff6b6b';
+    } else if (elapsed < 4000) {
+      countText = '2';
+      textColor = '#ffd93d';
+    } else if (elapsed < 5000) {
+      countText = '1';
+      textColor = '#6bcb77';
+    } else {
+      countText = 'GO!';
+      textColor = '#4ecdc4';
+      fontSize = 100;
+    }
+
+    // Pulse animation
+    const pulsePhase = (elapsed % 1000) / 1000;
+    const scale = 1 + Math.sin(pulsePhase * Math.PI) * 0.1;
+
+    ctx.font = `bold ${Math.round(fontSize * scale)}px Arial`;
+    ctx.fillStyle = textColor;
+    ctx.fillText(countText, W / 2, H / 2);
+
+    ctx.restore();
+  }
+}
+
+function drawRaceWinnerPopup(time) {
+  if (!race.showingWinner) return;
+  if (!race.winnerFish) return;
+
+  const fish = race.winnerFish;
+  const loser = race.loserFish;
+  const now = Date.now();
+  const elapsed = now - race.winnerShowStart;
+
+  // Fade in/out animatie
+  let alpha = 1;
+  if (elapsed < 300) { // Fade in eerste 300ms
+    alpha = elapsed / 300;
+  } else if (elapsed > 4700) { // Fade out laatste 300ms
+    alpha = (5000 - elapsed) / 300;
+  }
+
+  ctx.save();
+  ctx.globalAlpha = alpha;
+
+  // Bereken vis-grootte vooraf om banner dynamisch te maken
+  const visGrootte = fishSize(fish, now);
+  const visBannerGrootte = Math.min(visGrootte * 2.5, 160);
+
+  // Popup box (centered)
+  const boxW = Math.min(480, cv.width * 0.7);
+  const minBoxH = 260;
+  const maxBoxH = 420;
+  const neededH = 18 + 30 + visBannerGrootte + 20 + 50 + 18;
+  const boxH = Math.max(minBoxH, Math.min(maxBoxH, neededH));
+
+  const boxX = (cv.width - boxW) / 2;
+  const boxY = (cv.height - boxH) / 2;
+  const pad = 18;
+
+  // Subtiele schaduw
+  ctx.fillStyle = 'rgba(0,0,0,0.25)';
+  ctx.beginPath();
+  ctx.roundRect(boxX + 4, boxY + 4, boxW, boxH, 10);
+  ctx.fill();
+
+  // Main box
+  ctx.fillStyle = lightsOn ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.35)';
+  ctx.beginPath();
+  ctx.roundRect(boxX, boxY, boxW, boxH, 10);
+  ctx.fill();
+
+  // Titel bovenaan
+  ctx.fillStyle = lightsOn ? '#0b1e2d' : '#e9f1f7';
+  ctx.font = '700 20px system-ui,Segoe UI,Roboto,Arial';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+  ctx.fillText(`🏆 ${fish.name} Wint!`, boxX + boxW / 2, boxY + pad);
+
+  // Teken de winnende vis gecentreerd
+  ctx.save();
+  const visX = boxX + boxW / 2;
+  const visY = boxY + boxH / 2;
+
+  const originalX = fish.x;
+  const originalY = fish.y;
+  const originalVx = fish.vx;
+  const originalVy = fish.vy;
+  const originalBaseSize = fish.baseSize;
+
+  fish.x = visX;
+  fish.y = visY;
+  fish.vx = -1;
+  fish.vy = 0;
+  const scaleFactor = Math.min(2.5, 160 / visGrootte);
+  fish.baseSize = fish.baseSize * scaleFactor;
+  fish.hideLabel = true;
+  fish.hideShadow = true;
+
+  drawFish(fish, elapsed, now);
+
+  fish.x = originalX;
+  fish.y = originalY;
+  fish.vx = originalVx;
+  fish.vy = originalVy;
+  fish.baseSize = originalBaseSize;
+  fish.hideLabel = false;
+  fish.hideShadow = false;
+
+  ctx.restore();
+
+  // Tekst onderaan: "wint van [verliezer]"
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+  const centerX = boxX + boxW / 2;
+
+  ctx.globalAlpha = alpha * 0.85;
+  ctx.fillStyle = lightsOn ? '#0b1e2d' : '#e9f1f7';
+  ctx.font = '500 14px system-ui,Segoe UI,Roboto,Arial';
+  if (loser) {
+    ctx.fillText(`wint van ${loser.name}`, centerX, boxY + boxH - pad - 16);
+  }
+
+  ctx.globalAlpha = alpha;
+  ctx.restore();
+}
+
 function updateCooldown(){
     const cd=document.getElementById('cooldown');
     const left=Math.max(0,FEED_CD-(Date.now()-lastFed));
@@ -6355,10 +6814,18 @@ if(pumpOn&&Math.random()<0.6*performanceProfile.particleCount){for(let i=0;i<2;i
 drawPumpChampagne(); // Champagne fles bij pump (nieuwjaar)
 drawBubbles();drawFood();drawPoops();
 
+// Update race system
+updateRace(dt*1000);
+
 // Fish layer - update and draw with adaptive rate
 const updateRate=performanceProfile.fishUpdateRate;
 for(let i=0;i<fishes.length;i++){
   const f=fishes[i];
+  // Skip normal update for racing/spectating fish - they are controlled by race system
+  if(f.racing||f.spectating){
+    drawFish(f,t,now);
+    continue;
+  }
   // Update fish logic at reduced rate on low performance
   if(t%updateRate===i%updateRate){
     updateFish(f,dt*updateRate,now);
@@ -6387,8 +6854,17 @@ drawWaterGreenness();
 
 ctx.restore();
 
+// Draw race overlay (start/finish lines, VS text, winner announcement)
+ctx.save();
+ctx.translate(viewportConfig.offsetLeft,viewportConfig.offsetTop);
+drawRaceOverlay(ctx);
+ctx.restore();
+
 // Draw catch popup overlay (boven alles, full screen)
 drawCatchPopup(t);
+
+// Draw race winner popup overlay
+drawRaceWinnerPopup(t);
 
 // Draw error popup overlay (disconnected of already active)
 drawErrorPopup();
