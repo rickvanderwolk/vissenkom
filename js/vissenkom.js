@@ -448,6 +448,24 @@ function setupDecorations(){
     decorations.push({type:'skull',x,y,size,bobPhase,zIndex});
   }
 
+  // Kerst: kerstbal decoraties (altijd 1, 50% kans op 2e, 20% kans op 3e)
+  if(isChristmas()){
+    let numOrnaments=1;
+    if(Math.random()<0.5)numOrnaments++;
+    if(Math.random()<0.2)numOrnaments++;
+    for(let i=0;i<numOrnaments;i++){
+      const x=rand(80,W-80);
+      const size=rand(60,180);
+      const bobPhase=rand(0,Math.PI*2);
+      const zIndex=Math.random()<0.7?'back':'front';
+      const minY=H-size/2;
+      const maxY=H-sandHeight+10;
+      const y=rand(minY,maxY);
+      const ornamentColor={light:'#ff6b8a',mid:'#ff2d55',dark:'#c41e3a'}; // Rood
+      decorations.push({type:'ornament',x,y,size,bobPhase,zIndex,ornamentColor});
+    }
+  }
+
   // Nieuwjaar: grote champagnefles erbij
   if(isNewYear()){
     const x=rand(100,W-100);
@@ -3672,6 +3690,61 @@ function drawDecoration(deco,time){
       ctx.arc(bx+bolSize*0.2,by-bolSize*0.35,bolSize*0.12,0,Math.PI*2);
       ctx.fill();
     }
+  }
+  else if(deco.type==='ornament'){
+    // Kerstbal decoratie (zoals de bal maar dan op de bodem, schuin gedraaid)
+    const x=deco.x;
+    const y=deco.y+bobAmount;
+    const ballRadius=deco.size*0.35;
+    const color=deco.ornamentColor||{light:'#ff6b8a',mid:'#ff2d55',dark:'#c41e3a'};
+
+    // Schuin kantelen - richting gebaseerd op bobPhase
+    ctx.save();
+    ctx.translate(x,y);
+    const tiltDirection=deco.bobPhase>Math.PI?1:-1;
+    ctx.rotate(tiltDirection*0.25); // ~15 graden kantelen
+
+    // Metalen kroontje bovenop de bal
+    const capHeight=ballRadius*0.25;
+    const capWidth=ballRadius*0.4;
+    const capGrad=ctx.createLinearGradient(-capWidth/2,-ballRadius,capWidth/2,-ballRadius);
+    capGrad.addColorStop(0,`rgba(180,180,180,${fadeAlpha*lightMul})`);
+    capGrad.addColorStop(0.5,`rgba(220,220,220,${fadeAlpha*lightMul})`);
+    capGrad.addColorStop(1,`rgba(180,180,180,${fadeAlpha*lightMul})`);
+    ctx.fillStyle=capGrad;
+    ctx.fillRect(-capWidth/2,-ballRadius-capHeight,capWidth,capHeight);
+
+    // Haakje bovenop het kroontje
+    ctx.strokeStyle=`rgba(200,200,200,${fadeAlpha*lightMul})`;
+    ctx.lineWidth=2;
+    ctx.beginPath();
+    ctx.arc(0,-ballRadius-capHeight-4,5,Math.PI*0.2,Math.PI*0.8);
+    ctx.stroke();
+
+    // Glanzende kerstbal
+    const ornamentGrad=ctx.createRadialGradient(-ballRadius*0.3,-ballRadius*0.3,0,0,0,ballRadius);
+    ornamentGrad.addColorStop(0,color.light);
+    ornamentGrad.addColorStop(0.6,color.mid);
+    ornamentGrad.addColorStop(1,color.dark);
+    ctx.globalAlpha=fadeAlpha;
+    ctx.fillStyle=ornamentGrad;
+    ctx.beginPath();
+    ctx.arc(0,0,ballRadius,0,Math.PI*2);
+    ctx.fill();
+
+    // Extra glanzend wit highlight spotje
+    ctx.fillStyle=`rgba(255,255,255,${0.85*lightMul})`;
+    ctx.beginPath();
+    ctx.arc(-ballRadius*0.35,-ballRadius*0.35,ballRadius*0.35,0,Math.PI*2);
+    ctx.fill();
+
+    // Klein tweede highlight voor extra glans
+    ctx.fillStyle=`rgba(255,255,255,${0.4*lightMul})`;
+    ctx.beginPath();
+    ctx.arc(ballRadius*0.25,ballRadius*0.25,ballRadius*0.15,0,Math.PI*2);
+    ctx.fill();
+    ctx.globalAlpha=1;
+    ctx.restore();
   }
   else if(deco.type==='champagne'){
     const x=deco.x;
