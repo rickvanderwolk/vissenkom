@@ -38,6 +38,7 @@
         const fishNameInput = document.getElementById('fishNameInput');
         const heatingBtn = document.getElementById('heatingBtn');
         const playBallBtn = document.getElementById('playBallBtn');
+        const fishStatsBtn = document.getElementById('fishStatsBtn');
         // const themeBtn = document.getElementById('themeBtn'); // Tijdelijk uitgeschakeld
 
         // Status displays
@@ -186,7 +187,7 @@
             isConnected = connected;
 
             // Enable/disable controls based on connection
-            const controls = [feedBtn, lightBtn, discoBtn, pumpBtn, cleanBtn, refreshWaterBtn, tapGlassBtn, fishingRodBtn, medicineBtn, addFishBtn, fishNameInput, heatingBtn, playBallBtn]; // themeBtn tijdelijk verwijderd
+            const controls = [feedBtn, lightBtn, discoBtn, pumpBtn, cleanBtn, refreshWaterBtn, tapGlassBtn, fishingRodBtn, medicineBtn, addFishBtn, fishNameInput, heatingBtn, playBallBtn, fishStatsBtn]; // themeBtn tijdelijk verwijderd
             controls.forEach(control => {
                 if (control) {
                     control.disabled = !connected;
@@ -693,6 +694,7 @@
         medicineBtn.addEventListener('click', () => sendCommand('addMedicine'));
         heatingBtn.addEventListener('click', () => sendCommand('toggleHeating'));
         playBallBtn.addEventListener('click', () => sendCommand('addPlayBall'));
+        fishStatsBtn.addEventListener('click', () => sendCommand('showFishCredits'));
         // themeBtn.addEventListener('click', () => sendCommand('cycleTheme')); // Tijdelijk uitgeschakeld
 
         addFishBtn.addEventListener('click', () => {

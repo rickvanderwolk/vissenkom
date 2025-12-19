@@ -938,6 +938,9 @@ function handleCommand(data, fromClient) {
         case 'addPlayBall':
             handleAddPlayBall();
             break;
+        case 'showFishCredits':
+            handleShowFishCredits();
+            break;
         case 'ballGone':
             handleBallGone();
             break;
@@ -1185,6 +1188,13 @@ function handleTapGlass() {
 
     // Broadcast to main app to scare all fish
     broadcastToMainApp({ command: 'tapGlass' });
+}
+
+function handleShowFishCredits() {
+    console.log('📊 Vis stats credits gestart!');
+
+    // Broadcast to main app to show fish credits
+    broadcastToMainApp({ command: 'showFishCredits' });
 }
 
 function handleAddPlayBall() {

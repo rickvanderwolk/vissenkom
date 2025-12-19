@@ -136,6 +136,7 @@ let lastFed=0;let lastMedicine=0;let feedCooldown=60*60*1000;let medicineCooldow
 let lightsOn=true;let discoOn=false;let pumpOn=false;let heatingOn=true;const pumpPos={x:0,y:0};let pumpJustOnUntil=0;
 let discoBall={x:0,y:0,targetY:0,rotation:0,deployed:false,deployStart:0,deployDuration:2500,undeploying:false,undeployStart:0};
 let fishingRod={x:0,y:0,targetY:0,deployed:false,deployStart:0,deployDuration:2000,state:'idle',caughtFish:null,reelingStart:0,showCatchStart:0,baitSwing:0,retractStart:0};
+let fishCredits={active:false,startTime:0,scrollY:0};
 let waterGreenness=0;let waterGreennessTarget=0;
 let currentTemperature=24;
 let currentTheme='normal'; // Current theme (loaded from server)
@@ -1094,6 +1095,174 @@ function drawCatchPopup(time){
   ctx.fillText(`${totalWeight} gram`,centerX,boxY+boxH-pad-16); // Dynamisch onderaan banner
 
   ctx.globalAlpha=alpha; // Reset
+
+  ctx.restore();
+}
+
+function showFishCredits(){
+  if(fishCredits.active)return; // Al actief, negeer
+  fishCredits.active=true;
+  fishCredits.startTime=Date.now();
+  fishCredits.scrollY=0;
+  console.log('📊 Vis stats credits gestart');
+}
+
+function hideFishCredits(){
+  fishCredits.active=false;
+  console.log('📊 Vis stats credits gestopt');
+}
+
+function drawFishCredits(now){
+  if(!fishCredits.active)return;
+  if(fishes.length===0){hideFishCredits();return;}
+
+  const elapsed=now-fishCredits.startTime;
+
+  // Scroll configuratie
+  const cardHeight=140; // Hoogte per vis-kaart
+  const cardSpacing=20; // Ruimte tussen kaarten
+  const totalCardHeight=cardHeight+cardSpacing;
+  const scrollSpeed=0.04; // Pixels per ms
+  const fadeZoneHeight=100; // Fade zone hoogte
+
+  // Totale content hoogte
+  const totalHeight=fishes.length*totalCardHeight+cv.height; // Extra ruimte voor in/uit scroll
+
+  // Scroll positie (van onder naar boven)
+  fishCredits.scrollY=elapsed*scrollSpeed;
+
+  // Check of credits klaar zijn (alle vissen uit beeld gescrolld)
+  if(fishCredits.scrollY>totalHeight){
+    hideFishCredits();
+    return;
+  }
+
+  ctx.save();
+
+  // Semi-transparante overlay (altijd donker)
+  ctx.fillStyle='rgba(0,0,0,0.75)';
+  ctx.fillRect(0,0,cv.width,cv.height);
+
+  // Titel bovenaan (altijd licht op donkere overlay)
+  ctx.fillStyle='#e9f1f7';
+  ctx.font='700 28px system-ui,Segoe UI,Roboto,Arial';
+  ctx.textAlign='center';
+  ctx.textBaseline='top';
+  ctx.fillText('🐟 Vis Statistieken',cv.width/2,30);
+
+  // Teken elke vis
+  const startY=cv.height-fadeZoneHeight; // Start onder de fade zone
+
+  for(let i=0;i<fishes.length;i++){
+    const fish=fishes[i];
+    const cardY=startY+i*totalCardHeight-fishCredits.scrollY;
+
+    // Skip als buiten beeld
+    if(cardY<-cardHeight||cardY>cv.height)continue;
+
+    // Bereken alpha voor fade zones
+    let cardAlpha=1;
+    if(cardY<fadeZoneHeight){
+      cardAlpha=Math.max(0,cardY/fadeZoneHeight);
+    }else if(cardY>cv.height-fadeZoneHeight-cardHeight){
+      cardAlpha=Math.max(0,(cv.height-cardY-cardHeight)/fadeZoneHeight);
+    }
+
+    ctx.globalAlpha=cardAlpha;
+
+    // Kaart achtergrond
+    const cardW=Math.min(400,cv.width*0.85);
+    const cardX=(cv.width-cardW)/2;
+
+    // Schaduw
+    ctx.fillStyle='rgba(0,0,0,0.2)';
+    ctx.beginPath();
+    ctx.roundRect(cardX+3,cardY+3,cardW,cardHeight,10);
+    ctx.fill();
+
+    // Kaart (wit bij licht aan, donker bij licht uit)
+    ctx.fillStyle=lightsOn?'rgba(255,255,255,0.9)':'rgba(0,0,0,0.5)';
+    ctx.beginPath();
+    ctx.roundRect(cardX,cardY,cardW,cardHeight,10);
+    ctx.fill();
+
+    // Teken de vis links in de kaart
+    ctx.save();
+    const fishDisplayX=cardX+60;
+    const fishDisplayY=cardY+cardHeight/2;
+
+    // Tijdelijk vis eigenschappen aanpassen
+    const origX=fish.x,origY=fish.y,origVx=fish.vx,origVy=fish.vy;
+    const origHideLabel=fish.hideLabel,origHideShadow=fish.hideShadow;
+
+    fish.x=fishDisplayX;
+    fish.y=fishDisplayY;
+    fish.vx=1; // Kijk naar rechts
+    fish.vy=0;
+    fish.hideLabel=true;
+    fish.hideShadow=true;
+
+    drawFish(fish,elapsed,now);
+
+    // Restore
+    fish.x=origX;fish.y=origY;fish.vx=origVx;fish.vy=origVy;
+    fish.hideLabel=origHideLabel;fish.hideShadow=origHideShadow;
+    ctx.restore();
+
+    // Stats tekst rechts
+    ctx.globalAlpha=cardAlpha;
+    ctx.fillStyle=lightsOn?'#0b1e2d':'#e9f1f7';
+    ctx.textAlign='left';
+    ctx.textBaseline='top';
+
+    const textX=cardX+120;
+    let textY=cardY+15;
+    const lineHeight=20;
+
+    // Naam (groot)
+    ctx.font='700 18px system-ui,Segoe UI,Roboto,Arial';
+    ctx.fillText(fish.name,textX,textY);
+    textY+=lineHeight+5;
+
+    // Stats (kleiner)
+    ctx.font='400 14px system-ui,Segoe UI,Roboto,Arial';
+    ctx.fillStyle=lightsOn?'rgba(11,30,45,0.7)':'rgba(233,241,247,0.8)';
+
+    // Leeftijd
+    const ageDays=Math.floor((now-fish.bornAt)/(1000*60*60*24));
+    ctx.fillText(`Leeftijd: ${ageDays} ${ageDays===1?'dag':'dagen'}`,textX,textY);
+    textY+=lineHeight;
+
+    // Gegeten
+    ctx.fillText(`Gegeten: ${fish.eats||0}x`,textX,textY);
+    textY+=lineHeight;
+
+    // Gewicht
+    const baseWeight=fish.baseSize||20;
+    const totalWeight=Math.round(baseWeight+(fish.eats||0)*2+ageDays*0.5);
+    ctx.fillText(`Gewicht: ${totalWeight}g`,textX,textY);
+    textY+=lineHeight;
+
+    // Gezondheid
+    const hp=fish.health||100;
+    const hpColor=hp>50?'#4ade80':hp>25?'#fbbf24':'#ef4444';
+    ctx.fillStyle=hpColor;
+    ctx.fillText(`Gezondheid: ${Math.round(hp)}%`,textX,textY);
+
+    // Ziek indicator
+    if(fish.sick){
+      ctx.fillStyle='#ef4444';
+      ctx.fillText(' 🦠 Ziek',textX+120,textY);
+    }
+  }
+
+  ctx.globalAlpha=1;
+
+  // Instructie onderaan (altijd licht op donkere overlay)
+  ctx.fillStyle='rgba(233,241,247,0.5)';
+  ctx.font='400 12px system-ui,Segoe UI,Roboto,Arial';
+  ctx.textAlign='center';
+  ctx.fillText('Klik of druk ESC om te sluiten',cv.width/2,cv.height-20);
 
   ctx.restore();
 }
@@ -5693,6 +5862,9 @@ function handleRemoteCommand(data) {
                 case 'addPlayBall':
                     makePlayBall();
                     break;
+                case 'showFishCredits':
+                    showFishCredits();
+                    break;
                 case 'addMedicine':
                     console.log('💊 Medicine added - updating fish status');
 
@@ -6378,7 +6550,11 @@ function hideLoadingIndicator() {
     }
 }
 
-function init(){document.getElementById('tank').style.background=BG;document.body.classList.add('dark');document.body.classList.remove('light');lightsOn=true;resize();updateCooldown();updateStatusBar();drawLists();drawActivityList();showLoadingIndicator();initWebSocket()}
+function init(){document.getElementById('tank').style.background=BG;document.body.classList.add('dark');document.body.classList.remove('light');lightsOn=true;resize();updateCooldown();updateStatusBar();drawLists();drawActivityList();showLoadingIndicator();initWebSocket();
+// Fish credits close handlers
+cv.addEventListener('click',()=>{if(fishCredits.active)hideFishCredits();});
+document.addEventListener('keydown',(e)=>{if(e.key==='Escape'&&fishCredits.active)hideFishCredits();});
+}
 init();
 
 function loop(){
@@ -6462,6 +6638,9 @@ ctx.restore();
 
 // Draw catch popup overlay (boven alles, full screen)
 drawCatchPopup(t);
+
+// Draw fish credits overlay
+drawFishCredits(now);
 
 // Draw error popup overlay (disconnected of already active)
 drawErrorPopup();
