@@ -50,6 +50,10 @@
                             <div>Speelbal</div>
                             <div id="ballStatus">-</div>
                         </div>
+                        <div class="status-item">
+                            <div>Race</div>
+                            <div id="raceStatus">-</div>
+                        </div>
                     </div>
 
                     <div class="fish-hint-box">
@@ -75,6 +79,32 @@
                         <button id="fishingRodBtn" class="control-button care-button" disabled>
                             🎣 Hengel uitgooien
                         </button>
+
+                        <button id="raceBtn" class="control-button care-button" disabled>
+                            🏁 Start race
+                        </button>
+                    </div>
+
+                    <!-- Race selectie -->
+                    <div id="raceSelection" class="race-selection" style="display: none;">
+                        <h3 class="tab-header">Kies twee vissen voor de race</h3>
+                        <div class="race-dropdowns">
+                            <select id="raceFish1" class="race-select" disabled>
+                                <option value="">Kies vis 1...</option>
+                            </select>
+                            <span class="race-vs">VS</span>
+                            <select id="raceFish2" class="race-select" disabled>
+                                <option value="">Kies vis 2...</option>
+                            </select>
+                        </div>
+                        <div class="race-actions">
+                            <button id="startRaceBtn" class="control-button care-button" disabled>
+                                🏁 Start!
+                            </button>
+                            <button id="cancelRaceBtn" class="control-button cancel-button">
+                                ✕ Annuleren
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>

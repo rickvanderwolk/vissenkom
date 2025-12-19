@@ -223,7 +223,8 @@ let appState = {
     medicineCooldown: 24 * 60 * 60 * 1000, // 24 hours in milliseconds
     temperature: 24, // Current water temperature in °C
     heatingOn: true, // Heating thermostat on/off
-    hasBall: false // Is there currently a ball in the tank?
+    hasBall: false, // Is there currently a ball in the tank?
+    raceActive: false // Is there currently a race in progress?
 };
 
 // Track last broadcasted waterGreenness to avoid unnecessary updates
@@ -958,6 +959,13 @@ function handleCommand(data, fromClient) {
             sendFeedCooldownUpdate(fromClient);
             sendMedicineCooldownUpdate(fromClient);
             sendBallStatusUpdate(fromClient);
+            sendRaceStatusUpdate(fromClient);
+            break;
+        case 'startRace':
+            handleStartRace(data.fish1, data.fish2);
+            break;
+        case 'raceFinished':
+            handleRaceFinished(data.winner, data.loser);
             break;
         case 'getGameState':
             sendGameState(fromClient);
@@ -1544,6 +1552,106 @@ function sendBallStatusUpdate(client) {
         type: 'ballStatus',
         data: {
             hasBall: appState.hasBall
+        }
+    };
+
+    sendToClient(client, statusMessage);
+}
+
+// Race functions
+function handleStartRace(fish1Name, fish2Name) {
+    // Validate input
+    if (!fish1Name || !fish2Name) {
+        console.log('🏁 Race geannuleerd: ongeldige visnamen');
+        return;
+    }
+
+    // Check if race is already active
+    if (appState.raceActive) {
+        console.log('🏁 Race geannuleerd: er is al een race bezig');
+        broadcastRaceStatusUpdate();
+        return;
+    }
+
+    // Validate fish exist
+    const fish1 = appState.fishes.find(f => f.name === fish1Name);
+    const fish2 = appState.fishes.find(f => f.name === fish2Name);
+
+    if (!fish1 || !fish2) {
+        console.log('🏁 Race geannuleerd: vis niet gevonden');
+        return;
+    }
+
+    // Start the race
+    appState.raceActive = true;
+    console.log(`🏁 Race gestart: ${fish1Name} VS ${fish2Name}`);
+
+    // Log event
+    logEvent('race_started', {
+        fish1: fish1Name,
+        fish2: fish2Name
+    });
+
+    // Broadcast to main app to start the race visualization
+    broadcastToMainApp({
+        command: 'startRace',
+        fish1: fish1Name,
+        fish2: fish2Name
+    });
+
+    // Update controller status
+    broadcastRaceStatusUpdate();
+}
+
+function handleRaceFinished(winnerName, loserName) {
+    if (!appState.raceActive) {
+        console.log('🏁 Race finished melding genegeerd: geen actieve race');
+        return;
+    }
+
+    appState.raceActive = false;
+    console.log(`🏁 Race afgelopen! Winnaar: ${winnerName}`);
+
+    // Log event
+    logEvent('race_finished', {
+        winner: winnerName,
+        loser: loserName
+    });
+
+    // Broadcast race finished to all clients
+    const raceFinishedMessage = {
+        type: 'raceFinished',
+        data: {
+            winner: winnerName,
+            loser: loserName
+        }
+    };
+
+    // Send to controllers
+    controllers.forEach(client => {
+        sendToClient(client, raceFinishedMessage);
+    });
+
+    // Send to main apps
+    mainApps.forEach(client => {
+        sendToClient(client, raceFinishedMessage);
+    });
+
+    // Update race status
+    broadcastRaceStatusUpdate();
+}
+
+function broadcastRaceStatusUpdate() {
+    controllers.forEach(client => {
+        sendRaceStatusUpdate(client);
+    });
+}
+
+function sendRaceStatusUpdate(client) {
+    const statusMessage = {
+        type: 'raceStatus',
+        data: {
+            raceActive: appState.raceActive
         }
     };
 

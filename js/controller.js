@@ -40,6 +40,18 @@
         const playBallBtn = document.getElementById('playBallBtn');
         // const themeBtn = document.getElementById('themeBtn'); // Tijdelijk uitgeschakeld
 
+        // Race elements
+        const raceBtn = document.getElementById('raceBtn');
+        const raceSelection = document.getElementById('raceSelection');
+        const raceFish1 = document.getElementById('raceFish1');
+        const raceFish2 = document.getElementById('raceFish2');
+        const startRaceBtn = document.getElementById('startRaceBtn');
+        const cancelRaceBtn = document.getElementById('cancelRaceBtn');
+
+        // Fish list cache for race dropdowns
+        let fishList = [];
+        let raceActive = false;
+
         // Status displays
         const lightStatus = document.getElementById('lightStatus');
         const discoStatus = document.getElementById('discoStatus');
@@ -53,6 +65,7 @@
         const heatingStatus = document.getElementById('heatingStatus');
         const fishCountStatus = document.getElementById('fishCountStatus');
         const ballStatus = document.getElementById('ballStatus');
+        const raceStatus = document.getElementById('raceStatus');
         // const themeStatus = document.getElementById('themeStatus'); // Tijdelijk uitgeschakeld
         const qrValidityStatus = document.getElementById('qrValidityStatus');
         const qrValidityIcon = document.getElementById('qrValidityIcon');
@@ -186,7 +199,7 @@
             isConnected = connected;
 
             // Enable/disable controls based on connection
-            const controls = [feedBtn, lightBtn, discoBtn, pumpBtn, cleanBtn, refreshWaterBtn, tapGlassBtn, fishingRodBtn, medicineBtn, addFishBtn, fishNameInput, heatingBtn, playBallBtn]; // themeBtn tijdelijk verwijderd
+            const controls = [feedBtn, lightBtn, discoBtn, pumpBtn, cleanBtn, refreshWaterBtn, tapGlassBtn, fishingRodBtn, medicineBtn, addFishBtn, fishNameInput, heatingBtn, playBallBtn, raceBtn]; // themeBtn tijdelijk verwijderd
             controls.forEach(control => {
                 if (control) {
                     control.disabled = !connected;
@@ -292,8 +305,18 @@
                 case 'ballStatus':
                     updateBallStatus(message.data);
                     break;
+                case 'raceStatus':
+                    updateRaceStatus(message.data);
+                    break;
+                case 'raceStarted':
+                    handleRaceStarted();
+                    break;
+                case 'raceFinished':
+                    handleRaceFinished(message.data);
+                    break;
                 case 'gameState':
                     updateFishCount(message.data);
+                    updateFishList(message.data);
                     break;
                 case 'version':
                     document.getElementById('versionNumber').textContent = message.version;
@@ -861,3 +884,158 @@
                 connectWebSocket();
             }
         });
+
+        // Race functionality
+        function updateRaceStatus(statusData) {
+            raceActive = statusData.raceActive;
+
+            if (raceActive) {
+                raceStatus.textContent = '🏁 Bezig...';
+                raceStatus.style.color = '#ff9800';
+                raceBtn.disabled = true;
+                hideRaceSelection();
+            } else {
+                // Check if we have enough fish for a race
+                if (fishList.length >= 2) {
+                    raceStatus.textContent = '✅ Beschikbaar';
+                    raceStatus.style.color = '#4ecdc4';
+                    raceBtn.disabled = false;
+                } else {
+                    raceStatus.textContent = 'Min. 2 vissen';
+                    raceStatus.style.color = '#999';
+                    raceBtn.disabled = true;
+                }
+            }
+        }
+
+        function handleRaceStarted() {
+            raceActive = true;
+            raceStatus.textContent = '🏁 Bezig...';
+            raceStatus.style.color = '#ff9800';
+            raceBtn.disabled = true;
+            hideRaceSelection();
+        }
+
+        function handleRaceFinished(data) {
+            raceActive = false;
+            raceStatus.textContent = '✅ Beschikbaar';
+            raceStatus.style.color = '#4ecdc4';
+            raceBtn.disabled = false;
+
+            // Show winner notification
+            if (data.winner) {
+                showSuccess(`🏆 ${data.winner} wint de race!`);
+            }
+        }
+
+        function updateFishList(gameData) {
+            if (gameData && gameData.fishes) {
+                fishList = gameData.fishes.map(f => f.name);
+
+                // Update race button availability
+                if (!raceActive) {
+                    if (fishList.length >= 2) {
+                        raceBtn.disabled = false;
+                        raceStatus.textContent = '✅ Beschikbaar';
+                        raceStatus.style.color = '#4ecdc4';
+                    } else {
+                        raceBtn.disabled = true;
+                        raceStatus.textContent = 'Min. 2 vissen';
+                        raceStatus.style.color = '#999';
+                    }
+                }
+            }
+        }
+
+        function populateRaceDropdowns() {
+            // Clear existing options
+            raceFish1.innerHTML = '<option value="">Kies vis 1...</option>';
+            raceFish2.innerHTML = '<option value="">Kies vis 2...</option>';
+
+            // Sort fish list alphabetically
+            const sortedFish = [...fishList].sort((a, b) => a.localeCompare(b, 'nl'));
+
+            // Add fish options
+            sortedFish.forEach(name => {
+                const opt1 = document.createElement('option');
+                opt1.value = name;
+                opt1.textContent = name;
+                raceFish1.appendChild(opt1);
+
+                const opt2 = document.createElement('option');
+                opt2.value = name;
+                opt2.textContent = name;
+                raceFish2.appendChild(opt2);
+            });
+
+            // Enable dropdowns
+            raceFish1.disabled = false;
+            raceFish2.disabled = false;
+        }
+
+        function updateRaceDropdown2() {
+            // Filter out the selected fish from dropdown 1
+            const selected1 = raceFish1.value;
+            const currentSelected2 = raceFish2.value;
+
+            raceFish2.innerHTML = '<option value="">Kies vis 2...</option>';
+
+            // Sort and filter fish list
+            const sortedFish = [...fishList].sort((a, b) => a.localeCompare(b, 'nl'));
+
+            sortedFish.forEach(name => {
+                if (name !== selected1) {
+                    const opt = document.createElement('option');
+                    opt.value = name;
+                    opt.textContent = name;
+                    if (name === currentSelected2) {
+                        opt.selected = true;
+                    }
+                    raceFish2.appendChild(opt);
+                }
+            });
+
+            updateStartRaceButton();
+        }
+
+        function updateStartRaceButton() {
+            const fish1 = raceFish1.value;
+            const fish2 = raceFish2.value;
+            startRaceBtn.disabled = !fish1 || !fish2 || fish1 === fish2;
+        }
+
+        function showRaceSelection() {
+            populateRaceDropdowns();
+            raceSelection.style.display = 'block';
+            raceBtn.style.display = 'none';
+        }
+
+        function hideRaceSelection() {
+            raceSelection.style.display = 'none';
+            raceBtn.style.display = 'block';
+            raceFish1.value = '';
+            raceFish2.value = '';
+            startRaceBtn.disabled = true;
+        }
+
+        // Race event listeners
+        raceBtn.addEventListener('click', () => {
+            if (fishList.length >= 2 && !raceActive) {
+                showRaceSelection();
+            }
+        });
+
+        raceFish1.addEventListener('change', updateRaceDropdown2);
+        raceFish2.addEventListener('change', updateStartRaceButton);
+
+        startRaceBtn.addEventListener('click', () => {
+            const fish1 = raceFish1.value;
+            const fish2 = raceFish2.value;
+
+            if (fish1 && fish2 && fish1 !== fish2) {
+                sendCommand('startRace', { fish1, fish2 });
+                hideRaceSelection();
+            }
+        });
+
+        cancelRaceBtn.addEventListener('click', hideRaceSelection);
