@@ -631,10 +631,63 @@ function stopGameTick() {
     }
 }
 
+// Heartbeat system - detect and cleanup stale WebSocket connections
+let heartbeatInterval = null;
+
+function startHeartbeat() {
+    if (heartbeatInterval) {
+        console.log('⚠️ Heartbeat already running');
+        return;
+    }
+
+    console.log('💓 Starting heartbeat system');
+    heartbeatInterval = setInterval(() => {
+        const now = Date.now();
+        const allClients = [...mainApps, ...controllers];
+
+        allClients.forEach(client => {
+            const lastPong = clientLastPong.get(client) || 0;
+
+            // Check if client has timed out
+            if (lastPong > 0 && now - lastPong > HEARTBEAT_TIMEOUT) {
+                console.log('💔 Client heartbeat timeout - closing stale connection');
+                clientLastPong.delete(client);
+                try {
+                    client.close(1000, 'Heartbeat timeout');
+                } catch (e) {
+                    // Connection might already be dead
+                }
+                return;
+            }
+
+            // Send ping to client
+            try {
+                if (client.readyState === 1) { // WebSocket.OPEN
+                    client.send(JSON.stringify({ type: 'ping' }));
+                }
+            } catch (e) {
+                console.log('💔 Failed to send ping - removing client');
+                clientLastPong.delete(client);
+                mainApps.delete(client);
+                controllers.delete(client);
+            }
+        });
+    }, HEARTBEAT_INTERVAL);
+}
+
+function stopHeartbeat() {
+    if (heartbeatInterval) {
+        clearInterval(heartbeatInterval);
+        heartbeatInterval = null;
+        console.log('💔 Heartbeat stopped');
+    }
+}
+
 // Cleanup on server shutdown
 process.on('SIGINT', () => {
     console.log('\n🛑 Shutting down server...');
     stopGameTick();
+    stopHeartbeat();
     saveState();
     saveEventLog();
     process.exit(0);
@@ -643,6 +696,7 @@ process.on('SIGINT', () => {
 process.on('SIGTERM', () => {
     console.log('\n🛑 Shutting down server (SIGTERM)...');
     stopGameTick();
+    stopHeartbeat();
     saveState();
     saveEventLog();
     process.exit(0);
@@ -820,6 +874,11 @@ function broadcastRecentActivity() {
 const controllers = new Set();
 const mainApps = new Set();
 
+// Heartbeat tracking - last pong time per client
+const clientLastPong = new Map();
+const HEARTBEAT_INTERVAL = 30000; // Send ping every 30 seconds
+const HEARTBEAT_TIMEOUT = 60000;  // Consider dead after 60 seconds without pong
+
 // Access code system
 let currentAccessCode = '';
 let accessCodeExpiry = 0;
@@ -996,6 +1055,10 @@ function handleCommand(data, fromClient) {
             break;
         case 'cycleTheme':
             handleCycleTheme();
+            break;
+        case 'pong':
+            // Heartbeat response - update last pong time
+            clientLastPong.set(fromClient, Date.now());
             break;
         default:
             console.log('Onbekend commando:', data.command);
@@ -2090,6 +2153,7 @@ wss.on('connection', (ws, req) => {
         }
 
         controllers.add(ws);
+        clientLastPong.set(ws, Date.now()); // Initialize heartbeat tracking
         console.log('Controller verbonden met geldige code');
 
         // Log successful access
@@ -2125,6 +2189,7 @@ wss.on('connection', (ws, req) => {
         }
 
         mainApps.add(ws);
+        clientLastPong.set(ws, Date.now()); // Initialize heartbeat tracking
         console.log('Main app verbonden');
     }
 
@@ -2135,6 +2200,7 @@ wss.on('connection', (ws, req) => {
             // Mark this connection as a controller if it sends commands
             if (data.command && !controllers.has(ws) && !mainApps.has(ws)) {
                 controllers.add(ws);
+                clientLastPong.set(ws, Date.now()); // Initialize heartbeat tracking
                 console.log('Client gemarkeerd als controller');
             }
 
@@ -2148,12 +2214,14 @@ wss.on('connection', (ws, req) => {
         console.log('Client verbinding gesloten');
         controllers.delete(ws);
         mainApps.delete(ws);
+        clientLastPong.delete(ws);
     });
 
     ws.on('error', (error) => {
         console.error('WebSocket fout:', error);
         controllers.delete(ws);
         mainApps.delete(ws);
+        clientLastPong.delete(ws);
     });
 });
 
@@ -2175,4 +2243,7 @@ server.listen(PORT, async () => {
 
     // Start consolidated game tick
     startGameTick();
+
+    // Start heartbeat system for detecting stale connections
+    startHeartbeat();
 });

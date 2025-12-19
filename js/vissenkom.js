@@ -5546,6 +5546,10 @@ function handleRemoteCommand(data) {
     }
 
     switch (data.type) {
+        case 'ping':
+            // Heartbeat ping from server - respond with pong
+            sendToServer({ command: 'pong' });
+            break;
         case 'gameState':
             loadGameState(data.data);
             // Start game loop after successfully loading game state

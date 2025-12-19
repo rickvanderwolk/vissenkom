@@ -293,6 +293,10 @@
 
         function handleMessage(message) {
             switch (message.type) {
+                case 'ping':
+                    // Heartbeat ping from server - respond with pong
+                    sendCommand('pong');
+                    break;
                 case 'status':
                     updateStatus(message.data);
                     break;
