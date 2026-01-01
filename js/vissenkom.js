@@ -2146,15 +2146,16 @@ function drawNewYearText(time){
 
 
   }else{ // 1-6 januari: feestelijk
-    // 2025 groot
+    // Huidig jaar groot
+    const currentYear = new Date().getFullYear();
     ctx.font=`bold ${Math.floor(W*0.12)}px Arial, sans-serif`;
     ctx.shadowColor='#ffd700';
     ctx.shadowBlur=25*glowPulse;
     ctx.fillStyle=`rgba(255,215,0,${0.85*glowPulse})`;
-    ctx.fillText('2025',centerX,centerY);
+    ctx.fillText(currentYear,centerX,centerY);
     ctx.shadowBlur=0;
     ctx.fillStyle='#fff8dc';
-    ctx.fillText('2025',centerX,centerY);
+    ctx.fillText(currentYear,centerX,centerY);
 
     // Gelukkig Nieuwjaar eronder
     ctx.font=`bold ${Math.floor(W*0.04)}px Arial, sans-serif`;
