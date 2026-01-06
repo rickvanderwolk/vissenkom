@@ -5760,7 +5760,13 @@ function handleRemoteCommand(data) {
                             // Also update sick/medicated status if provided to keep emoji in sync
                             if (data.sick !== undefined) fish.sick = data.sick;
                             if (data.medicated !== undefined) fish.medicated = data.medicated;
-                            console.log(`💚 Health updated for ${data.fishName}: ${data.health}% (sick: ${fish.sick}, medicated: ${fish.medicated})`);
+                            // Mark fish as dead if health reached 0
+                            if (data.health <= 0) {
+                                fish.dead = true;
+                                console.log(`💀 ${data.fishName} is overleden (health: 0%)`);
+                            } else {
+                                console.log(`💚 Health updated for ${data.fishName}: ${data.health}% (sick: ${fish.sick}, medicated: ${fish.medicated})`);
+                            }
                         }
                     }
                     break;
@@ -6043,12 +6049,20 @@ function loadGameState(state) {
             existingFish.medicated = serverFish.medicated !== undefined ? serverFish.medicated : false;
             existingFish.medicatedAt = serverFish.medicatedAt !== undefined ? serverFish.medicatedAt : null;
             existingFish.health = serverFish.health !== undefined ? serverFish.health : 100;
+            // Mark fish as dead if health is 0
+            if (existingFish.health <= 0) {
+                existingFish.dead = true;
+            }
             // Also update stats that may have changed
             existingFish.eats = serverFish.eats !== undefined ? serverFish.eats : existingFish.eats;
             existingFish.lastEat = serverFish.lastEat !== undefined ? serverFish.lastEat : existingFish.lastEat;
         } else {
             // New fish from server - add it
             const fish = makeFishFromData(serverFish);
+            // Mark fish as dead if health is 0
+            if (fish && fish.health <= 0) {
+                fish.dead = true;
+            }
             if (fish) fishes.push(fish);
         }
     });
@@ -6947,7 +6961,7 @@ drawRaceWinnerPopup(t);
 // Draw error popup overlay (disconnected of already active)
 drawErrorPopup();
 
-for(let i=fishes.length-1;i>=0;i--){if(fishes[i].dead){const deadFish={name:fishes[i].name,bornAt:fishes[i].bornAt,diedAt:Date.now()};deadLog.push(deadFish);fishes.splice(i,1);sendToServer({command:'fishDied',fish:deadFish})}}
+for(let i=fishes.length-1;i>=0;i--){if(fishes[i].dead){const deadFish={...fishes[i],diedAt:Date.now(),health:0};deadLog.push(deadFish);fishes.splice(i,1);sendToServer({command:'fishDied',fish:deadFish})}}
 
 if(now-lastListUpdate>LIST_UPDATE_INTERVAL){drawLists();drawActivityList();lastListUpdate=now}
 if(now-lastCooldownUpdate>COOLDOWN_UPDATE_INTERVAL){updateCooldown();updateStatusBar();lastCooldownUpdate=now}

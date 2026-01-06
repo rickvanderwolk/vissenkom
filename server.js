@@ -1797,6 +1797,17 @@ function sendStateHash(client) {
 
 function handleFishDied(deadFish) {
     console.log('Vis overleden:', deadFish.name);
+
+    // Check if fish is already in deadLog (prevent duplicates)
+    const alreadyDead = appState.deadLog.some(d => d.name === deadFish.name);
+    if (alreadyDead) {
+        console.log(`${deadFish.name} is al in deadLog, skip duplicate`);
+        return;
+    }
+
+    // Only set health to 0, preserve all other data
+    deadFish.health = 0;
+
     appState.deadLog.push(deadFish);
 
     // Log event
@@ -2007,6 +2018,30 @@ function updateFishHealth() {
                     temperature: temp,
                     sickDuration: fish.sick ? (now - fish.sickStartedAt) : 0
                 });
+
+                // Add to dead log with all fish data (preserve original state at death)
+                const deadFish = { ...fish };
+                deadFish.diedAt = now;
+                deadFish.health = 0;
+                appState.deadLog.push(deadFish);
+
+                // Remove from fishes array
+                const fishIndex = appState.fishes.findIndex(f => f.name === fish.name);
+                if (fishIndex !== -1) {
+                    appState.fishes.splice(fishIndex, 1);
+                }
+
+                // Broadcast health update with 0 health so clients mark fish as dead
+                broadcastToMainApp({
+                    command: 'healthUpdate',
+                    fishName: fish.name,
+                    health: 0,
+                    sick: fish.sick,
+                    medicated: fish.medicated
+                });
+
+                // Save state immediately
+                saveState();
             }
 
             // Check recovery using centralized recovery logic

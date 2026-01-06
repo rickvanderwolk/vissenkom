@@ -7,7 +7,9 @@ events-archive/
 events.json.backup
 events.json.migrated
 gamestate.json
+gamestate.json.backup*
 config.json
+admin-log.jsonl
 
 # Test coverage
 coverage/
