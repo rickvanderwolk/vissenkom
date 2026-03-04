@@ -20,16 +20,19 @@ export function calculateTemperatureDamage(temp) {
  * @param {number} temperature - Current tank temperature
  * @returns {Object} - New health value and whether fish recovered
  */
-export function calculateHealthChange(fish, temperature) {
+export function calculateHealthChange(fish, temperature, options = {}) {
+    const hungerRate = options.hungerRate ?? 0.167;
+    const diseaseRate = options.diseaseRate ?? 0.083;
+
     let health = fish.health || 100;
     let recovered = false;
 
-    // Hunger damage: -0.167% per 10 minutes
-    health = Math.max(0, health - 0.167);
+    // Hunger damage per 10 minutes
+    health = Math.max(0, health - hungerRate);
 
-    // Disease damage: -0.083% per 10 minutes when sick and not medicated
+    // Disease damage per 10 minutes when sick and not medicated
     if (fish.sick && !fish.medicated) {
-        health = Math.max(0, health - 0.083);
+        health = Math.max(0, health - diseaseRate);
     }
 
     // Temperature stress damage (divided by 6 in the original code)
