@@ -145,6 +145,29 @@ describe('Health System', () => {
             // Hunger (-0.167) + Disease (-0.083) + Temperature (-2.0/6 = -0.333) = -0.583
             expect(result.health).toBeCloseTo(99.417, 2);
         });
+
+        it('should use custom hungerRate from options', () => {
+            const fish = { health: 100, sick: false, medicated: false };
+            const result = calculateHealthChange(fish, 24, { hungerRate: 0.083 });
+
+            expect(result.health).toBeCloseTo(99.917, 3);
+        });
+
+        it('should use custom diseaseRate from options', () => {
+            const fish = { health: 100, sick: true, medicated: false };
+            const result = calculateHealthChange(fish, 24, { diseaseRate: 0.020 });
+
+            // Hunger (-0.167) + Disease (-0.020) = -0.187
+            expect(result.health).toBeCloseTo(99.813, 3);
+        });
+
+        it('should use both custom rates from options', () => {
+            const fish = { health: 100, sick: true, medicated: false };
+            const result = calculateHealthChange(fish, 24, { hungerRate: 0.050, diseaseRate: 0.020 });
+
+            // Hunger (-0.050) + Disease (-0.020) = -0.070
+            expect(result.health).toBeCloseTo(99.930, 3);
+        });
     });
 
     describe('determineDeathCause', () => {

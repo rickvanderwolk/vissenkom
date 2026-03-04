@@ -70,6 +70,8 @@ let config = {
     footerLinkText: 'View on GitHub',
     showBehaviorEmoji: true,
     showControllerStatusBlocks: false,
+    hungerRate: 0.167,
+    diseaseRate: 0.083,
     viewport: {
         offsetTop: 0,
         offsetBottom: 0,
@@ -1992,7 +1994,10 @@ function updateFishHealth() {
     const updates = appState.fishes.map(fish => {
         return updateFishState(fish.name, (fish) => {
             // Use new game logic function to calculate health changes
-            const result = gameLogic.calculateHealthChange(fish, temp);
+            const result = gameLogic.calculateHealthChange(fish, temp, {
+                hungerRate: config.hungerRate,
+                diseaseRate: config.diseaseRate
+            });
 
             // Update fish health with calculated value
             fish.health = result.health;

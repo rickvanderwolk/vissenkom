@@ -6,6 +6,10 @@
   "footerLinkText": "View on GitHub",
   "showBehaviorEmoji": true,
   "showControllerStatusBlocks": false,
+  "hungerRate": 0.167,
+  "// hungerRate": "Health loss per 10 min from hunger (default: 0.167, ~4 days to die)",
+  "diseaseRate": 0.083,
+  "// diseaseRate": "Extra health loss per 10 min when sick and not medicated (default: 0.083)",
   "viewport": {
     "offsetTop": 0,
     "offsetBottom": 0,
