@@ -101,13 +101,15 @@ Beschikbare opties:
 
 | Optie | Beschrijving                                                                                                                                                                                                                                      | Standaard |
 |-------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------|
-| `theme` | Thema van de vissenkom. Opties: `null` (automatisch op basis van seizoen, nu alleen `normal`, `halloween`, `christmas` en `newyear`), `normal`, `spring`, `summer`, `autumn`, `winter`, `tropical`, `arctic`, `halloween`, `christmas`, `newyear` | `null` |
-| `showFooter` | Toon de footer in de controller                                                                                                                                                                                                                   | `true` |
-| `footerLink` | URL waar de footer naartoe linkt                                                                                                                                                                                                                  | `https://github.com/rickvanderwolk/vissenkom` |
-| `footerLinkText` | Tekst van de link in de footer                                                                                                                                                                                                                    | `View on GitHub` |
-| `showBehaviorEmoji` | Toon emoji's bij vissen die hun huidige gedrag weergeven (bijv. dansen, rusten, schooling)                                                                                                                                                        | `true` |
-| `showControllerStatusBlocks` | Toon statusblokken in de controller (temperatuur, pomp, etc.)                                                                                                                                                                                     | `false` |
-| `viewport` | Object met `offsetTop`, `offsetBottom`, `offsetLeft`, `offsetRight` om het zichtbare gebied aan te passen (handig voor schermen met randen)                                                                                                       | `0` voor alle waarden |
+| `theme` | Thema van de vissenkom. Opties: `null` (automatisch op basis van seizoen), `normal`, `spring`, `summer`, `autumn`, `winter`, `tropical`, `arctic`, `halloween`, `christmas`, `newyear` | `null` |
+| `showFooter` | Toon de footer in de controller | `true` |
+| `footerLink` | URL waar de footer naartoe linkt | `https://github.com/rickvanderwolk/vissenkom` |
+| `footerLinkText` | Tekst van de link in de footer | `View on GitHub` |
+| `showBehaviorEmoji` | Toon emoji's bij vissen die hun huidige gedrag weergeven (bijv. dansen, rusten, schooling) | `true` |
+| `showControllerStatusBlocks` | Toon statusblokken in de controller (temperatuur, pomp, etc.) | `false` |
+| `hungerRate` | Gezondheidsverlies per 10 minuten door honger | `0.167` (~4 dagen tot dood) |
+| `diseaseRate` | Extra gezondheidsverlies per 10 minuten bij ziekte zonder medicijnen | `0.083` |
+| `viewport` | Object met `offsetTop`, `offsetBottom`, `offsetLeft`, `offsetRight` om het zichtbare gebied aan te passen (handig voor schermen met randen) | `0` voor alle waarden |
 
 ## Credits
 
