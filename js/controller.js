@@ -330,13 +330,6 @@
                     break;
                 case 'success':
                     showSuccess(message.message);
-                    // Switch to home tab after showing success toast
-                    setTimeout(() => {
-                        if (window.switchToTab) {
-                            window.switchToTab('care');
-                            localStorage.setItem('vissenkom_active_tab', 'care');
-                        }
-                    }, 500);
                     break;
                 case 'error':
                     showError(message.message);
@@ -555,15 +548,11 @@
 
         function updateBallStatus(statusData) {
             if (statusData.hasBall) {
-                // Er is al een bal
                 playBallBtn.disabled = true;
-                ballStatus.textContent = '🎾 Bal aanwezig';
-                ballStatus.style.color = '#ff9800';
+                if (ballStatus) { ballStatus.textContent = '🎾 Bal aanwezig'; ballStatus.style.color = '#ff9800'; }
             } else {
-                // Geen bal, button beschikbaar
                 playBallBtn.disabled = false;
-                ballStatus.textContent = '✅ Beschikbaar';
-                ballStatus.style.color = '#4ecdc4';
+                if (ballStatus) { ballStatus.textContent = '✅ Beschikbaar'; ballStatus.style.color = '#4ecdc4'; }
             }
         }
 
@@ -739,62 +728,21 @@
 
         // Status display visibility
         function initStatusDisplay(config) {
-            // Default to true if not specified
             const showStatus = config && config.showControllerStatusBlocks !== undefined ? config.showControllerStatusBlocks : true;
 
-            const statusDisplays = document.querySelectorAll('.tab-status-display');
-            statusDisplays.forEach(display => {
-                display.style.display = showStatus ? 'grid' : 'none';
+            const dashboard = document.querySelector('.status-dashboard');
+            if (dashboard) {
+                dashboard.style.display = showStatus ? 'grid' : 'none';
+            }
+            const inlineStatuses = document.querySelectorAll('.inline-status');
+            inlineStatuses.forEach(el => {
+                el.style.display = showStatus ? 'flex' : 'none';
             });
         }
 
-        // Tab switching functionality
+        // Single page layout - no tab switching needed
         function initTabs() {
-            const tabButtons = document.querySelectorAll('.tab-button');
-            const tabPanels = document.querySelectorAll('.tab-panel');
-
-            // Make switchToTab globally accessible
-            window.switchToTab = function(tabName) {
-                // Update tab buttons
-                tabButtons.forEach(btn => {
-                    if (btn.getAttribute('data-tab') === tabName) {
-                        btn.classList.add('active');
-                    } else {
-                        btn.classList.remove('active');
-                    }
-                });
-
-                // Update tab panels
-                tabPanels.forEach(panel => {
-                    if (panel.getAttribute('data-panel') === tabName) {
-                        panel.classList.add('active');
-                    } else {
-                        panel.classList.remove('active');
-                    }
-                });
-            };
-
-            // Restore last active tab from localStorage or default to 'care'
-            const savedTab = localStorage.getItem('vissenkom_active_tab') || 'care';
-            window.switchToTab(savedTab);
-
-            // Add click listeners to tab buttons
-            tabButtons.forEach(button => {
-                button.addEventListener('click', () => {
-                    const tabName = button.getAttribute('data-tab');
-                    window.switchToTab(tabName);
-                    localStorage.setItem('vissenkom_active_tab', tabName);
-                });
-            });
-
-            // Add click listener to fish hint link
-            const fishTabLink = document.getElementById('fishTabLink');
-            if (fishTabLink) {
-                fishTabLink.addEventListener('click', () => {
-                    window.switchToTab('fish');
-                    localStorage.setItem('vissenkom_active_tab', 'fish');
-                });
-            }
+            // No-op: all sections visible on single page
         }
 
         // Mobile debugging - check DOM elements on startup
@@ -894,19 +842,19 @@
             raceActive = statusData.raceActive;
 
             if (raceActive) {
-                raceStatus.textContent = '🏁 Bezig...';
-                raceStatus.style.color = '#ff9800';
+                if(raceStatus)raceStatus.textContent = '🏁 Bezig...';
+                if(raceStatus)raceStatus.style.color = '#ff9800';
                 raceBtn.disabled = true;
                 hideRaceSelection();
             } else {
                 // Check if we have enough fish for a race
                 if (fishList.length >= 2) {
-                    raceStatus.textContent = '✅ Beschikbaar';
-                    raceStatus.style.color = '#4ecdc4';
+                    if(raceStatus)raceStatus.textContent = '✅ Beschikbaar';
+                    if(raceStatus)raceStatus.style.color = '#4ecdc4';
                     raceBtn.disabled = false;
                 } else {
-                    raceStatus.textContent = 'Min. 2 vissen';
-                    raceStatus.style.color = '#999';
+                    if(raceStatus)raceStatus.textContent = 'Min. 2 vissen';
+                    if(raceStatus)raceStatus.style.color = '#999';
                     raceBtn.disabled = true;
                 }
             }
@@ -914,16 +862,16 @@
 
         function handleRaceStarted() {
             raceActive = true;
-            raceStatus.textContent = '🏁 Bezig...';
-            raceStatus.style.color = '#ff9800';
+            if(raceStatus)raceStatus.textContent = '🏁 Bezig...';
+            if(raceStatus)raceStatus.style.color = '#ff9800';
             raceBtn.disabled = true;
             hideRaceSelection();
         }
 
         function handleRaceFinished(data) {
             raceActive = false;
-            raceStatus.textContent = '✅ Beschikbaar';
-            raceStatus.style.color = '#4ecdc4';
+            if(raceStatus)raceStatus.textContent = '✅ Beschikbaar';
+            if(raceStatus)raceStatus.style.color = '#4ecdc4';
             raceBtn.disabled = false;
 
             // Show winner notification
@@ -940,12 +888,12 @@
                 if (!raceActive) {
                     if (fishList.length >= 2) {
                         raceBtn.disabled = false;
-                        raceStatus.textContent = '✅ Beschikbaar';
-                        raceStatus.style.color = '#4ecdc4';
+                        if(raceStatus)raceStatus.textContent = '✅ Beschikbaar';
+                        if(raceStatus)raceStatus.style.color = '#4ecdc4';
                     } else {
                         raceBtn.disabled = true;
-                        raceStatus.textContent = 'Min. 2 vissen';
-                        raceStatus.style.color = '#999';
+                        if(raceStatus)raceStatus.textContent = 'Min. 2 vissen';
+                        if(raceStatus)raceStatus.style.color = '#999';
                     }
                 }
             }
