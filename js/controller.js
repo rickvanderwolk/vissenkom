@@ -199,7 +199,11 @@
             isConnected = connected;
 
             // Enable/disable controls based on connection
-            const controls = [feedBtn, lightBtn, discoBtn, pumpBtn, cleanBtn, refreshWaterBtn, tapGlassBtn, fishingRodBtn, medicineBtn, addFishBtn, fishNameInput, heatingBtn, playBallBtn, raceBtn]; // themeBtn tijdelijk verwijderd
+            const controls = [feedBtn, lightBtn, discoBtn, pumpBtn, cleanBtn, refreshWaterBtn, tapGlassBtn, fishingRodBtn, medicineBtn, addFishBtn, fishNameInput, heatingBtn, playBallBtn, raceBtn,
+                document.getElementById('bottomSandBtn'), document.getElementById('bottomPebblesBtn'), document.getElementById('bottomGravelBtn'),
+                document.getElementById('bgDefaultBtn'), document.getElementById('bgDeepseaBtn'), document.getElementById('bgTropicalBtn'), document.getElementById('bgRiverBtn'), document.getElementById('bgNightBtn'),
+                document.getElementById('addCastleBtn'), document.getElementById('addRockBtn'), document.getElementById('addDriftwoodBtn'), document.getElementById('addCaveBtn'), document.getElementById('addChestBtn'), document.getElementById('removeDecorationBtn')
+            ]; // themeBtn tijdelijk verwijderd
             controls.forEach(control => {
                 if (control) {
                     control.disabled = !connected;
@@ -462,6 +466,30 @@
             //     themeStatus.style.color = '#e9f1f7';
             // }
 
+            // Update bottom type status
+            const bottomNames = { zand: '🏖️ Zand', kiezels: '🪨 Kiezels', grind: '⚙️ Grind' };
+            const bottomStatusEl = document.getElementById('bottomStatus');
+            if (bottomStatusEl && status.bottomType) {
+                bottomStatusEl.textContent = bottomNames[status.bottomType] || 'Zand';
+                bottomStatusEl.style.color = '#e9f1f7';
+            }
+
+            // Update background status
+            const bgNames = { diepzee: '🌊 Diepzee', tropisch: '🌴 Tropisch', rivier: '🏞️ Rivier', nacht: '🌙 Nacht' };
+            const bgStatusEl = document.getElementById('backgroundStatus');
+            if (bgStatusEl) {
+                bgStatusEl.textContent = status.backgroundPreset ? (bgNames[status.backgroundPreset] || 'Standaard') : '🎨 Standaard';
+                bgStatusEl.style.color = '#e9f1f7';
+            }
+
+            // Update decoration count
+            const decoStatusEl = document.getElementById('decorationStatus');
+            if (decoStatusEl) {
+                const count = status.decorationCount || 0;
+                decoStatusEl.textContent = `${count} / 5`;
+                decoStatusEl.style.color = count >= 5 ? '#ffd700' : '#e9f1f7';
+            }
+
             // Update QR code validity if expiry time is provided
             if (status.accessCodeExpiry) {
                 accessCodeExpiry = status.accessCodeExpiry;
@@ -721,6 +749,26 @@
         heatingBtn.addEventListener('click', () => sendCommand('toggleHeating'));
         playBallBtn.addEventListener('click', () => sendCommand('addPlayBall'));
         // themeBtn.addEventListener('click', () => sendCommand('cycleTheme')); // Tijdelijk uitgeschakeld
+
+        // Bodemtype knoppen
+        document.getElementById('bottomSandBtn').addEventListener('click', () => sendCommand('setBottomType', { bottomType: 'zand' }));
+        document.getElementById('bottomPebblesBtn').addEventListener('click', () => sendCommand('setBottomType', { bottomType: 'kiezels' }));
+        document.getElementById('bottomGravelBtn').addEventListener('click', () => sendCommand('setBottomType', { bottomType: 'grind' }));
+
+        // Achtergrond knoppen
+        document.getElementById('bgDefaultBtn').addEventListener('click', () => sendCommand('setBackground', { preset: null }));
+        document.getElementById('bgDeepseaBtn').addEventListener('click', () => sendCommand('setBackground', { preset: 'diepzee' }));
+        document.getElementById('bgTropicalBtn').addEventListener('click', () => sendCommand('setBackground', { preset: 'tropisch' }));
+        document.getElementById('bgRiverBtn').addEventListener('click', () => sendCommand('setBackground', { preset: 'rivier' }));
+        document.getElementById('bgNightBtn').addEventListener('click', () => sendCommand('setBackground', { preset: 'nacht' }));
+
+        // Decoratie knoppen
+        document.getElementById('addCastleBtn').addEventListener('click', () => sendCommand('addDecoration', { type: 'castle' }));
+        document.getElementById('addRockBtn').addEventListener('click', () => sendCommand('addDecoration', { type: 'rock' }));
+        document.getElementById('addDriftwoodBtn').addEventListener('click', () => sendCommand('addDecoration', { type: 'driftwood' }));
+        document.getElementById('addCaveBtn').addEventListener('click', () => sendCommand('addDecoration', { type: 'cave' }));
+        document.getElementById('addChestBtn').addEventListener('click', () => sendCommand('addDecoration', { type: 'chest' }));
+        document.getElementById('removeDecorationBtn').addEventListener('click', () => sendCommand('removeDecoration', { id: 'last' }));
 
         addFishBtn.addEventListener('click', () => {
             const name = fishNameInput.value.trim();

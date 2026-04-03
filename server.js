@@ -188,7 +188,10 @@ const server = http.createServer((req, res) => {
             contentType = 'audio/mpeg';
         }
 
-        res.writeHead(200, { 'Content-Type': contentType });
+        res.writeHead(200, {
+            'Content-Type': contentType,
+            'Cache-Control': 'no-cache, no-store, must-revalidate'
+        });
         res.end(data);
     });
 });
@@ -226,7 +229,10 @@ let appState = {
     temperature: 24, // Current water temperature in °C
     heatingOn: true, // Heating thermostat on/off
     hasBall: false, // Is there currently a ball in the tank?
-    raceActive: false // Is there currently a race in progress?
+    raceActive: false, // Is there currently a race in progress?
+    bottomType: 'zand', // Bottom type: 'zand', 'kiezels', 'grind'
+    backgroundPreset: null, // Background preset: null (theme default), 'diepzee', 'tropisch', 'rivier', 'nacht'
+    userDecorations: [] // User-placed decorations: [{ id, type, xPct, yPct, size, zIndex }]
 };
 
 // Track last broadcasted waterGreenness to avoid unnecessary updates
@@ -1058,6 +1064,18 @@ function handleCommand(data, fromClient) {
         case 'cycleTheme':
             handleCycleTheme();
             break;
+        case 'setBottomType':
+            handleSetBottomType(data.bottomType);
+            break;
+        case 'setBackground':
+            handleSetBackground(data.preset);
+            break;
+        case 'addDecoration':
+            handleAddDecoration(data.type, fromClient);
+            break;
+        case 'removeDecoration':
+            handleRemoveDecoration(data.id, fromClient);
+            break;
         case 'pong':
             // Heartbeat response - update last pong time
             clientLastPong.set(fromClient, Date.now());
@@ -1209,6 +1227,120 @@ function handleCycleTheme() {
 
     // Update status for controllers
     broadcastStatusUpdate();
+}
+
+function handleSetBottomType(bottomType) {
+    const validTypes = ['zand', 'kiezels', 'grind'];
+    if (!validTypes.includes(bottomType)) {
+        console.log('Ongeldig bodemtype:', bottomType);
+        return;
+    }
+
+    appState.bottomType = bottomType;
+    console.log(`🏖️ Bodemtype gewijzigd naar "${bottomType}"`);
+
+    logEvent('bottom_type_change', { bottomType });
+
+    broadcastToMainApp({ command: 'setBottomType', bottomType });
+    broadcastStatusUpdate();
+    saveState();
+}
+
+function handleSetBackground(preset) {
+    const validPresets = [null, 'diepzee', 'tropisch', 'rivier', 'nacht'];
+    if (!validPresets.includes(preset)) {
+        console.log('Ongeldige achtergrond preset:', preset);
+        return;
+    }
+
+    appState.backgroundPreset = preset;
+    console.log(`🎨 Achtergrond gewijzigd naar "${preset || 'standaard'}"`);
+
+    logEvent('background_change', { preset: preset || 'standaard' });
+
+    broadcastToMainApp({ command: 'setBackground', preset });
+    broadcastStatusUpdate();
+    saveState();
+}
+
+function handleAddDecoration(type, fromClient) {
+    const validTypes = ['castle', 'rock', 'driftwood', 'cave', 'chest'];
+    if (!validTypes.includes(type)) {
+        console.log('Ongeldig decoratie type:', type);
+        sendToClient(fromClient, { type: 'error', message: 'Ongeldig decoratie type' });
+        return;
+    }
+
+    if ((appState.userDecorations || []).length >= 5) {
+        console.log('Maximum aantal decoraties bereikt');
+        sendToClient(fromClient, { type: 'error', message: 'Maximum 5 decoraties bereikt' });
+        return;
+    }
+
+    const sizeRanges = {
+        castle: [80, 140],
+        rock: [50, 100],
+        driftwood: [60, 120],
+        cave: [70, 130],
+        chest: [50, 90]
+    };
+    const hueRanges = {
+        castle: [200, 220],
+        rock: [180, 220],
+        driftwood: [25, 45],
+        cave: [190, 230],
+        chest: [25, 45]
+    };
+    const [minSize, maxSize] = sizeRanges[type];
+    const [minHue, maxHue] = hueRanges[type];
+
+    const decoration = {
+        id: Date.now(),
+        type,
+        xPct: 0.1 + Math.random() * 0.8,
+        size: minSize + Math.random() * (maxSize - minSize),
+        hue: minHue + Math.random() * (maxHue - minHue),
+        zIndex: Math.random() < 0.7 ? 'back' : 'front'
+    };
+
+    appState.userDecorations = appState.userDecorations || [];
+    appState.userDecorations.push(decoration);
+    console.log(`🏰 Decoratie toegevoegd: ${type} (id: ${decoration.id})`);
+
+    logEvent('decoration_added', { type, id: decoration.id });
+
+    broadcastToMainApp({ command: 'addDecoration', decoration });
+    broadcastStatusUpdate();
+    saveState();
+}
+
+function handleRemoveDecoration(id, fromClient) {
+    appState.userDecorations = appState.userDecorations || [];
+
+    if (appState.userDecorations.length === 0) {
+        sendToClient(fromClient, { type: 'error', message: 'Geen decoraties om te verwijderen' });
+        return;
+    }
+
+    let removed;
+    if (id === 'last') {
+        removed = appState.userDecorations.pop();
+    } else {
+        const index = appState.userDecorations.findIndex(d => d.id === id);
+        if (index === -1) {
+            sendToClient(fromClient, { type: 'error', message: 'Decoratie niet gevonden' });
+            return;
+        }
+        removed = appState.userDecorations.splice(index, 1)[0];
+    }
+
+    console.log(`🗑️ Decoratie verwijderd: ${removed.type} (id: ${removed.id})`);
+
+    logEvent('decoration_removed', { type: removed.type, id: removed.id });
+
+    broadcastToMainApp({ command: 'removeDecoration', id: removed.id });
+    broadcastStatusUpdate();
+    saveState();
 }
 
 function handleCleanTank() {
@@ -1512,7 +1644,10 @@ function broadcastStatusUpdate() {
             roomTemperature: getRoomTemperature(),
             theme: currentTheme,
             accessCodeExpiry: accessCodeExpiry,
-            fishHealth: fishHealthData
+            fishHealth: fishHealthData,
+            bottomType: appState.bottomType || 'zand',
+            backgroundPreset: appState.backgroundPreset || null,
+            decorationCount: (appState.userDecorations || []).length
         }
     };
 
@@ -1553,7 +1688,10 @@ function sendStatusUpdate(client) {
             roomTemperature: getRoomTemperature(),
             theme: currentTheme,
             accessCodeExpiry: accessCodeExpiry,
-            fishHealth: fishHealthData
+            fishHealth: fishHealthData,
+            bottomType: appState.bottomType || 'zand',
+            backgroundPreset: appState.backgroundPreset || null,
+            decorationCount: (appState.userDecorations || []).length
         }
     };
 
@@ -1742,7 +1880,10 @@ function sendGameState(client) {
             poopCount: appState.poopCount,
             waterGreenness: appState.waterGreenness,
             theme: currentTheme,
-            hasBall: appState.hasBall
+            hasBall: appState.hasBall,
+            bottomType: appState.bottomType || 'zand',
+            backgroundPreset: appState.backgroundPreset || null,
+            userDecorations: appState.userDecorations || []
         }
     };
 

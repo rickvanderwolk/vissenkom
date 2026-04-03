@@ -10,7 +10,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="msapplication-navbutton-color" content="#0b1e2d">
-    <link rel="stylesheet" href="css/controller.css">
+    <link rel="stylesheet" href="css/controller.css?v=0.26.0">
 </head>
 <body>
     <div class="controller-container">
@@ -162,6 +162,78 @@
                             🎨 Thema wisselen
                         </button> -->
                     </div>
+
+                    <h3 class="tab-header">Bodem</h3>
+                    <div class="tab-status-display">
+                        <div class="status-item">
+                            <div>Bodemtype</div>
+                            <div id="bottomStatus">Zand</div>
+                        </div>
+                    </div>
+                    <div class="controls-grid">
+                        <button id="bottomSandBtn" class="control-button tank-button" disabled>
+                            🏖️ Zand
+                        </button>
+                        <button id="bottomPebblesBtn" class="control-button tank-button" disabled>
+                            🪨 Kiezels
+                        </button>
+                        <button id="bottomGravelBtn" class="control-button tank-button" disabled>
+                            ⚙️ Grind
+                        </button>
+                    </div>
+
+                    <h3 class="tab-header">Achtergrond</h3>
+                    <div class="tab-status-display">
+                        <div class="status-item">
+                            <div>Achtergrond</div>
+                            <div id="backgroundStatus">Standaard</div>
+                        </div>
+                    </div>
+                    <div class="controls-grid">
+                        <button id="bgDefaultBtn" class="control-button tank-button" disabled>
+                            🎨 Standaard
+                        </button>
+                        <button id="bgDeepseaBtn" class="control-button tank-button" disabled>
+                            🌊 Diepzee
+                        </button>
+                        <button id="bgTropicalBtn" class="control-button tank-button" disabled>
+                            🌴 Tropisch
+                        </button>
+                        <button id="bgRiverBtn" class="control-button tank-button" disabled>
+                            🏞️ Rivier
+                        </button>
+                        <button id="bgNightBtn" class="control-button tank-button" disabled>
+                            🌙 Nacht
+                        </button>
+                    </div>
+
+                    <h3 class="tab-header">Decoraties</h3>
+                    <div class="tab-status-display">
+                        <div class="status-item">
+                            <div>Decoraties</div>
+                            <div id="decorationStatus">0 / 5</div>
+                        </div>
+                    </div>
+                    <div class="controls-grid">
+                        <button id="addCastleBtn" class="control-button tank-button" disabled>
+                            🏰 Kasteel
+                        </button>
+                        <button id="addRockBtn" class="control-button tank-button" disabled>
+                            🪨 Rots
+                        </button>
+                        <button id="addDriftwoodBtn" class="control-button tank-button" disabled>
+                            🪵 Drijfhout
+                        </button>
+                        <button id="addCaveBtn" class="control-button tank-button" disabled>
+                            🕳️ Grot
+                        </button>
+                        <button id="addChestBtn" class="control-button tank-button" disabled>
+                            📦 Schatkist
+                        </button>
+                        <button id="removeDecorationBtn" class="control-button tank-button" disabled>
+                            🗑️ Verwijder laatste
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -238,6 +310,6 @@
         </div>
     </div>
 
-    <script src="js/controller.js"></script>
+    <script src="js/controller.js?v=0.26.0"></script>
 </body>
 </html>

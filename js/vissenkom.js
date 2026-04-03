@@ -140,6 +140,16 @@ let race={active:false,fish1:null,fish2:null,startTime:0,duration:15000,startX:0
 let waterGreenness=0;let waterGreennessTarget=0;
 let currentTemperature=24;
 let currentTheme='normal'; // Current theme (loaded from server)
+let bottomType='zand'; // Bottom type: 'zand', 'kiezels', 'grind'
+let backgroundPreset=null; // Background preset: null (theme default), 'diepzee', 'tropisch', 'rivier', 'nacht'
+let userDecorations=[]; // User-placed decorations (stored with percentage coords)
+
+const BACKGROUND_PRESETS={
+  diepzee:{bgLight:['#0a2a4a','#071e38','#051628','#030e18'],bgDark:['#040e18','#030a12','#02070e','#01040a']},
+  tropisch:{bgLight:['#1abc9c','#16a085','#138d75','#117a65'],bgDark:['#0e5c4e','#0b4a3e','#083830','#062620']},
+  rivier:{bgLight:['#2e7d32','#256b28','#1b5e20','#145218'],bgDark:['#103e14','#0c3010','#08220c','#041408']},
+  nacht:{bgLight:['#1a237e','#151b60','#101445','#0b0d2a'],bgDark:['#080a20','#060818','#040610','#020408']}
+};
 
 // Helper functions for theme
 function getThemeConfig(){return THEMES[currentTheme]||THEMES.normal}
@@ -406,6 +416,24 @@ function setupPlants(){
 function setupDecorations(){
   decorations.length=0;
   const sandHeight=70;
+
+  // Re-add user-placed decorations (calculate y on bottom, like procedural ones)
+  const defaultHues={castle:210,rock:200,driftwood:35,cave:210,chest:35};
+  userDecorations.forEach(d=>{
+    const decoMinY=H-d.size/2;
+    const decoMaxY=H-sandHeight+10;
+    decorations.push({
+      type:d.type,
+      x:d.xPct*W,
+      y:rand(Math.min(decoMinY,decoMaxY),Math.max(decoMinY,decoMaxY)),
+      size:d.size,
+      hue:d.hue!==undefined?d.hue:(defaultHues[d.type]||200),
+      bobPhase:Math.random()*Math.PI*2,
+      zIndex:d.zIndex,
+      userPlaced:true,
+      id:d.id
+    });
+  });
 
   // Theme-based decoration or normal castle
   // In Halloween mode: altijd minimaal 1 pompoen
@@ -1782,53 +1810,191 @@ function drawSandBottom(time){
   const sandHeight=70;
   const sandTop=H-sandHeight;
 
-  // Winter/Kerst: witte sneeuw ipv zand
-  if(isWinter()||isChristmas()){
-    const snowGrad=ctx.createLinearGradient(0,sandTop,0,H);
-    if(lightsOn){
-      snowGrad.addColorStop(0,'#FFFFFF'); // Wit sneeuw boven
-      snowGrad.addColorStop(0.5,'#F0F8FF'); // Licht blauwige sneeuw
-      snowGrad.addColorStop(1,'#E6F2FF'); // Iets donkerder sneeuw onder
-    } else {
-      snowGrad.addColorStop(0,'#C8D8E8'); // Blauwgrijze sneeuw (nacht)
-      snowGrad.addColorStop(0.5,'#B0C4D8'); // Midden
-      snowGrad.addColorStop(1,'#98B0C8'); // Donkerder (nacht)
-    }
-    ctx.fillStyle=snowGrad;
+  // Gebruikerskeuze heeft voorrang, winter/kerst sneeuw alleen bij default 'zand'
+  if(bottomType==='kiezels'){
+    drawPebblesBottom(time,sandTop,sandHeight);
+  } else if(bottomType==='grind'){
+    drawGravelBottom(time,sandTop,sandHeight);
+  } else if((isWinter()||isChristmas())){
+    drawSnowBottom(time,sandTop,sandHeight);
   } else {
-    // Normaal: zand gradient (lichter boven, donkerder onder)
-    const sandGrad=ctx.createLinearGradient(0,sandTop,0,H);
-    if(lightsOn){
-      sandGrad.addColorStop(0,'#E5C89A'); // Licht zand boven
-      sandGrad.addColorStop(0.5,'#D4AF7A'); // Midden zand
-      sandGrad.addColorStop(1,'#B89968'); // Donkerder zand onder
-    } else {
-      sandGrad.addColorStop(0,'#8A7556'); // Donker zand boven (nacht)
-      sandGrad.addColorStop(0.5,'#6D5D45'); // Midden
-      sandGrad.addColorStop(1,'#544736'); // Donkerst (nacht)
+    drawSandBottomDefault(time,sandTop,sandHeight);
+  }
+}
+
+function drawSandBottomDefault(time,sandTop,sandHeight){
+  const sandGrad=ctx.createLinearGradient(0,sandTop,0,H);
+  if(lightsOn){
+    sandGrad.addColorStop(0,'#E5C89A');
+    sandGrad.addColorStop(0.5,'#D4AF7A');
+    sandGrad.addColorStop(1,'#B89968');
+  } else {
+    sandGrad.addColorStop(0,'#8A7556');
+    sandGrad.addColorStop(0.5,'#6D5D45');
+    sandGrad.addColorStop(1,'#544736');
+  }
+  ctx.fillStyle=sandGrad;
+  drawBottomShape(time,sandTop);
+  drawBottomShadow(time,sandTop);
+  // Zand textuur
+  if(lightsOn){
+    ctx.fillStyle='rgba(0,0,0,0.04)';
+    for(let i=0;i<80;i++){
+      ctx.beginPath();
+      ctx.arc(rand(0,W),rand(sandTop,H),rand(0.5,1.5),0,Math.PI*2);
+      ctx.fill();
     }
-    ctx.fillStyle=sandGrad;
+    ctx.fillStyle='rgba(255,255,255,0.1)';
+    for(let i=0;i<40;i++){
+      ctx.beginPath();
+      ctx.arc(rand(0,W),rand(sandTop,H),rand(0.5,1),0,Math.PI*2);
+      ctx.fill();
+    }
+  }
+}
+
+function drawSnowBottom(time,sandTop,sandHeight){
+  const snowGrad=ctx.createLinearGradient(0,sandTop,0,H);
+  if(lightsOn){
+    snowGrad.addColorStop(0,'#FFFFFF');
+    snowGrad.addColorStop(0.5,'#F0F8FF');
+    snowGrad.addColorStop(1,'#E6F2FF');
+  } else {
+    snowGrad.addColorStop(0,'#C8D8E8');
+    snowGrad.addColorStop(0.5,'#B0C4D8');
+    snowGrad.addColorStop(1,'#98B0C8');
+  }
+  ctx.fillStyle=snowGrad;
+  drawBottomShape(time,sandTop);
+  drawBottomShadow(time,sandTop);
+}
+
+// Cached bottom textures (regenerated on resize or type change)
+let bottomTextureCache=null;
+let bottomTextureCacheKey='';
+
+function generateBottomTexture(sandTop,sandHeight){
+  const key=`${bottomType}_${lightsOn}_${W}_${H}`;
+  if(bottomTextureCacheKey===key&&bottomTextureCache)return bottomTextureCache;
+
+  const offscreen=document.createElement('canvas');
+  offscreen.width=W;
+  offscreen.height=sandHeight+20; // extra for wave peaks
+  const oc=offscreen.getContext('2d');
+
+  if(bottomType==='kiezels'){
+    // Kiezels: ellipsen met highlight
+    const count=lightsOn?40:25;
+    for(let i=0;i<count;i++){
+      const px=Math.random()*W;
+      const py=8+Math.random()*(sandHeight-8);
+      const rx=3+Math.random()*5;
+      const ry=2+Math.random()*3;
+      oc.save();
+      oc.translate(px,py);
+      oc.rotate(Math.random()*Math.PI);
+      const hueShift=Math.random()*20-10;
+      oc.fillStyle=lightsOn?`hsl(200,${10+hueShift}%,${50+Math.random()*10}%)`:`hsl(200,8%,${25+Math.random()*10}%)`;
+      oc.beginPath();
+      oc.ellipse(0,0,rx,ry,0,0,Math.PI*2);
+      oc.fill();
+      if(lightsOn){
+        oc.fillStyle='rgba(255,255,255,0.25)';
+        oc.beginPath();
+        oc.ellipse(-rx*0.2,-ry*0.3,rx*0.5,ry*0.4,0,0,Math.PI*2);
+        oc.fill();
+      }
+      oc.restore();
+    }
+  } else if(bottomType==='grind'){
+    // Grind: dichte kleine stipjes
+    if(lightsOn){
+      oc.fillStyle='rgba(0,0,0,0.06)';
+      for(let i=0;i<120;i++){
+        oc.beginPath();
+        oc.arc(Math.random()*W,Math.random()*sandHeight,0.5+Math.random()*1.5,0,Math.PI*2);
+        oc.fill();
+      }
+      oc.fillStyle='rgba(255,255,255,0.12)';
+      for(let i=0;i<60;i++){
+        oc.beginPath();
+        oc.arc(Math.random()*W,Math.random()*sandHeight,0.5+Math.random(),0,Math.PI*2);
+        oc.fill();
+      }
+      for(let i=0;i<30;i++){
+        const gr=1+Math.random()*2;
+        oc.fillStyle=`hsl(${15+Math.random()*20},${15+Math.random()*15}%,${45+Math.random()*15}%)`;
+        oc.beginPath();
+        oc.arc(Math.random()*W,5+Math.random()*(sandHeight-5),gr,0,Math.PI*2);
+        oc.fill();
+      }
+    } else {
+      oc.fillStyle='rgba(0,0,0,0.08)';
+      for(let i=0;i<80;i++){
+        oc.beginPath();
+        oc.arc(Math.random()*W,Math.random()*sandHeight,0.5+Math.random(),0,Math.PI*2);
+        oc.fill();
+      }
+    }
   }
 
-  // Teken basis zand/sneeuw laag met golvende bovenkant
+  bottomTextureCache=offscreen;
+  bottomTextureCacheKey=key;
+  return offscreen;
+}
+
+function drawPebblesBottom(time,sandTop,sandHeight){
+  const grad=ctx.createLinearGradient(0,sandTop,0,H);
+  if(lightsOn){
+    grad.addColorStop(0,'#B0BEC5');
+    grad.addColorStop(0.5,'#90A4AE');
+    grad.addColorStop(1,'#78909C');
+  } else {
+    grad.addColorStop(0,'#546E7A');
+    grad.addColorStop(0.5,'#455A64');
+    grad.addColorStop(1,'#37474F');
+  }
+  ctx.fillStyle=grad;
+  drawBottomShape(time,sandTop);
+  drawBottomShadow(time,sandTop);
+  const tex=generateBottomTexture(sandTop,sandHeight);
+  ctx.drawImage(tex,0,sandTop-10);
+}
+
+function drawGravelBottom(time,sandTop,sandHeight){
+  const grad=ctx.createLinearGradient(0,sandTop,0,H);
+  if(lightsOn){
+    grad.addColorStop(0,'#BCAAA4');
+    grad.addColorStop(0.5,'#A1887F');
+    grad.addColorStop(1,'#8D6E63');
+  } else {
+    grad.addColorStop(0,'#6D4C41');
+    grad.addColorStop(0.5,'#5D4037');
+    grad.addColorStop(1,'#4E342E');
+  }
+  ctx.fillStyle=grad;
+  drawBottomShape(time,sandTop);
+  drawBottomShadow(time,sandTop);
+  const tex=generateBottomTexture(sandTop,sandHeight);
+  ctx.drawImage(tex,0,sandTop-10);
+}
+
+function drawBottomShape(time,sandTop){
   ctx.beginPath();
   ctx.moveTo(0,H);
   ctx.lineTo(0,sandTop);
-
-  // Golvende duinen aan de top
   for(let x=0;x<=W;x+=5){
     const wave1=Math.sin(x*0.015+time*0.003)*8;
     const wave2=Math.sin(x*0.008+time*0.002)*5;
     const wave3=Math.sin(x*0.025)*3;
-    const y=sandTop+wave1+wave2+wave3;
-    ctx.lineTo(x,y);
+    ctx.lineTo(x,sandTop+wave1+wave2+wave3);
   }
-
   ctx.lineTo(W,H);
   ctx.closePath();
   ctx.fill();
+}
 
-  // Subtiele schaduw op de duinen voor diepte
+function drawBottomShadow(time,sandTop){
   ctx.strokeStyle=lightsOn?'rgba(0,0,0,0.08)':'rgba(0,0,0,0.15)';
   ctx.lineWidth=1.5;
   ctx.beginPath();
@@ -1841,27 +2007,6 @@ function drawSandBottom(time){
     else ctx.lineTo(x,y);
   }
   ctx.stroke();
-
-  // Zand textuur (kleine stipjes)
-  if(lightsOn){
-    ctx.fillStyle='rgba(0,0,0,0.04)';
-    for(let i=0;i<80;i++){
-      const x=rand(0,W);
-      const y=rand(sandTop,H);
-      ctx.beginPath();
-      ctx.arc(x,y,rand(0.5,1.5),0,Math.PI*2);
-      ctx.fill();
-    }
-    // Lichtere stipjes
-    ctx.fillStyle='rgba(255,255,255,0.1)';
-    for(let i=0;i<40;i++){
-      const x=rand(0,W);
-      const y=rand(sandTop,H);
-      ctx.beginPath();
-      ctx.arc(x,y,rand(0.5,1),0,Math.PI*2);
-      ctx.fill();
-    }
-  }
 }
 
 function drawAmbientGlow(time){
@@ -2274,9 +2419,14 @@ function clearFrame(time){
   ctx.rect(0,0,W,H);
   ctx.clip();
 
-  // Fill viewport area with gradient background for depth - theme based
+  // Fill viewport area with gradient background for depth - preset or theme based
   const theme=getThemeConfig();
-  const bgColors=lightsOn?theme.bgLight:theme.bgDark;
+  let bgColors;
+  if(backgroundPreset&&BACKGROUND_PRESETS[backgroundPreset]){
+    bgColors=lightsOn?BACKGROUND_PRESETS[backgroundPreset].bgLight:BACKGROUND_PRESETS[backgroundPreset].bgDark;
+  } else {
+    bgColors=lightsOn?theme.bgLight:theme.bgDark;
+  }
   const bgGrad=ctx.createLinearGradient(0,0,0,H);
   bgGrad.addColorStop(0,bgColors[0]);
   bgGrad.addColorStop(0.3,bgColors[1]);
@@ -5595,6 +5745,14 @@ function handleRemoteCommand(data) {
                     currentTheme = newTheme;
                 }
             }
+            // Update bottom type from server
+            if(data.data && data.data.bottomType !== undefined) {
+                bottomType = data.data.bottomType;
+            }
+            // Update background preset from server
+            if(data.data && data.data.backgroundPreset !== undefined) {
+                backgroundPreset = data.data.backgroundPreset;
+            }
             // Update fish health data for real-time health bar updates
             if(data.data && data.data.fishHealth && Array.isArray(data.data.fishHealth)) {
                 let syncChanges = 0;
@@ -5772,6 +5930,46 @@ function handleRemoteCommand(data) {
                     break;
                 case 'startRace':
                     startRace(data.fish1, data.fish2);
+                    break;
+                case 'setBottomType':
+                    if(data.bottomType) bottomType = data.bottomType;
+                    console.log(`🏖️ Bodemtype gewijzigd naar "${bottomType}"`);
+                    break;
+                case 'setBackground':
+                    backgroundPreset = data.preset;
+                    console.log(`🎨 Achtergrond gewijzigd naar "${backgroundPreset || 'standaard'}"`);
+                    break;
+                case 'addDecoration':
+                    if(data.decoration) {
+                        const d = data.decoration;
+                        const defHues={castle:210,rock:200,driftwood:35,cave:210,chest:35};
+                        const sandH=70;
+                        const decoMinY=H-d.size/2;
+                        const decoMaxY=H-sandH+10;
+                        userDecorations.push(d);
+                        decorations.push({
+                            type: d.type,
+                            x: d.xPct * W,
+                            y: rand(Math.min(decoMinY,decoMaxY),Math.max(decoMinY,decoMaxY)),
+                            size: d.size,
+                            hue: d.hue!==undefined?d.hue:(defHues[d.type]||200),
+                            bobPhase: Math.random() * Math.PI * 2,
+                            zIndex: d.zIndex,
+                            userPlaced: true,
+                            id: d.id
+                        });
+                        updateLayerCache();
+                        console.log(`🏰 Decoratie toegevoegd: ${d.type}`);
+                    }
+                    break;
+                case 'removeDecoration':
+                    if(data.id !== undefined) {
+                        userDecorations = userDecorations.filter(d => d.id !== data.id);
+                        const idx = decorations.findIndex(d => d.userPlaced && d.id === data.id);
+                        if(idx !== -1) decorations.splice(idx, 1);
+                        updateLayerCache();
+                        console.log(`🗑️ Decoratie verwijderd (id: ${data.id})`);
+                    }
                     break;
                 default:
                     console.log('Onbekend commando:', data.command);
@@ -6035,6 +6233,17 @@ function loadGameState(state) {
     if(state.theme !== undefined) {
         currentTheme = state.theme || 'normal';
         console.log('🎨 Theme from server:', state.theme, '(currentTheme:', currentTheme, ')');
+    }
+
+    // Update bottom type
+    bottomType = state.bottomType || 'zand';
+
+    // Update background preset
+    backgroundPreset = state.backgroundPreset || null;
+
+    // Update user decorations
+    if(state.userDecorations && Array.isArray(state.userDecorations)) {
+        userDecorations = state.userDecorations;
     }
 
     // Update existing fishes or add new ones (don't clear to preserve animations)
