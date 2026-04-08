@@ -17,22 +17,42 @@
         <h1>🐟 Vissenkom Controller</h1>
 
         <!-- Compact Status Dashboard -->
-        <div class="status-dashboard">
+        <div class="status-dashboard" style="display: none;">
             <div class="status-item">
                 <div>Voer</div>
                 <div id="feedStatus">-</div>
+            </div>
+            <div class="status-item">
+                <div>Medicijn</div>
+                <div id="medicineStatus">-</div>
+            </div>
+            <div class="status-item">
+                <div>Poep</div>
+                <div id="poopStatus">-</div>
+            </div>
+            <div class="status-item">
+                <div>Water</div>
+                <div id="waterStatus">-</div>
             </div>
             <div class="status-item">
                 <div>Licht</div>
                 <div id="lightStatus">-</div>
             </div>
             <div class="status-item">
-                <div>Temperatuur</div>
-                <div id="temperatureStatus">-</div>
+                <div>Disco</div>
+                <div id="discoStatus">-</div>
             </div>
             <div class="status-item">
-                <div>Water</div>
-                <div id="waterStatus">-</div>
+                <div>Pomp</div>
+                <div id="pumpStatus">-</div>
+            </div>
+            <div class="status-item">
+                <div>Verwarming</div>
+                <div id="heatingStatus">-</div>
+            </div>
+            <div class="status-item">
+                <div>Temperatuur</div>
+                <div id="temperatureStatus">-</div>
             </div>
             <div class="status-item">
                 <div>Vissen</div>
@@ -47,9 +67,6 @@
         <!-- Verzorging -->
         <div class="category-section">
             <h3 class="section-header section-header--care">❤️ Verzorging</h3>
-            <div class="inline-status">
-                <span>Medicijn: <strong id="medicineStatus">-</strong></span>
-            </div>
             <div class="controls-grid">
                 <button id="feedBtn" class="control-button care-button" disabled>
                     🍤 Voeren
@@ -63,9 +80,6 @@
         <!-- Onderhoud -->
         <div class="category-section">
             <h3 class="section-header section-header--maintenance">✨ Onderhoud</h3>
-            <div class="inline-status">
-                <span>Poep: <strong id="poopStatus">-</strong></span>
-            </div>
             <div class="controls-grid">
                 <button id="cleanBtn" class="control-button maintenance-button" disabled>
                     💩 Poep opruimen
@@ -120,11 +134,6 @@
         <!-- Kom instellingen -->
         <div class="category-section">
             <h3 class="section-header section-header--tank">🏠 Kom</h3>
-            <div class="inline-status">
-                <span>Disco: <strong id="discoStatus">-</strong></span>
-                <span>Pomp: <strong id="pumpStatus">-</strong></span>
-                <span>Verwarming: <strong id="heatingStatus">-</strong></span>
-            </div>
             <div class="controls-grid">
                 <button id="lightBtn" class="control-button tank-button" disabled>
                     🌙 Licht uit

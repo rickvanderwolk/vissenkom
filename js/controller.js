@@ -515,7 +515,7 @@
             if (cooldownData.canFeed) {
                 feedCooldownEndTime = 0; // Clear cooldown
                 feedBtn.disabled = false;
-                feedStatus.textContent = '✅ Beschikbaar';
+                feedStatus.textContent = '✅ Kan nu';
                 feedStatus.style.color = '#4ecdc4';
             } else {
                 // Calculate end time based on lastFed + cooldown duration
@@ -533,7 +533,7 @@
             if (cooldownData.canAddMedicine) {
                 medicineCooldownEndTime = 0; // Clear cooldown
                 medicineBtn.disabled = false;
-                medicineStatus.textContent = '✅ Beschikbaar';
+                medicineStatus.textContent = '✅ Kan nu';
                 medicineStatus.style.color = '#4ecdc4';
             } else {
                 // Calculate end time based on lastMedicine + cooldown duration
@@ -552,7 +552,7 @@
                 if (ballStatus) { ballStatus.textContent = '🎾 Bal aanwezig'; ballStatus.style.color = '#ff9800'; }
             } else {
                 playBallBtn.disabled = false;
-                if (ballStatus) { ballStatus.textContent = '✅ Beschikbaar'; ballStatus.style.color = '#4ecdc4'; }
+                if (ballStatus) { ballStatus.textContent = '✅ Kan nu'; ballStatus.style.color = '#4ecdc4'; }
             }
         }
 
@@ -734,10 +734,6 @@
             if (dashboard) {
                 dashboard.style.display = showStatus ? 'grid' : 'none';
             }
-            const inlineStatuses = document.querySelectorAll('.inline-status');
-            inlineStatuses.forEach(el => {
-                el.style.display = showStatus ? 'flex' : 'none';
-            });
         }
 
         // Single page layout - no tab switching needed
@@ -803,7 +799,7 @@
                     // Cooldown ended
                     feedCooldownEndTime = 0;
                     feedBtn.disabled = false;
-                    feedStatus.textContent = '✅ Beschikbaar';
+                    feedStatus.textContent = '✅ Kan nu';
                     feedStatus.style.color = '#4ecdc4';
                 }
             }
@@ -822,7 +818,7 @@
                     // Cooldown ended
                     medicineCooldownEndTime = 0;
                     medicineBtn.disabled = false;
-                    medicineStatus.textContent = '✅ Beschikbaar';
+                    medicineStatus.textContent = '✅ Kan nu';
                     medicineStatus.style.color = '#4ecdc4';
                 }
             }
@@ -849,7 +845,7 @@
             } else {
                 // Check if we have enough fish for a race
                 if (fishList.length >= 2) {
-                    if(raceStatus)raceStatus.textContent = '✅ Beschikbaar';
+                    if(raceStatus)raceStatus.textContent = '✅ Kan nu';
                     if(raceStatus)raceStatus.style.color = '#4ecdc4';
                     raceBtn.disabled = false;
                 } else {
@@ -870,7 +866,7 @@
 
         function handleRaceFinished(data) {
             raceActive = false;
-            if(raceStatus)raceStatus.textContent = '✅ Beschikbaar';
+            if(raceStatus)raceStatus.textContent = '✅ Kan nu';
             if(raceStatus)raceStatus.style.color = '#4ecdc4';
             raceBtn.disabled = false;
 
@@ -888,7 +884,7 @@
                 if (!raceActive) {
                     if (fishList.length >= 2) {
                         raceBtn.disabled = false;
-                        if(raceStatus)raceStatus.textContent = '✅ Beschikbaar';
+                        if(raceStatus)raceStatus.textContent = '✅ Kan nu';
                         if(raceStatus)raceStatus.style.color = '#4ecdc4';
                     } else {
                         raceBtn.disabled = true;

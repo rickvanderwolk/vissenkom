@@ -160,24 +160,10 @@
         .section-header--tank { color: #4a90e2; }
         .section-header--fish { color: #9b59b6; }
 
-        /* Compact inline status row */
-        .inline-status {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 12px 20px;
-            margin-bottom: 16px;
-            font-size: 0.9em;
-            color: rgba(233, 241, 247, 0.75);
-        }
-
-        .inline-status strong {
-            color: #e9f1f7;
-        }
-
         /* Status dashboard at top */
         .status-dashboard {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(85px, 1fr));
             gap: 10px;
             margin-bottom: 32px;
             padding: 16px;
@@ -186,10 +172,29 @@
             border: 1px solid rgba(255, 255, 255, 0.08);
         }
 
+        @media (max-width: 600px) {
+            .status-dashboard {
+                grid-template-columns: repeat(3, 1fr);
+                gap: 8px;
+                padding: 12px;
+            }
+
+            .status-dashboard .status-item {
+                font-size: 0.78em;
+            }
+        }
+
+        @media (max-width: 360px) {
+            .status-dashboard {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
         .status-dashboard .status-item {
             text-align: center;
             font-size: 0.85em;
-            line-height: 1.5;
+            line-height: 1.4;
+            min-width: 0;
         }
 
         .status-dashboard .status-item > div:first-child {
@@ -201,6 +206,9 @@
         .status-dashboard .status-item > div:last-child {
             font-weight: 700;
             font-size: 1em;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .controls-grid {
