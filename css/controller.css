@@ -146,12 +146,69 @@
             color: #50e3c2;
         }
 
-        /* Tab headers for specific tabs */
-        .tab-header {
-            margin: 0 0 20px 0 !important;
-            font-size: 1.1em !important;
-            color: #50e3c2 !important;
+        /* Section headers */
+        .section-header {
+            margin: 0 0 18px 0;
+            font-size: 1.15em;
+            font-weight: 700;
             text-align: center;
+        }
+
+        .section-header--care { color: #3ecf5c; }
+        .section-header--maintenance { color: #f39c12; }
+        .section-header--play { color: #00bcd4; }
+        .section-header--tank { color: #4a90e2; }
+        .section-header--fish { color: #9b59b6; }
+
+        /* Status dashboard at top */
+        .status-dashboard {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(85px, 1fr));
+            gap: 10px;
+            margin-bottom: 32px;
+            padding: 16px;
+            background: rgba(0, 0, 0, 0.25);
+            border-radius: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        @media (max-width: 600px) {
+            .status-dashboard {
+                grid-template-columns: repeat(3, 1fr);
+                gap: 8px;
+                padding: 12px;
+            }
+
+            .status-dashboard .status-item {
+                font-size: 0.78em;
+            }
+        }
+
+        @media (max-width: 360px) {
+            .status-dashboard {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        .status-dashboard .status-item {
+            text-align: center;
+            font-size: 0.85em;
+            line-height: 1.4;
+            min-width: 0;
+        }
+
+        .status-dashboard .status-item > div:first-child {
+            opacity: 0.7;
+            font-size: 0.85em;
+            margin-bottom: 2px;
+        }
+
+        .status-dashboard .status-item > div:last-child {
+            font-weight: 700;
+            font-size: 1em;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .controls-grid {
@@ -243,54 +300,6 @@
             font-weight: 600;
         }
 
-        /* Inline status displays per tab */
-        .tab-status-display {
-            margin-bottom: 28px;
-            padding-bottom: 28px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
-            gap: 15px;
-        }
-
-        .tab-status-display .status-item {
-            background: rgba(255, 255, 255, 0.12);
-            padding: 16px 12px;
-            border-radius: 12px;
-            font-size: 1em;
-            font-weight: 600;
-            line-height: 1.5;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-        }
-
-        .tab-status-display .status-item > div:first-child {
-            opacity: 0.85;
-            font-size: 0.9em;
-            margin-bottom: 6px;
-        }
-
-        .tab-status-display .status-item > div:last-child {
-            font-size: 1.1em;
-            font-weight: 700;
-        }
-
-        @media (max-width: 600px) {
-            .tab-status-display {
-                margin-bottom: 20px;
-                padding-bottom: 20px;
-                gap: 12px;
-                grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-            }
-
-            .tab-status-display .status-item {
-                padding: 14px 10px;
-                font-size: 0.95em;
-            }
-
-            .tab-status-display .status-item > div:last-child {
-                font-size: 1.05em;
-            }
-        }
 
         /* Fish hint box on Home tab */
         .fish-hint-box {
@@ -451,10 +460,6 @@
                 margin-bottom: 24px;
             }
 
-            .tab-status-display {
-                margin-bottom: 22px;
-                padding-bottom: 22px;
-            }
 
             .connection-status {
                 margin-bottom: 20px;
@@ -466,9 +471,8 @@
                 margin-bottom: 20px;
             }
 
-            .tab-header {
-                font-size: 1em !important;
-                margin-bottom: 15px !important;
+            .section-header {
+                font-size: 1em;
             }
 
             .fish-hint-box {
@@ -568,10 +572,6 @@
                 margin-bottom: 20px;
             }
 
-            .tab-status-display {
-                margin-bottom: 18px;
-                padding-bottom: 18px;
-            }
 
             .version-display {
                 padding: 0 10px 15px 10px;
@@ -629,108 +629,6 @@
                 padding: 12px !important;
                 font-size: 14px !important;
             }
-        }
-
-        /* Tab Navigation */
-        .tab-navigation {
-            display: flex;
-            gap: 8px;
-            margin-bottom: 36px;
-            background: rgba(0, 0, 0, 0.25);
-            border-radius: 14px;
-            padding: 8px;
-        }
-
-        .tab-button {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            gap: 6px;
-            padding: 14px 10px;
-            border: 2px solid transparent;
-            border-radius: 10px;
-            background: transparent;
-            color: rgba(233, 241, 247, 0.6);
-            cursor: pointer;
-            transition: all 0.3s ease;
-            font-size: 14px;
-            font-weight: 500;
-            /* Mobile touch optimization */
-            min-height: 64px;
-            touch-action: manipulation;
-            -webkit-tap-highlight-color: transparent;
-        }
-
-        .tab-icon {
-            font-size: 24px;
-            transition: transform 0.3s ease;
-        }
-
-        .tab-label {
-            font-size: 12px;
-            white-space: nowrap;
-        }
-
-        .tab-button:hover {
-            color: rgba(233, 241, 247, 0.9);
-            background: rgba(255, 255, 255, 0.05);
-        }
-
-        .tab-button.active {
-            background: rgba(80, 227, 194, 0.25);
-            color: #50e3c2;
-            border: 2px solid rgba(80, 227, 194, 0.5);
-            box-shadow: 0 2px 8px rgba(80, 227, 194, 0.3);
-        }
-
-        .tab-button.active .tab-icon {
-            transform: scale(1.1);
-        }
-
-        /* Individual tab colors when active */
-        .tab-button[data-tab="care"].active {
-            background: rgba(62, 207, 92, 0.25);
-            color: #3ecf5c;
-            border-color: rgba(62, 207, 92, 0.5);
-            box-shadow: 0 2px 8px rgba(62, 207, 92, 0.3);
-        }
-
-        .tab-button[data-tab="tank"].active {
-            background: rgba(74, 144, 226, 0.25);
-            color: #4a90e2;
-            border-color: rgba(74, 144, 226, 0.5);
-            box-shadow: 0 2px 8px rgba(74, 144, 226, 0.3);
-        }
-
-        .tab-button[data-tab="maintenance"].active {
-            background: rgba(243, 156, 18, 0.25);
-            color: #f39c12;
-            border-color: rgba(243, 156, 18, 0.5);
-            box-shadow: 0 2px 8px rgba(243, 156, 18, 0.3);
-        }
-
-        .tab-button[data-tab="fish"].active {
-            background: rgba(155, 89, 182, 0.25);
-            color: #9b59b6;
-            border-color: rgba(155, 89, 182, 0.5);
-            box-shadow: 0 2px 8px rgba(155, 89, 182, 0.3);
-        }
-
-        /* Tab Content */
-        .tab-content {
-            position: relative;
-            padding-top: 0;
-        }
-
-        .tab-panel {
-            display: none;
-            animation: fadeIn 0.3s ease;
-        }
-
-        .tab-panel.active {
-            display: block;
         }
 
         @keyframes fadeIn {
@@ -804,6 +702,22 @@
 
         .maintenance-button:disabled {
             box-shadow: 0 2px 8px rgba(243, 156, 18, 0.15) !important;
+        }
+
+        /* Play button */
+        .play-button {
+            background: linear-gradient(135deg, #00bcd4, #00a0b4) !important;
+            box-shadow: 0 4px 16px rgba(0, 188, 212, 0.4), 0 2px 8px rgba(0, 0, 0, 0.2) !important;
+        }
+
+        @media (hover: hover) and (pointer: fine) {
+            .play-button:hover {
+                box-shadow: 0 6px 24px rgba(0, 188, 212, 0.5), 0 3px 10px rgba(0, 0, 0, 0.25) !important;
+            }
+        }
+
+        .play-button:disabled {
+            box-shadow: 0 2px 8px rgba(0, 188, 212, 0.15) !important;
         }
 
         /* Cancel button */
@@ -928,51 +842,3 @@
             }
         }
 
-        /* Mobile responsiveness for tabs */
-        @media (max-width: 600px) {
-            .tab-navigation {
-                margin-bottom: 24px;
-                gap: 6px;
-                padding: 6px;
-            }
-
-            .tab-button {
-                padding: 12px 6px;
-                min-height: 58px;
-                gap: 5px;
-            }
-
-            .tab-icon {
-                font-size: 22px;
-            }
-
-            .tab-label {
-                font-size: 11px;
-                font-weight: 600;
-                letter-spacing: 0.01em;
-            }
-        }
-
-        @media (max-width: 400px), (max-height: 600px) {
-            .tab-navigation {
-                gap: 5px;
-                padding: 5px;
-                margin-bottom: 18px;
-            }
-
-            .tab-button {
-                padding: 10px 4px;
-                min-height: 54px;
-                gap: 4px;
-            }
-
-            .tab-icon {
-                font-size: 20px;
-            }
-
-            .tab-label {
-                font-size: 10px;
-                font-weight: 600;
-                letter-spacing: 0.01em;
-            }
-        }
