@@ -4,31 +4,70 @@ let lamps=[];let W=0,H=0;
 let viewportConfig={offsetTop:0,offsetBottom:0,offsetLeft:0,offsetRight:0};
 
 // === ADAPTIVE PERFORMANCE SYSTEM ===
-let performanceProfile={quality:'high',particleCount:1,detailLevel:1,skipFrames:0,fishUpdateRate:1};
+let performanceProfile={quality:'low',particleCount:0.4,detailLevel:0.7,skipFrames:0,fishUpdateRate:1};
 let fpsHistory=[];let frameCount=0;let lastFPSCheck=Date.now();
+// Cached background gradients (invalidated on resize/theme/light change)
+let cachedBgGrad=null;let cachedVignetteGrad=null;let cachedBgKey='';
+// Cached sand offscreen canvas
+let sandCanvas=null;let sandCtx=null;let sandCacheKey='';let lastSandTime=0;
+// Pre-generated sand texture dots (regenerated on resize)
+let sandDots=null;let sandDotsKey='';
+// Frame time tracking
+let frameTimeHistory=[];let lastFrameStart=0;
 function measureFPS(){
   frameCount++;
   const now=Date.now();
   if(now-lastFPSCheck>=1000){
     const fps=frameCount;
     fpsHistory.push(fps);
-    if(fpsHistory.length>5)fpsHistory.shift();
+    if(fpsHistory.length>10)fpsHistory.shift();
     frameCount=0;
     lastFPSCheck=now;
     updatePerformanceProfile();
   }
 }
+// Quality levels: 0=verylow, 1=low, 2=medium, 3=high
+const PERF_PROFILES=[
+  {quality:'verylow',particleCount:0.2,detailLevel:0.5,skipFrames:1,fishUpdateRate:1},
+  {quality:'low',particleCount:0.4,detailLevel:0.7,skipFrames:0,fishUpdateRate:1},
+  {quality:'medium',particleCount:0.7,detailLevel:0.85,skipFrames:0,fishUpdateRate:1},
+  {quality:'high',particleCount:1,detailLevel:1,skipFrames:0,fishUpdateRate:1}
+];
+let currentPerfLevel=1; // Start low, scale up based on device capability
+let lastTargetLevel=-1;
+let framesAtTarget=0;
+function applyPerfLevel(level){
+  currentPerfLevel=level;
+  performanceProfile=PERF_PROFILES[currentPerfLevel];
+}
 function updatePerformanceProfile(){
-  if(fpsHistory.length<3)return;
+  if(fpsHistory.length<5)return;
   const avgFPS=fpsHistory.reduce((a,b)=>a+b,0)/fpsHistory.length;
-  if(avgFPS>=55){
-    performanceProfile={quality:'high',particleCount:1,detailLevel:1,skipFrames:0,fishUpdateRate:1};
-  }else if(avgFPS>=40){
-    performanceProfile={quality:'medium',particleCount:0.7,detailLevel:0.85,skipFrames:0,fishUpdateRate:1};
-  }else if(avgFPS>=25){
-    performanceProfile={quality:'low',particleCount:0.4,detailLevel:0.7,skipFrames:0,fishUpdateRate:2};
-  }else{
-    performanceProfile={quality:'verylow',particleCount:0.2,detailLevel:0.5,skipFrames:1,fishUpdateRate:3};
+
+  // Determine what level the FPS suggests
+  let targetLevel;
+  if(avgFPS>=55)targetLevel=3;
+  else if(avgFPS>=40)targetLevel=2;
+  else if(avgFPS>=25)targetLevel=1;
+  else targetLevel=0;
+
+  // Reset counter when target changes
+  if(targetLevel!==lastTargetLevel){framesAtTarget=0;lastTargetLevel=targetLevel}
+  else framesAtTarget++;
+
+  if(targetLevel<currentPerfLevel){
+    // Downgrade: react after 2 consistent seconds
+    if(framesAtTarget>=2){
+      applyPerfLevel(targetLevel);
+      framesAtTarget=0;
+    }
+  }else if(targetLevel>currentPerfLevel){
+    // Upgrade: conservative — 8 consistent seconds, one step at a time
+    const upgradeThresholds=[30,45,58]; // verylow→low, low→medium, medium→high
+    if(avgFPS>=upgradeThresholds[currentPerfLevel]&&framesAtTarget>=8){
+      applyPerfLevel(Math.min(currentPerfLevel+1,3));
+      framesAtTarget=0;
+    }
   }
 }
 
@@ -50,12 +89,15 @@ function showStats(){
     const avgFPS=fpsHistory.length>0?Math.round(fpsHistory.reduce((a,b)=>a+b,0)/fpsHistory.length):0;
     const currentFPS=fpsHistory.length>0?fpsHistory[fpsHistory.length-1]:0;
     const fpsColor=currentFPS>=50?'#0f0':currentFPS>=30?'#ff0':'#f00';
+    const avgFrameTime=frameTimeHistory.length>0?frameTimeHistory.reduce((a,b)=>a+b,0)/frameTimeHistory.length:0;
+    const maxFrameTime=frameTimeHistory.length>0?Math.max(...frameTimeHistory):0;
     const on='<span style="color:#0f0">ON</span>';
     const off='<span style="color:#f00">OFF</span>';
     overlay.innerHTML=`
       <div style="border-bottom:1px solid #0f0;margin-bottom:6px;padding-bottom:4px;font-weight:bold">🐟 Stats</div>
       <div style="color:#888;font-size:10px;margin-bottom:4px">PERFORMANCE</div>
       <div>FPS: <span style="color:${fpsColor}">${currentFPS}</span> (avg: ${avgFPS})</div>
+      <div>Frame: <span style="color:${avgFrameTime>12?'#f00':avgFrameTime>8?'#ff0':'#0f0'}">${avgFrameTime.toFixed(1)}ms</span> (max: ${maxFrameTime.toFixed(1)}ms) <span style="color:#888">/ 16.6ms</span></div>
       <div>Quality: <span style="color:#0ff">${performanceProfile.quality}</span></div>
       <div>Particles: ${Math.round(performanceProfile.particleCount*100)}% | Detail: ${Math.round(performanceProfile.detailLevel*100)}%</div>
       <div style="color:#888;font-size:10px;margin-top:6px;margin-bottom:4px">VISSENKOM</div>
@@ -1300,7 +1342,7 @@ function checkFishBite(){
 
   const BITE_DISTANCE=20; // pixels - vis moet dichterbij komen
   let closestFish=null;
-  let closestDist=BITE_DISTANCE;
+  let closestDistSq=BITE_DISTANCE*BITE_DISTANCE;
 
   // Bereken huidige aas positie
   const baitX=fishingRod.x;
@@ -1308,9 +1350,10 @@ function checkFishBite(){
 
   // Zoek dichtstbijzijnde vis
   for(const fish of fishes){
-    const dist=Math.hypot(fish.x-baitX,fish.y-baitY);
-    if(dist<closestDist){
-      closestDist=dist;
+    const dx=fish.x-baitX,dy=fish.y-baitY;
+    const distSq=dx*dx+dy*dy;
+    if(distSq<closestDistSq){
+      closestDistSq=distSq;
       closestFish=fish;
     }
   }
@@ -1363,7 +1406,7 @@ function healthPct(f,now){
   // Fallback for very old fish data (shouldn't happen)
   return 0;
 }
-function fishSize(f,now){const ageDays=(now-f.bornAt)/DAY;const growth=1+Math.log(1+ageDays*0.15)*0.35+Math.log(1+f.eats*0.5)*0.25;return f.baseSize*growth}
+function fishSize(f,now){const eats=f.eats||0;const nowMin=Math.floor(now/60000);if(f._sizeCache&&f._sizeCache.e===eats&&f._sizeCache.t===nowMin)return f._sizeCache.v;const ageDays=(now-f.bornAt)/DAY;const growth=1+Math.log(1+ageDays*0.15)*0.35+Math.log(1+eats*0.5)*0.25;const v=f.baseSize*growth;f._sizeCache={e:eats,t:nowMin,v};return v}
 function steerTowards(f,tx,ty,str){
   // Validate inputs to prevent jumping
   if(isNaN(tx) || isNaN(ty) || isNaN(str)) return;
@@ -1645,26 +1688,6 @@ function drawStars(time){
     }
   }
 
-  // Extra kerst sparkles (gouden glitters die langzaam bewegen)
-  if(christmasMode){
-    const sparkleCount = 8;
-    for(let i=0;i<sparkleCount;i++){
-      const sparklePhase = i * 3.7 + time * 0.0003;
-      const x = (Math.sin(sparklePhase) * 0.4 + 0.5) * W;
-      const y = (Math.cos(sparklePhase * 0.7) * 0.3 + 0.3) * H;
-      const sparkle = Math.sin(time * 0.005 + i * 2.1) * 0.5 + 0.5;
-      const sparkleAlpha = sparkle * 0.6 * baseDimming;
-
-      // Gouden glitter
-      const sparkleGrad = ctx.createRadialGradient(x,y,0,x,y,4);
-      sparkleGrad.addColorStop(0,`rgba(255,215,100,${sparkleAlpha})`);
-      sparkleGrad.addColorStop(1,`rgba(255,215,100,0)`);
-      ctx.fillStyle = sparkleGrad;
-      ctx.beginPath();
-      ctx.arc(x,y,4,0,Math.PI*2);
-      ctx.fill();
-    }
-  }
 }
 
 function drawHalloweenMoon(){
@@ -1779,111 +1802,104 @@ function drawSpiderWebs(){
 }
 
 function drawSandBottom(time){
+  // Cache sand to offscreen canvas, redraw every ~100ms for subtle wave animation
+  const sandKey=W+'x'+H+lightsOn+currentTheme;
+  const timeKey=Math.floor(time*10); // Update ~6x per second (time is t/60)
+  if(!sandCanvas||sandCacheKey!==sandKey||timeKey!==lastSandTime){
+    if(!sandCanvas||sandCanvas.width!==W||sandCanvas.height!==H){
+      sandCanvas=document.createElement('canvas');
+      sandCanvas.width=W;sandCanvas.height=H;
+      sandCtx=sandCanvas.getContext('2d');
+    }
+    sandCtx.clearRect(0,0,W,H);
+    renderSandToCanvas(sandCtx,time);
+    sandCacheKey=sandKey;
+    lastSandTime=timeKey;
+  }
+  ctx.drawImage(sandCanvas,0,0);
+}
+function renderSandToCanvas(c,time){
   const sandHeight=70;
   const sandTop=H-sandHeight;
 
   // Winter/Kerst: witte sneeuw ipv zand
   if(isWinter()||isChristmas()){
-    const snowGrad=ctx.createLinearGradient(0,sandTop,0,H);
+    const snowGrad=c.createLinearGradient(0,sandTop,0,H);
     if(lightsOn){
-      snowGrad.addColorStop(0,'#FFFFFF'); // Wit sneeuw boven
-      snowGrad.addColorStop(0.5,'#F0F8FF'); // Licht blauwige sneeuw
-      snowGrad.addColorStop(1,'#E6F2FF'); // Iets donkerder sneeuw onder
+      snowGrad.addColorStop(0,'#FFFFFF');
+      snowGrad.addColorStop(0.5,'#F0F8FF');
+      snowGrad.addColorStop(1,'#E6F2FF');
     } else {
-      snowGrad.addColorStop(0,'#C8D8E8'); // Blauwgrijze sneeuw (nacht)
-      snowGrad.addColorStop(0.5,'#B0C4D8'); // Midden
-      snowGrad.addColorStop(1,'#98B0C8'); // Donkerder (nacht)
+      snowGrad.addColorStop(0,'#C8D8E8');
+      snowGrad.addColorStop(0.5,'#B0C4D8');
+      snowGrad.addColorStop(1,'#98B0C8');
     }
-    ctx.fillStyle=snowGrad;
+    c.fillStyle=snowGrad;
   } else {
-    // Normaal: zand gradient (lichter boven, donkerder onder)
-    const sandGrad=ctx.createLinearGradient(0,sandTop,0,H);
+    const sandGrad=c.createLinearGradient(0,sandTop,0,H);
     if(lightsOn){
-      sandGrad.addColorStop(0,'#E5C89A'); // Licht zand boven
-      sandGrad.addColorStop(0.5,'#D4AF7A'); // Midden zand
-      sandGrad.addColorStop(1,'#B89968'); // Donkerder zand onder
+      sandGrad.addColorStop(0,'#E5C89A');
+      sandGrad.addColorStop(0.5,'#D4AF7A');
+      sandGrad.addColorStop(1,'#B89968');
     } else {
-      sandGrad.addColorStop(0,'#8A7556'); // Donker zand boven (nacht)
-      sandGrad.addColorStop(0.5,'#6D5D45'); // Midden
-      sandGrad.addColorStop(1,'#544736'); // Donkerst (nacht)
+      sandGrad.addColorStop(0,'#8A7556');
+      sandGrad.addColorStop(0.5,'#6D5D45');
+      sandGrad.addColorStop(1,'#544736');
     }
-    ctx.fillStyle=sandGrad;
+    c.fillStyle=sandGrad;
   }
 
-  // Teken basis zand/sneeuw laag met golvende bovenkant
-  ctx.beginPath();
-  ctx.moveTo(0,H);
-  ctx.lineTo(0,sandTop);
-
-  // Golvende duinen aan de top
+  // Pre-calculate wave points once, reuse for fill and stroke
+  const wavePoints=[];
   for(let x=0;x<=W;x+=5){
     const wave1=Math.sin(x*0.015+time*0.003)*8;
     const wave2=Math.sin(x*0.008+time*0.002)*5;
     const wave3=Math.sin(x*0.025)*3;
-    const y=sandTop+wave1+wave2+wave3;
-    ctx.lineTo(x,y);
+    wavePoints.push({x,y:sandTop+wave1+wave2+wave3});
   }
 
-  ctx.lineTo(W,H);
-  ctx.closePath();
-  ctx.fill();
+  c.beginPath();
+  c.moveTo(0,H);
+  c.lineTo(0,sandTop);
+  for(let i=0;i<wavePoints.length;i++){c.lineTo(wavePoints[i].x,wavePoints[i].y)}
+  c.lineTo(W,H);
+  c.closePath();
+  c.fill();
 
-  // Subtiele schaduw op de duinen voor diepte
-  ctx.strokeStyle=lightsOn?'rgba(0,0,0,0.08)':'rgba(0,0,0,0.15)';
-  ctx.lineWidth=1.5;
-  ctx.beginPath();
-  for(let x=0;x<=W;x+=5){
-    const wave1=Math.sin(x*0.015+time*0.003)*8;
-    const wave2=Math.sin(x*0.008+time*0.002)*5;
-    const wave3=Math.sin(x*0.025)*3;
-    const y=sandTop+wave1+wave2+wave3;
-    if(x===0)ctx.moveTo(x,y);
-    else ctx.lineTo(x,y);
-  }
-  ctx.stroke();
+  c.strokeStyle=lightsOn?'rgba(0,0,0,0.08)':'rgba(0,0,0,0.15)';
+  c.lineWidth=1.5;
+  c.beginPath();
+  c.moveTo(wavePoints[0].x,wavePoints[0].y);
+  for(let i=1;i<wavePoints.length;i++){c.lineTo(wavePoints[i].x,wavePoints[i].y)}
+  c.stroke();
 
-  // Zand textuur (kleine stipjes)
   if(lightsOn){
-    ctx.fillStyle='rgba(0,0,0,0.04)';
-    for(let i=0;i<80;i++){
-      const x=rand(0,W);
-      const y=rand(sandTop,H);
-      ctx.beginPath();
-      ctx.arc(x,y,rand(0.5,1.5),0,Math.PI*2);
-      ctx.fill();
+    // Generate fixed dot positions once per resize
+    const dotKey=W+'x'+H;
+    if(!sandDots||sandDotsKey!==dotKey){
+      sandDots={dark:[],light:[]};
+      for(let i=0;i<80;i++){sandDots.dark.push({x:rand(0,W),y:rand(sandTop,H),r:rand(0.5,1.5)})}
+      for(let i=0;i<40;i++){sandDots.light.push({x:rand(0,W),y:rand(sandTop,H),r:rand(0.5,1)})}
+      sandDotsKey=dotKey;
     }
-    // Lichtere stipjes
-    ctx.fillStyle='rgba(255,255,255,0.1)';
-    for(let i=0;i<40;i++){
-      const x=rand(0,W);
-      const y=rand(sandTop,H);
-      ctx.beginPath();
-      ctx.arc(x,y,rand(0.5,1),0,Math.PI*2);
-      ctx.fill();
+    c.fillStyle='rgba(0,0,0,0.04)';
+    for(let i=0;i<sandDots.dark.length;i++){
+      const d=sandDots.dark[i];
+      c.beginPath();
+      c.arc(d.x,d.y,d.r,0,Math.PI*2);
+      c.fill();
+    }
+    c.fillStyle='rgba(255,255,255,0.1)';
+    for(let i=0;i<sandDots.light.length;i++){
+      const d=sandDots.light[i];
+      c.beginPath();
+      c.arc(d.x,d.y,d.r,0,Math.PI*2);
+      c.fill();
     }
   }
 }
 
-function drawAmbientGlow(time){
-  // Subtiele gloeiende vlekken in de achtergrond voor meer variatie
-  if(lightsOn){
-    ctx.globalCompositeOperation='lighter';
-    for(let i=0;i<4;i++){
-      const x=W*(0.15+i*0.25);
-      const y=H*0.4+Math.sin(time*0.008+i)*H*0.15;
-      const pulse=Math.sin(time*0.012+i*1.5)*0.3+0.7;
-      const grad=ctx.createRadialGradient(x,y,0,x,y,150);
-      grad.addColorStop(0,`rgba(80,227,194,${0.04*pulse})`);
-      grad.addColorStop(0.5,`rgba(80,227,194,${0.02*pulse})`);
-      grad.addColorStop(1,'rgba(0,0,0,0)');
-      ctx.fillStyle=grad;
-      ctx.beginPath();
-      ctx.arc(x,y,150,0,Math.PI*2);
-      ctx.fill();
-    }
-    ctx.globalCompositeOperation='source-over';
-  }
-}
+function drawAmbientGlow(time){}
 
 function drawParticles(){
   for(const p of particles){
@@ -2277,20 +2293,26 @@ function clearFrame(time){
   // Fill viewport area with gradient background for depth - theme based
   const theme=getThemeConfig();
   const bgColors=lightsOn?theme.bgLight:theme.bgDark;
-  const bgGrad=ctx.createLinearGradient(0,0,0,H);
-  bgGrad.addColorStop(0,bgColors[0]);
-  bgGrad.addColorStop(0.3,bgColors[1]);
-  bgGrad.addColorStop(0.7,bgColors[2]);
-  bgGrad.addColorStop(1,bgColors[3]);
-  ctx.fillStyle=bgGrad;
+  const bgKey=currentTheme+lightsOn+W+H;
+  if(bgKey!==cachedBgKey){
+    cachedBgGrad=ctx.createLinearGradient(0,0,0,H);
+    cachedBgGrad.addColorStop(0,bgColors[0]);
+    cachedBgGrad.addColorStop(0.3,bgColors[1]);
+    cachedBgGrad.addColorStop(0.7,bgColors[2]);
+    cachedBgGrad.addColorStop(1,bgColors[3]);
+    cachedVignetteGrad=ctx.createRadialGradient(W/2,H/2,Math.min(W,H)*0.3,W/2,H/2,Math.max(W,H)*0.8);
+    cachedVignetteGrad.addColorStop(0,'rgba(0,0,0,0)');
+    cachedVignetteGrad.addColorStop(1,`rgba(0,0,0,${theme.vignette})`);
+    cachedBgKey=bgKey;
+  }
+  ctx.fillStyle=cachedBgGrad;
   ctx.fillRect(0,0,W,H);
 
-  // Extra subtiele radiale gradient voor meer diepte (donkerder in hoeken)
-  const vignetteGrad=ctx.createRadialGradient(W/2,H/2,Math.min(W,H)*0.3,W/2,H/2,Math.max(W,H)*0.8);
-  vignetteGrad.addColorStop(0,'rgba(0,0,0,0)');
-  vignetteGrad.addColorStop(1,`rgba(0,0,0,${theme.vignette})`);
-  ctx.fillStyle=vignetteGrad;
-  ctx.fillRect(0,0,W,H);
+  // Extra subtiele radiale gradient voor meer diepte (donkerder in hoeken) - skip on low performance
+  if(performanceProfile.quality!=='low'&&performanceProfile.quality!=='verylow'){
+    ctx.fillStyle=cachedVignetteGrad;
+    ctx.fillRect(0,0,W,H);
+  }
 
   drawStars(time);
   drawHalloweenMoon();
@@ -2323,7 +2345,7 @@ function drawFood(){for(let i=foods.length-1;i>=0;i--){const p=foods[i];
   ctx.fillStyle=p.color||'#ffb37a';ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fill();
   // Verwijder alleen als ttl verloopt (niet meer als het de bodem raakt)
   if(p.ttl<=0){foods.splice(i,1)}}}
-function drawBubbles(){const theme=getThemeConfig();for(let i=bubbles.length-1;i>=0;i--){const b=bubbles[i];b.y-=b.vy;b.x+=b.vx;b.ttl--;ctx.globalAlpha=lightsOn?0.7:0.5;ctx.fillStyle=theme.bubbleColor;ctx.beginPath();ctx.arc(b.x,b.y,b.r,0,Math.PI*2);ctx.fill();ctx.globalAlpha=1;if(b.y<-10||b.ttl<=0){releaseBubble(b);bubbles.splice(i,1)}}}
+function drawBubbles(){if(bubbles.length===0)return;const bubbleColor=(THEMES[currentTheme]||THEMES.normal).bubbleColor;ctx.globalAlpha=lightsOn?0.7:0.5;ctx.fillStyle=bubbleColor;for(let i=bubbles.length-1;i>=0;i--){const b=bubbles[i];b.y-=b.vy;b.x+=b.vx;b.ttl--;ctx.beginPath();ctx.arc(b.x,b.y,b.r,0,Math.PI*2);ctx.fill();if(b.y<-10||b.ttl<=0){releaseBubble(b);bubbles.splice(i,1)}}ctx.globalAlpha=1}
 
 function drawPoops(){
   for(const p of poops) {
@@ -2405,12 +2427,13 @@ function updatePlayBalls(){
     if(!ball.lastPlayingCheck || Date.now() - ball.lastPlayingCheck > 2000) {
       ball.lastPlayingCheck = Date.now();
 
-      const playingFish = fishes.filter(f => f.behaviorState === 'playing').length;
+      let playingFish = 0;
+      const availableFish = [];
+      for(let j=0;j<fishes.length;j++){if(fishes[j].behaviorState==='playing')playingFish++;else availableFish.push(fishes[j])}
 
       if(playingFish < 2) {
         // Niet genoeg vissen spelen, voeg er 1-2 toe
         const needed = 2 - playingFish;
-        const availableFish = fishes.filter(f => f.behaviorState !== 'playing');
 
         for(let j = 0; j < needed && j < availableFish.length; j++) {
           const randomIndex = Math.floor(Math.random() * availableFish.length);
@@ -3017,6 +3040,12 @@ function drawPlants(time){
   }
 }
 
+function getDecoGrad(deco,key,createFn){
+  if(!deco._gradCache)deco._gradCache={};
+  const cacheKey=key+lightsOn+Math.round(fadeAlpha*10);
+  if(!deco._gradCache[cacheKey]){deco._gradCache={};deco._gradCache[cacheKey]=createFn()}
+  return deco._gradCache[cacheKey];
+}
 function drawDecoration(deco,time){
   const lightMul=lightsOn?1:0.6;
   const bobAmount=0; // Static decorations for performance
@@ -3024,9 +3053,7 @@ function drawDecoration(deco,time){
   if(deco.type==='rock'){
     const x=deco.x;
     const y=deco.y+bobAmount;
-    const grad=ctx.createRadialGradient(x-deco.size*0.2,y-deco.size*0.2,0,x,y,deco.size);
-    grad.addColorStop(0,`hsla(${deco.hue},30%,${60*lightMul}%,1)`);
-    grad.addColorStop(1,`hsla(${deco.hue},40%,${30*lightMul}%,1)`);
+    const grad=getDecoGrad(deco,'rock',()=>{const g=ctx.createRadialGradient(x-deco.size*0.2,y-deco.size*0.2,0,x,y,deco.size);g.addColorStop(0,`hsla(${deco.hue},30%,${60*lightMul}%,1)`);g.addColorStop(1,`hsla(${deco.hue},40%,${30*lightMul}%,1)`);return g});
     ctx.fillStyle=grad;
     ctx.beginPath();
     ctx.ellipse(x,y,deco.size*0.8,deco.size*0.6,0,0,Math.PI*2);
@@ -3073,9 +3100,7 @@ function drawDecoration(deco,time){
     const y=deco.y+bobAmount;
 
     // Large main rock
-    const grad1=ctx.createRadialGradient(x-deco.size*0.2,y-deco.size*0.3,0,x,y,deco.size*0.8);
-    grad1.addColorStop(0,`hsla(${deco.hue},35%,${50*lightMul}%,1)`);
-    grad1.addColorStop(1,`hsla(${deco.hue},45%,${25*lightMul}%,1)`);
+    const grad1=getDecoGrad(deco,'rf1',()=>{const g=ctx.createRadialGradient(x-deco.size*0.2,y-deco.size*0.3,0,x,y,deco.size*0.8);g.addColorStop(0,`hsla(${deco.hue},35%,${50*lightMul}%,1)`);g.addColorStop(1,`hsla(${deco.hue},45%,${25*lightMul}%,1)`);return g});
     ctx.fillStyle=grad1;
     ctx.beginPath();
     ctx.ellipse(x,y,deco.size*0.7,deco.size*0.5,0,0,Math.PI*2);
@@ -3084,9 +3109,7 @@ function drawDecoration(deco,time){
     // Secondary rocks
     const rock2X=x-deco.size*0.4;
     const rock2Y=y+deco.size*0.2;
-    const grad2=ctx.createRadialGradient(rock2X,rock2Y-deco.size*0.1,0,rock2X,rock2Y,deco.size*0.3);
-    grad2.addColorStop(0,`hsla(${deco.hue+10},30%,${55*lightMul}%,1)`);
-    grad2.addColorStop(1,`hsla(${deco.hue+10},40%,${30*lightMul}%,1)`);
+    const grad2=getDecoGrad(deco,'rf2',()=>{const g=ctx.createRadialGradient(rock2X,rock2Y-deco.size*0.1,0,rock2X,rock2Y,deco.size*0.3);g.addColorStop(0,`hsla(${deco.hue+10},30%,${55*lightMul}%,1)`);g.addColorStop(1,`hsla(${deco.hue+10},40%,${30*lightMul}%,1)`);return g});
     ctx.fillStyle=grad2;
     ctx.beginPath();
     ctx.ellipse(rock2X,rock2Y,deco.size*0.3,deco.size*0.2,0,0,Math.PI*2);
@@ -3104,9 +3127,7 @@ function drawDecoration(deco,time){
     const y=deco.y+bobAmount;
 
     // Cave entrance/archway
-    const archGrad=ctx.createRadialGradient(x,y-deco.size*0.2,0,x,y,deco.size*0.8);
-    archGrad.addColorStop(0,`hsla(${deco.hue},40%,${40*lightMul}%,1)`);
-    archGrad.addColorStop(1,`hsla(${deco.hue},50%,${20*lightMul}%,1)`);
+    const archGrad=getDecoGrad(deco,'cave',()=>{const g=ctx.createRadialGradient(x,y-deco.size*0.2,0,x,y,deco.size*0.8);g.addColorStop(0,`hsla(${deco.hue},40%,${40*lightMul}%,1)`);g.addColorStop(1,`hsla(${deco.hue},50%,${20*lightMul}%,1)`);return g});
     ctx.fillStyle=archGrad;
     ctx.beginPath();
     ctx.ellipse(x,y,deco.size*0.6,deco.size*0.4,0,0,Math.PI*2);
@@ -3151,9 +3172,7 @@ function drawDecoration(deco,time){
     const pumpkinHeight=deco.size*0.7;
 
     // Pompoen lichaam (oranje met segmenten)
-    const pumpkinGrad=ctx.createRadialGradient(x-pumpkinWidth*0.2,y-pumpkinHeight*0.2,0,x,y,pumpkinWidth*0.6);
-    pumpkinGrad.addColorStop(0,`hsla(${deco.hue},85%,${58*lightMul}%,${fadeAlpha})`);
-    pumpkinGrad.addColorStop(1,`hsla(${deco.hue},75%,${40*lightMul}%,${fadeAlpha})`);
+    const pumpkinGrad=getDecoGrad(deco,'pumpkin',()=>{const g=ctx.createRadialGradient(x-pumpkinWidth*0.2,y-pumpkinHeight*0.2,0,x,y,pumpkinWidth*0.6);g.addColorStop(0,`hsla(${deco.hue},85%,${58*lightMul}%,${fadeAlpha})`);g.addColorStop(1,`hsla(${deco.hue},75%,${40*lightMul}%,${fadeAlpha})`);return g});
     ctx.fillStyle=pumpkinGrad;
     ctx.beginPath();
     ctx.ellipse(x,y,pumpkinWidth*0.5,pumpkinHeight*0.45,0,0,Math.PI*2);
@@ -3220,9 +3239,7 @@ function drawDecoration(deco,time){
     const skullHeight=deco.size*0.9;
 
     // Schedel (wit/beige met schaduw)
-    const skullGrad=ctx.createRadialGradient(x-skullWidth*0.2,y-skullHeight*0.2,0,x,y,skullWidth*0.5);
-    skullGrad.addColorStop(0,`hsla(40,20%,${85*lightMul}%,${fadeAlpha})`); // Licht beige
-    skullGrad.addColorStop(1,`hsla(40,25%,${65*lightMul}%,${fadeAlpha})`); // Donkerder beige
+    const skullGrad=getDecoGrad(deco,'skull',()=>{const g=ctx.createRadialGradient(x-skullWidth*0.2,y-skullHeight*0.2,0,x,y,skullWidth*0.5);g.addColorStop(0,`hsla(40,20%,${85*lightMul}%,${fadeAlpha})`);g.addColorStop(1,`hsla(40,25%,${65*lightMul}%,${fadeAlpha})`);return g});
     ctx.fillStyle=skullGrad;
 
     // Hoofd (ovaal)
@@ -3271,9 +3288,7 @@ function drawDecoration(deco,time){
     const snowmanHeight=deco.size*1.1;
 
     // Sneeuwpop lichaam (3 sneeuwballen gestapeld)
-    const snowGrad=ctx.createRadialGradient(x-snowmanWidth*0.2,y-snowmanHeight*0.2,0,x,y,snowmanWidth*0.5);
-    snowGrad.addColorStop(0,`hsla(200,20%,${95*lightMul}%,${fadeAlpha})`); // Wit met blauwe tint
-    snowGrad.addColorStop(1,`hsla(200,15%,${85*lightMul}%,${fadeAlpha})`); // Licht grijs
+    const snowGrad=getDecoGrad(deco,'snowman',()=>{const g=ctx.createRadialGradient(x-snowmanWidth*0.2,y-snowmanHeight*0.2,0,x,y,snowmanWidth*0.5);g.addColorStop(0,`hsla(200,20%,${95*lightMul}%,${fadeAlpha})`);g.addColorStop(1,`hsla(200,15%,${85*lightMul}%,${fadeAlpha})`);return g});
 
     // Onderste bal (grootste)
     ctx.fillStyle=snowGrad;
@@ -3467,9 +3482,7 @@ function drawDecoration(deco,time){
     ctx.fillStyle=`hsla(25,35%,${20*lightMul}%,${fadeAlpha})`;
     ctx.fillRect(windowX-windowSize/2-2,windowY-windowSize/2-2,windowSize+4,windowSize+4);
     // Warm licht van binnen
-    const windowGrad=ctx.createRadialGradient(windowX,windowY,0,windowX,windowY,windowSize/2);
-    windowGrad.addColorStop(0,`hsla(45,100%,${75*lightMul}%,${fadeAlpha})`);
-    windowGrad.addColorStop(1,`hsla(40,90%,${60*lightMul}%,${fadeAlpha})`);
+    const windowGrad=getDecoGrad(deco,'window',()=>{const g=ctx.createRadialGradient(windowX,windowY,0,windowX,windowY,windowSize/2);g.addColorStop(0,`hsla(45,100%,${75*lightMul}%,${fadeAlpha})`);g.addColorStop(1,`hsla(40,90%,${60*lightMul}%,${fadeAlpha})`);return g});
     ctx.fillStyle=windowGrad;
     ctx.fillRect(windowX-windowSize/2,windowY-windowSize/2,windowSize,windowSize);
     // Kruis in het raam
@@ -3615,10 +3628,7 @@ function drawDecoration(deco,time){
     // Schaaltje/bordje
     const plateWidth=deco.size*0.9;
     const plateHeight=deco.size*0.12;
-    const plateGrad=ctx.createLinearGradient(x-plateWidth/2,y+bolSize*0.8,x+plateWidth/2,y+bolSize*0.8+plateHeight);
-    plateGrad.addColorStop(0,`hsla(0,0%,${90*lightMul}%,${fadeAlpha})`);
-    plateGrad.addColorStop(0.5,`hsla(0,0%,${98*lightMul}%,${fadeAlpha})`);
-    plateGrad.addColorStop(1,`hsla(0,0%,${85*lightMul}%,${fadeAlpha})`);
+    const plateGrad=getDecoGrad(deco,'plate',()=>{const g=ctx.createLinearGradient(x-plateWidth/2,y+bolSize*0.8,x+plateWidth/2,y+bolSize*0.8+plateHeight);g.addColorStop(0,`hsla(0,0%,${90*lightMul}%,${fadeAlpha})`);g.addColorStop(0.5,`hsla(0,0%,${98*lightMul}%,${fadeAlpha})`);g.addColorStop(1,`hsla(0,0%,${85*lightMul}%,${fadeAlpha})`);return g});
     ctx.fillStyle=plateGrad;
     ctx.beginPath();
     ctx.ellipse(x,y+bolSize*0.9,plateWidth/2,plateHeight,0,0,Math.PI*2);
@@ -3709,10 +3719,7 @@ function drawDecoration(deco,time){
     // Metalen kroontje bovenop de bal
     const capHeight=ballRadius*0.25;
     const capWidth=ballRadius*0.4;
-    const capGrad=ctx.createLinearGradient(-capWidth/2,-ballRadius,capWidth/2,-ballRadius);
-    capGrad.addColorStop(0,`rgba(180,180,180,${fadeAlpha*lightMul})`);
-    capGrad.addColorStop(0.5,`rgba(220,220,220,${fadeAlpha*lightMul})`);
-    capGrad.addColorStop(1,`rgba(180,180,180,${fadeAlpha*lightMul})`);
+    const capGrad=getDecoGrad(deco,'cap',()=>{const g=ctx.createLinearGradient(-capWidth/2,-ballRadius,capWidth/2,-ballRadius);g.addColorStop(0,`rgba(180,180,180,${fadeAlpha*lightMul})`);g.addColorStop(0.5,`rgba(220,220,220,${fadeAlpha*lightMul})`);g.addColorStop(1,`rgba(180,180,180,${fadeAlpha*lightMul})`);return g});
     ctx.fillStyle=capGrad;
     ctx.fillRect(-capWidth/2,-ballRadius-capHeight,capWidth,capHeight);
 
@@ -3724,10 +3731,7 @@ function drawDecoration(deco,time){
     ctx.stroke();
 
     // Glanzende kerstbal
-    const ornamentGrad=ctx.createRadialGradient(-ballRadius*0.3,-ballRadius*0.3,0,0,0,ballRadius);
-    ornamentGrad.addColorStop(0,color.light);
-    ornamentGrad.addColorStop(0.6,color.mid);
-    ornamentGrad.addColorStop(1,color.dark);
+    const ornamentGrad=getDecoGrad(deco,'ornament',()=>{const g=ctx.createRadialGradient(-ballRadius*0.3,-ballRadius*0.3,0,0,0,ballRadius);g.addColorStop(0,color.light);g.addColorStop(0.6,color.mid);g.addColorStop(1,color.dark);return g});
     ctx.globalAlpha=fadeAlpha;
     ctx.fillStyle=ornamentGrad;
     ctx.beginPath();
@@ -3762,11 +3766,7 @@ function drawDecoration(deco,time){
     ctx.rotate(tiltDirection*0.35); // ~20 graden kantelen
 
     // Fles body (donkergroen glas)
-    const bodyGrad=ctx.createLinearGradient(-bottleWidth/2,0,bottleWidth/2,0);
-    bodyGrad.addColorStop(0,`hsla(140,45%,${15*lightMul}%,${fadeAlpha})`);
-    bodyGrad.addColorStop(0.3,`hsla(140,40%,${25*lightMul}%,${fadeAlpha})`);
-    bodyGrad.addColorStop(0.7,`hsla(140,40%,${22*lightMul}%,${fadeAlpha})`);
-    bodyGrad.addColorStop(1,`hsla(140,45%,${12*lightMul}%,${fadeAlpha})`);
+    const bodyGrad=getDecoGrad(deco,'bottle',()=>{const g=ctx.createLinearGradient(-bottleWidth/2,0,bottleWidth/2,0);g.addColorStop(0,`hsla(140,45%,${15*lightMul}%,${fadeAlpha})`);g.addColorStop(0.3,`hsla(140,40%,${25*lightMul}%,${fadeAlpha})`);g.addColorStop(0.7,`hsla(140,40%,${22*lightMul}%,${fadeAlpha})`);g.addColorStop(1,`hsla(140,45%,${12*lightMul}%,${fadeAlpha})`);return g});
     ctx.fillStyle=bodyGrad;
 
     // Fles body shape (relatief aan 0,0)
@@ -3879,13 +3879,40 @@ function drawDecorations(time){
 function ageLabelMS(ms){const s=Math.floor(ms/1000);if(s<60)return s+'s';const m=Math.floor(ms/60000);if(m<60)return m+'m';const h=Math.floor(ms/3600000);if(h<24)return h+'u';const d=Math.floor(h/24);if(d<7)return d+'d';if(d<30)return Math.floor(d/7)+'w';const mo=Math.floor(d/30);if(mo<12)return mo+'mnd';return Math.floor(d/365)+'jr'}
 function ageLabel(f,now){return ageLabelMS(now-f.bornAt)}
 
+// Get or create fish body sprite (cached offscreen canvas)
+function getFishSprite(f,s,fishHue,dim){
+  const hueKey=Math.round(fishHue);const dimKey=Math.round(dim*100);const sKey=Math.round(s*10);
+  if(f._sprite&&f._sprite.h===hueKey&&f._sprite.d===dimKey&&f._sprite.s===sKey)return f._sprite;
+  // Sprite canvas sized to fit body + tail with padding
+  const pw=Math.ceil(s*3.2);const ph=Math.ceil(s*1.6);
+  let sc=f._sprite&&f._sprite.cv;
+  if(!sc||sc.width!==pw||sc.height!==ph){sc=document.createElement('canvas');sc.width=pw;sc.height=ph}
+  const c=sc.getContext('2d');
+  c.clearRect(0,0,pw,ph);
+  const cx=pw/2+s*0.15;const cy=ph/2; // Center point offset to accommodate tail
+  // Body gradient
+  const bodyGrad=c.createLinearGradient(cx-s*0.6,cy,cx+s*0.6,cy);
+  bodyGrad.addColorStop(0,`hsla(${hueKey},90%,${60*dim}%,1)`);
+  bodyGrad.addColorStop(1,`hsla(${Math.round((fishHue+50)%360)},80%,${50*dim}%,1)`);
+  c.fillStyle=bodyGrad;c.beginPath();c.ellipse(cx,cy,s*0.9,s*0.55,0,0,Math.PI*2);c.fill();
+  // Tail
+  c.fillStyle=`hsla(${Math.round((fishHue+20)%360)},80%,${55*dim}%,1)`;
+  c.beginPath();c.moveTo(cx-s*0.9,cy);c.lineTo(cx-s*1.4,cy-s*0.35);c.lineTo(cx-s*1.2,cy);c.lineTo(cx-s*1.4,cy+s*0.35);c.closePath();c.fill();
+  // Eye
+  const eyeLight=dim>0.5;
+  c.fillStyle=eyeLight?'#fff':'#d8e1e8';c.beginPath();c.arc(cx+s*0.35,cy-s*0.08,s*0.11,0,Math.PI*2);c.fill();
+  c.fillStyle=eyeLight?'#000':'#24323c';c.beginPath();c.arc(cx+s*0.37,cy-s*0.08,s*0.05,0,Math.PI*2);c.fill();
+  f._sprite={cv:sc,h:hueKey,d:dimKey,s:sKey,pw,ph,cx,cy};
+  return f._sprite;
+}
+
 function drawFish(f,t,now){
   const s=fishSize(f,now);
   // Als vis gevangen is, verticale oriëntatie (hoofd naar boven)
   const a=f.caughtVertical?-Math.PI/2:Math.atan2(f.vy,f.vx);
 
   // Subtiele schaduw onder de vis voor diepte-effect (skip on low performance, niet bij gevangen vis of in banner)
-  if(lightsOn&&performanceProfile.quality!=='verylow'&&!f.caughtVertical&&!f.hideShadow){
+  if(lightsOn&&performanceProfile.quality!=='verylow'&&performanceProfile.quality!=='low'&&!f.caughtVertical&&!f.hideShadow){
     ctx.globalAlpha=0.15;
     ctx.fillStyle='#000';
     ctx.beginPath();
@@ -3915,7 +3942,7 @@ function drawFish(f,t,now){
   // Ensure f.hue is a valid number, fallback to 0 if NaN
   let fishHue = isNaN(f.hue) ? 0 : f.hue;
 
-  if(discoOn&&performanceProfile.quality!=='verylow'){
+  if(discoOn&&performanceProfile.quality!=='verylow'&&performanceProfile.quality!=='low'){
     // Ensure all inputs are valid numbers before calculating
     const timeInput = isNaN(t) ? 0 : t;
     const xInput = isNaN(f.x) ? 0 : f.x;
@@ -3931,13 +3958,14 @@ function drawFish(f,t,now){
     glow.addColorStop(1,'rgba(0,0,0,0)');
     ctx.fillStyle=glow;ctx.beginPath();ctx.arc(0,0,s*1.5,0,Math.PI*2);ctx.fill();
   }
-  const bodyGrad=ctx.createLinearGradient(-s*0.6,0,s*0.6,0);
-  bodyGrad.addColorStop(0,`hsla(${Math.round(fishHue)},90%,${60*dim}%,1)`);bodyGrad.addColorStop(1,`hsla(${Math.round((fishHue+50)%360)},80%,${50*dim}%,1)`);
-  ctx.fillStyle=bodyGrad;ctx.beginPath();ctx.ellipse(0,0,s*0.9,s*0.55,0,0,Math.PI*2);ctx.fill();
-  ctx.fillStyle=`hsla(${Math.round((fishHue+20)%360)},80%,${55*dim}%,1)`;ctx.beginPath();ctx.moveTo(-s*0.9,0);ctx.lineTo(-s*1.4,-s*0.35);ctx.lineTo(-s*1.2,0);ctx.lineTo(-s*1.4,s*0.35);ctx.closePath();ctx.fill();
+
+  // Draw fish body from cached sprite
+  const sprite=getFishSprite(f,s,fishHue,dim);
+  ctx.drawImage(sprite.cv,-sprite.cx,-sprite.cy);
+
+  // Animated fin (drawn live for smooth animation)
   const finW=s*0.45;const finH=s*0.25;const finWave=Math.sin(t*(discoOn?0.04:0.02)+f.x*0.03)*0.5+0.5;
   ctx.save();ctx.translate(-s*0.35,0);ctx.rotate((finWave-0.5)*(discoOn?1.2:0.6));ctx.fillStyle=`hsla(${Math.round((fishHue+70)%360)},85%,${65*dim}%,1)`;ctx.beginPath();ctx.ellipse(0,0,finW,finH,0,0,Math.PI*2);ctx.fill();ctx.restore();
-  ctx.fillStyle=lightsOn?'#fff':'#d8e1e8';ctx.beginPath();ctx.arc(s*0.35,-s*0.08,s*0.11,0,Math.PI*2);ctx.fill();ctx.fillStyle=lightsOn?'#000':'#24323c';ctx.beginPath();ctx.arc(s*0.37,-s*0.08,s*0.05,0,Math.PI*2);ctx.fill();
 
   // Af en toe een glinsterend sterretje op de vis (alleen als gezond en licht aan) - skip on low performance
   if(lightsOn && performanceProfile.quality!=='low' && performanceProfile.quality!=='verylow' && healthPct(f,now)>50 && Math.sin(t*0.1+f.x*0.05)>0.85){
@@ -3955,32 +3983,6 @@ function drawFish(f,t,now){
     }
   }
 
-  // Kerstmutsje voor de visjes - tijdelijk uitgeschakeld
-  // if(isChristmas()){
-  //   const hatX = s*0.5; // Bovenop het hoofd
-  //   const hatY = -s*0.4;
-  //   const hatWidth = s*0.4;
-  //   const hatHeight = s*0.5;
-
-  //   // Rode muts (driehoek)
-  //   ctx.fillStyle = `hsla(0,85%,${50*lightMul}%,1)`;
-  //   ctx.beginPath();
-  //   ctx.moveTo(hatX - hatWidth*0.5, hatY); // Links onder
-  //   ctx.lineTo(hatX + hatWidth*0.5, hatY); // Rechts onder
-  //   ctx.lineTo(hatX + hatWidth*0.2, hatY - hatHeight); // Punt (iets naar rechts)
-  //   ctx.closePath();
-  //   ctx.fill();
-
-  //   // Witte rand onderaan
-  //   ctx.fillStyle = `hsla(0,0%,${95*lightMul}%,1)`;
-  //   ctx.fillRect(hatX - hatWidth*0.5, hatY - s*0.08, hatWidth, s*0.08);
-
-  //   // Wit bolletje op de punt
-  //   ctx.beginPath();
-  //   ctx.arc(hatX + hatWidth*0.2, hatY - hatHeight, s*0.12, 0, Math.PI*2);
-  //   ctx.fill();
-  // }
-
   ctx.restore();
 
   // Verberg label als hideLabel flag gezet is (voor banner display)
@@ -3997,8 +3999,13 @@ function drawFish(f,t,now){
   const pad=6;
   const nameFont='600 14px system-ui,Segoe UI,Roboto,Arial';
   const ageFont='500 11px system-ui,Segoe UI,Roboto,Arial';
-  ctx.font=nameFont;const tw1=ctx.measureText(label1).width;
-  ctx.font=ageFont;const tw2=ctx.measureText(label2).width;
+  // Cache measureText results - only recalculate when labels change
+  if(!f._labelCache||f._labelCache.l1!==label1||f._labelCache.l2!==label2){
+    ctx.font=nameFont;const tw1=ctx.measureText(label1).width;
+    ctx.font=ageFont;const tw2=ctx.measureText(label2).width;
+    f._labelCache={l1:label1,l2:label2,tw1,tw2};
+  }
+  const tw1=f._labelCache.tw1;const tw2=f._labelCache.tw2;
   const lw=Math.max(90,Math.max(tw1,tw2)+pad*2);
   const lh=50;
   const lx=Math.round(clamp(f.x-lw/2,6,W-lw-6));const ly=Math.round(f.y-Math.max(s*2.0,65));
@@ -4122,12 +4129,19 @@ function handleSurfaceSwimming(f) {
   steerTowards(f, targetX, targetY, 0.03);
 }
 
+function applySchoolingCache(f){
+  if(!f._schoolCache)return;
+  f.vx+=f._schoolCache.dvx;
+  f.vy+=f._schoolCache.dvy;
+}
 function handleSchooling(f) {
   const schoolRadius = 80;
   const schoolRadiusSq = schoolRadius * schoolRadius; // Use squared distance
   const separationRadius = 25;
   const separationRadiusSq = separationRadius * separationRadius;
   let nearby = [];
+
+  const vxBefore=f.vx;const vyBefore=f.vy;
 
   // Find nearby fish using squared distance
   for(const other of fishes) {
@@ -4180,6 +4194,9 @@ function handleSchooling(f) {
     f.vx += (avgVx - f.vx) * 0.05;
     f.vy += (avgVy - f.vy) * 0.05;
   }
+
+  // Cache the velocity delta for reuse on skipped frames
+  f._schoolCache={dvx:f.vx-vxBefore,dvy:f.vy-vyBefore};
 }
 
 function handlePlayful(f) {
@@ -4293,8 +4310,8 @@ function handleCurious(f) {
     steerTowards(f, f.curiousTarget.x, f.curiousTarget.y, 0.04);
 
     // When close, pick new target
-    const dist = Math.hypot(f.curiousTarget.x - f.x, f.curiousTarget.y - f.y);
-    if(dist < 30) {
+    const dx=f.curiousTarget.x-f.x,dy=f.curiousTarget.y-f.y;
+    if(dx*dx+dy*dy < 900) {
       f.curiousTarget = null;
     }
   }
@@ -4328,18 +4345,20 @@ function handleHiding(f) {
 
     // Check plants
     plants.forEach(p => {
-      const dist = Math.hypot(p.x - f.x, p.y - f.y);
-      if(dist < minDist) {
-        minDist = dist;
+      const dx=p.x-f.x,dy=p.y-f.y;
+      const distSq=dx*dx+dy*dy;
+      if(distSq < minDist) {
+        minDist = distSq;
         closest = {x: p.x, y: p.y + rand(-15, 15)};
       }
     });
 
     // Check decorations
     decorations.forEach(d => {
-      const dist = Math.hypot(d.x - f.x, d.y - f.y);
-      if(dist < minDist) {
-        minDist = dist;
+      const dx=d.x-f.x,dy=d.y-f.y;
+      const distSq=dx*dx+dy*dy;
+      if(distSq < minDist) {
+        minDist = distSq;
         closest = {x: d.x + rand(-20, 20), y: d.y};
       }
     });
@@ -4352,8 +4371,8 @@ function handleHiding(f) {
     steerTowards(f, f.hideTarget.x, f.hideTarget.y, 0.04);
 
     // When close, stay still
-    const dist = Math.hypot(f.hideTarget.x - f.x, f.hideTarget.y - f.y);
-    if(dist < 40) {
+    const hdx=f.hideTarget.x-f.x,hdy=f.hideTarget.y-f.y;
+    if(hdx*hdx+hdy*hdy < 1600) {
       f.vx *= 0.9; // Heavy damping
       f.vy *= 0.9;
     }
@@ -4375,11 +4394,13 @@ function handleTerritorial(f) {
   let intruder = null;
   let closestDist = Infinity;
 
+  const terRadSq=f.territoryRadius*f.territoryRadius;
   fishes.forEach(other => {
     if(other === f) return;
-    const dist = Math.hypot(other.x - f.territoryCenter.x, other.y - f.territoryCenter.y);
-    if(dist < f.territoryRadius && dist < closestDist) {
-      closestDist = dist;
+    const dx=other.x-f.territoryCenter.x,dy=other.y-f.territoryCenter.y;
+    const distSq=dx*dx+dy*dy;
+    if(distSq < terRadSq && distSq < closestDist) {
+      closestDist = distSq;
       intruder = other;
     }
   });
@@ -4394,9 +4415,8 @@ function handleTerritorial(f) {
     f.vy += Math.sin(angle) * 0.15;
 
     // Make intruder flee if close enough
-    const chaseRadius = 60;
-    const distToIntruder = Math.hypot(intruder.x - f.x, intruder.y - f.y);
-    if(distToIntruder < chaseRadius) {
+    const cdx=intruder.x-f.x,cdy=intruder.y-f.y;
+    if(cdx*cdx+cdy*cdy < 3600) {
       // Intruder flees away from territorial fish
       const fleeAngle = Math.atan2(intruder.y - f.y, intruder.x - f.x);
       intruder.vx += Math.cos(fleeAngle) * 0.25;
@@ -4410,9 +4430,11 @@ function handleTerritorial(f) {
     }
   } else {
     // No intruder, patrol around territory center
-    const distToCenter = Math.hypot(f.x - f.territoryCenter.x, f.y - f.territoryCenter.y);
+    const pcx=f.x-f.territoryCenter.x,pcy=f.y-f.territoryCenter.y;
+    const distToCenterSq=pcx*pcx+pcy*pcy;
+    const patrolLimitSq=(f.territoryRadius*0.8)*(f.territoryRadius*0.8);
 
-    if(distToCenter > f.territoryRadius * 0.8) {
+    if(distToCenterSq > patrolLimitSq) {
       // Return to center
       steerTowards(f, f.territoryCenter.x, f.territoryCenter.y, 0.04);
     } else {
@@ -4477,10 +4499,10 @@ function handleHunting(f) {
     f.huntTimer--;
 
     // Check distance to target
-    const dist = Math.hypot(targetX - f.x, targetY - f.y);
+    const htdx=targetX-f.x,htdy=targetY-f.y;
 
     // Lunge if timer expired or very close
-    if(f.huntTimer <= 0 || dist < 80) {
+    if(f.huntTimer <= 0 || htdx*htdx+htdy*htdy < 6400) {
       f.huntPhase = 'lunging';
       f.huntTimer = Math.floor(rand(30, 60)); // Lunge duration
     }
@@ -4546,7 +4568,7 @@ function handlePlaying(f) {
   if(closestBall) {
     const dx = closestBall.x - f.x;
     const dy = closestBall.y - f.y;
-    const dist = Math.sqrt(dx * dx + dy * dy);
+    const dist = closestDist;
     const fishSizeNow = fishSize(f, Date.now());
 
     // Iets ruimere collision - vis raakt bal net voordat ze overlapten
@@ -4647,7 +4669,7 @@ function handlePlaying(f) {
 }
 
 function updateFish(f,dt,now){
-  let target=null;let best=1e9;for(const p of foods){const d=(p.x-f.x)**2+(p.y-f.y)**2;if(d<best){best=d;target=p}}
+  let target=null;if(foods.length>0){let best=1e9;for(const p of foods){const d=(p.x-f.x)**2+(p.y-f.y)**2;if(d<best){best=d;target=p}}}
   const hp=healthPct(f,now);
 
   // Track if fish is chasing food (for emoji display)
@@ -4681,10 +4703,11 @@ function updateFish(f,dt,now){
     // Vis wordt aangetrokken tot aas (net als voer)
     const baitX=fishingRod.x;
     const baitY=fishingRod.targetY;
-    const distToBait=Math.hypot(f.x-baitX,f.y-baitY);
+    const bdx=f.x-baitX,bdy=f.y-baitY;
+    const distToBaitSq=bdx*bdx+bdy*bdy;
 
     // Binnen 120px wordt vis aangetrokken (moeilijker - was 200px)
-    if(distToBait<120){
+    if(distToBaitSq<14400){
       steerTowards(f,baitX,baitY,0.06); // Iets sterker dan voer
       // Reset to normal behavior
       if(f.behaviorState !== 'normal') {
@@ -4736,8 +4759,8 @@ function updateFish(f,dt,now){
     // Chance to regain pump interest (~35% per minute per fish)
     // Only if fish is near the pump (within 200px)
     if(pumpOn && !f.pumpInterest) {
-      const distToPump = Math.hypot(f.x - pumpPos.x, f.y - (H - 30));
-      if(distToPump < 200 && Math.random() < 0.0001) {
+      const pdx=f.x-pumpPos.x,pdy=f.y-(H-30);
+      if(pdx*pdx+pdy*pdy < 40000 && Math.random() < 0.0001) {
         f.pumpInterest = true;
         f.pumpInterestUntil = now + rand(20000, 40000); // 20-40 seconds interest
       }
@@ -4850,6 +4873,9 @@ function updateFish(f,dt,now){
         handleSurfaceSwimming(f);
         break;
       case 'schooling':
+        // Reduce O(n²) schooling frequency on lower performance, reuse cached forces on skipped frames
+        if(performanceProfile.quality==='low'&&t%3!==0){applySchoolingCache(f);break}
+        if(performanceProfile.quality==='verylow'&&t%5!==0){applySchoolingCache(f);break}
         handleSchooling(f);
         break;
       case 'playful':
@@ -5002,7 +5028,7 @@ function updateFish(f,dt,now){
   if(isNaN(f.y)) f.y = H / 2;
 
   bounceOffWalls(f);
-  for(let i=foods.length-1;i>=0;i--){const p=foods[i];if(Math.hypot(p.x-f.x,p.y-f.y)<fishSize(f,now)*0.7+p.r){foods.splice(i,1);f.blink=8;f.lastEat=Date.now();f.eats++;f.health=Math.min(100,f.health+15);sendToServer({command:'updateFishStats',fishName:f.name,stats:{eats:f.eats,lastEat:f.lastEat,health:f.health}})}}
+  for(let i=foods.length-1;i>=0;i--){const p=foods[i];const fdx=p.x-f.x,fdy=p.y-f.y;const eatR=fishSize(f,now)*0.7+p.r;if(fdx*fdx+fdy*fdy<eatR*eatR){foods.splice(i,1);f.blink=8;f.lastEat=Date.now();f.eats++;f.health=Math.min(100,f.health+15);sendToServer({command:'updateFishStats',fishName:f.name,stats:{eats:f.eats,lastEat:f.lastEat,health:f.health}})}}
 
   // Pooping logic - fish poop 15-60 minutes after eating (50% chance to reduce frequency)
   const timeSinceEat = now - f.lastEat;
@@ -6860,6 +6886,7 @@ function init(){document.getElementById('tank').style.background=BG;document.bod
 init();
 
 function loop(){
+const frameStart=performance.now();
 // Stop loop if game is not active (e.g., vissenkom already active elsewhere)
 if(!gameLoopStarted){
   return;
@@ -6998,6 +7025,11 @@ if(fadeState==='idle'&&now-lastDecorUpdate>DECOR_UPDATE_INTERVAL){
     fadeAlpha=fadeProgress;
   }
 }
+
+// Track frame time
+const frameTime=performance.now()-frameStart;
+frameTimeHistory.push(frameTime);
+if(frameTimeHistory.length>60)frameTimeHistory.shift();
 
 requestAnimationFrame(loop)}
 // loop() is now started after gameState is received (see handleRemoteCommand)
