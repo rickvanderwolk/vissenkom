@@ -1,8 +1,11 @@
+        html {
+            background-color: #0b1e2d;
+        }
+
         html, body {
             height: 100%;
             margin: 0;
             font-family: system-ui, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
-            background: linear-gradient(135deg, #0b1e2d 0%, #083042 100%);
             color: #e9f1f7;
             box-sizing: border-box;
             /* Mobile optimizations */
@@ -23,6 +26,7 @@
             min-height: -webkit-fill-available; /* iOS Safari fix */
             padding: 20px 20px; /* Explicitly set left and right padding */
             display: block; /* Change from flex to block for scrolling */
+            background: linear-gradient(135deg, #0b1e2d 0%, #083042 100%);
         }
 
         .controller-container {
