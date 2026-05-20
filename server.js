@@ -72,7 +72,6 @@ let config = {
     showControllerStatusBlocks: false,
     hungerRate: 0.167,
     diseaseRate: 0.083,
-    renderScale: 1.0,
     viewport: {
         offsetTop: 0,
         offsetBottom: 0,

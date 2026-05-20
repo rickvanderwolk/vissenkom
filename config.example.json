@@ -10,8 +10,6 @@
   "// hungerRate": "Health loss per 10 min from hunger (default: 0.167, ~4 days to die)",
   "diseaseRate": 0.083,
   "// diseaseRate": "Extra health loss per 10 min when sick and not medicated (default: 0.083)",
-  "renderScale": 1.0,
-  "// renderScale": "Display render resolution scale (0.25-1.0). Lower = fewer pixels rendered, better FPS on weak hardware like Raspberry Pi. Try 0.5 on a Pi.",
   "viewport": {
     "offsetTop": 0,
     "offsetBottom": 0,
