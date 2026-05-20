@@ -73,6 +73,33 @@ npm start
 
 Ga naar http://localhost:3000
 
+## Display op een Raspberry Pi
+
+De vissenkom-display kan op een Raspberry Pi (4 of 5) gedraaid worden in kiosk-modus. Met veel vissen (30+) kan de framerate inzakken — twee dingen helpen veruit het meest.
+
+**1. Chromium starten met GPU-flags:**
+
+```bash
+chromium-browser --kiosk \
+  --enable-gpu-rasterization \
+  --enable-zero-copy \
+  --ignore-gpu-blocklist \
+  --use-gl=egl \
+  --disable-background-timer-throttling \
+  --disable-renderer-backgrounding \
+  http://localhost:3000
+```
+
+**2. Verlaag `renderScale` in `config.json`:**
+
+```json
+{ "renderScale": 0.5 }
+```
+
+Dit rendert op een kwart van de pixels en laat de browser het stretchen naar volledig scherm. Bij 30-50 vissen tilt dit de FPS op een Pi 5 typisch van ~5 naar ~25-30. Geldige waarden: `0.25` tot `1.0`.
+
+Open DevTools in de display-browser en roep `showStats()` aan om een FPS- en quality-overlay te tonen — handig om te zien welke `renderScale` voldoende is.
+
 ## Zelf hosten
 
 Je kunt een vissenkom op je eigen server draaien. Hiervoor heb je Node en NPM nodig. Wil je snel starten? Hieronder staat hoe je in een paar minuten een vissenkom opzet met Railway.
@@ -109,6 +136,7 @@ Beschikbare opties:
 | `showControllerStatusBlocks` | Toon statusblokken in de controller (temperatuur, pomp, etc.) | `false` |
 | `hungerRate` | Gezondheidsverlies per 10 minuten door honger | `0.167` (~4 dagen tot dood) |
 | `diseaseRate` | Extra gezondheidsverlies per 10 minuten bij ziekte zonder medicijnen | `0.083` |
+| `renderScale` | Interne render-resolutie voor het display (`0.25` t/m `1.0`). Lager = minder pixels rendert per frame, fors betere FPS op zwakke hardware (bv. Raspberry Pi). `0.5` rendert op een kwart van de pixels en stretcht via CSS naar volledig scherm. | `1.0` |
 | `viewport` | Object met `offsetTop`, `offsetBottom`, `offsetLeft`, `offsetRight` om het zichtbare gebied aan te passen (handig voor schermen met randen) | `0` voor alle waarden |
 
 ## Credits

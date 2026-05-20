@@ -1,7 +1,11 @@
 const cv=document.getElementById('c');const ctx=cv.getContext('2d');
 const rand=(a,b)=>Math.random()*(b-a)+a;const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 let lamps=[];let W=0,H=0;
+// viewportConfig holds offsets in BACKING-pixel coords (scaled by renderScale).
+// viewportConfigCSS holds raw CSS-pixel offsets from config — used for DOM positioning.
 let viewportConfig={offsetTop:0,offsetBottom:0,offsetLeft:0,offsetRight:0};
+let viewportConfigCSS={offsetTop:0,offsetBottom:0,offsetLeft:0,offsetRight:0};
+let renderScale=1.0;
 
 // === ADAPTIVE PERFORMANCE SYSTEM ===
 let performanceProfile={quality:'low',particleCount:0.4,detailLevel:0.7,skipFrames:0,fishUpdateRate:1};
@@ -140,12 +144,17 @@ function releaseParticle(p){
 }
 
 function resize(){
-  const fullW=cv.clientWidth;
-  const fullH=cv.clientHeight;
-  cv.width=fullW;
-  cv.height=fullH;
-  W=fullW-(viewportConfig.offsetLeft+viewportConfig.offsetRight);
-  H=fullH-(viewportConfig.offsetTop+viewportConfig.offsetBottom);
+  const cssW=cv.clientWidth;
+  const cssH=cv.clientHeight;
+  const s=Math.max(0.25,Math.min(1,renderScale||1));
+  cv.width=Math.max(1,Math.floor(cssW*s));
+  cv.height=Math.max(1,Math.floor(cssH*s));
+  viewportConfig.offsetTop=Math.floor((viewportConfigCSS.offsetTop||0)*s);
+  viewportConfig.offsetBottom=Math.floor((viewportConfigCSS.offsetBottom||0)*s);
+  viewportConfig.offsetLeft=Math.floor((viewportConfigCSS.offsetLeft||0)*s);
+  viewportConfig.offsetRight=Math.floor((viewportConfigCSS.offsetRight||0)*s);
+  W=cv.width-(viewportConfig.offsetLeft+viewportConfig.offsetRight);
+  H=cv.height-(viewportConfig.offsetTop+viewportConfig.offsetBottom);
   pumpPos.x=W-70; // Altijd initialiseren voor champagnefles
   updateUIPositions();
   setupLamps();setupDiscoBall();setupFishingRod();setupPlants();setupDecorations();setupStars();setupParticles();setupSpiderWebs();
@@ -156,11 +165,11 @@ function updateUIPositions(){
   const side=document.querySelector('.side');
   const statusbar=document.querySelector('.statusbar');
   if(side){
-    side.style.left=(viewportConfig.offsetLeft+8)+'px';
-    side.style.top=(viewportConfig.offsetTop+8)+'px';
+    side.style.left=(viewportConfigCSS.offsetLeft+8)+'px';
+    side.style.top=(viewportConfigCSS.offsetTop+8)+'px';
   }
   if(statusbar){
-    statusbar.style.bottom=(viewportConfig.offsetBottom+8)+'px';
+    statusbar.style.bottom=(viewportConfigCSS.offsetBottom+8)+'px';
   }
 }
 window.addEventListener('resize',resize);
@@ -5657,11 +5666,19 @@ function handleRemoteCommand(data) {
             if(data.config) {
                 // Store full config
                 appConfig = { ...appConfig, ...data.config };
-                // Handle viewport config
+                // Handle viewport config (CSS-pixel offsets — scaled in resize())
                 if(data.config.viewport) {
-                    viewportConfig = data.config.viewport;
-                    resize(); // Recalculate viewport dimensions
+                    viewportConfigCSS = {
+                        offsetTop: data.config.viewport.offsetTop || 0,
+                        offsetBottom: data.config.viewport.offsetBottom || 0,
+                        offsetLeft: data.config.viewport.offsetLeft || 0,
+                        offsetRight: data.config.viewport.offsetRight || 0
+                    };
                 }
+                if(typeof data.config.renderScale === 'number') {
+                    renderScale = data.config.renderScale;
+                }
+                resize(); // Recalculate viewport dimensions & canvas backing-store
             }
             break;
         case 'stateHash':
