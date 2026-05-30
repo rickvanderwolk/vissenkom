@@ -18,6 +18,14 @@
     <div class="controller-container">
         <h1>🐟 Vissenkom Controller</h1>
 
+        <!-- Tip: vis toevoegen -->
+        <div class="fish-hint-box" id="addFishTip">
+            <div class="fish-hint-icon">🐟</div>
+            <div class="fish-hint-text">
+                <strong>Tip:</strong> Voeg een vis toe via <span class="fish-hint-link" id="addFishHintLink">Vis toevoegen ↓</span>
+            </div>
+        </div>
+
         <!-- Compact Status Dashboard -->
         <div class="status-dashboard" style="display: none;">
             <div class="status-item">
@@ -153,7 +161,7 @@
         </div>
 
         <!-- Vis toevoegen -->
-        <div class="category-section">
+        <div class="category-section" id="addFishSection">
             <h3 class="section-header section-header--fish">🐟 Vis toevoegen</h3>
             <div class="add-fish-container">
                 <input type="text" id="fishNameInput" placeholder="Naam van je visje..." disabled>

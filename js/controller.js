@@ -734,11 +734,29 @@
             if (dashboard) {
                 dashboard.style.display = showStatus ? 'grid' : 'none';
             }
+
+            // Add-fish tip badge visibility (default to true if not specified)
+            const showAddFishTip = config && config.showAddFishTip !== undefined ? config.showAddFishTip : true;
+            const addFishTip = document.getElementById('addFishTip');
+            if (addFishTip) {
+                addFishTip.style.display = showAddFishTip ? 'flex' : 'none';
+            }
         }
 
         // Single page layout - no tab switching needed
         function initTabs() {
-            // No-op: all sections visible on single page
+            // Tip badge scrolls down to the "Vis toevoegen" section
+            const addFishHintLink = document.getElementById('addFishHintLink');
+            const addFishSection = document.getElementById('addFishSection');
+            if (addFishHintLink && addFishSection) {
+                addFishHintLink.addEventListener('click', () => {
+                    addFishSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    const fishNameInput = document.getElementById('fishNameInput');
+                    if (fishNameInput && !fishNameInput.disabled) {
+                        fishNameInput.focus();
+                    }
+                });
+            }
         }
 
         // Mobile debugging - check DOM elements on startup

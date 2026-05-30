@@ -70,6 +70,7 @@ let config = {
     footerLinkText: 'View on GitHub',
     showBehaviorEmoji: true,
     showControllerStatusBlocks: false,
+    showAddFishTip: true,
     hungerRate: 0.167,
     diseaseRate: 0.083,
     viewport: {

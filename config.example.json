@@ -6,6 +6,7 @@
   "footerLinkText": "View on GitHub",
   "showBehaviorEmoji": true,
   "showControllerStatusBlocks": false,
+  "showAddFishTip": true,
   "hungerRate": 0.167,
   "// hungerRate": "Health loss per 10 min from hunger (default: 0.167, ~4 days to die)",
   "diseaseRate": 0.083,
