@@ -751,8 +751,13 @@
             if (addFishHintLink && addFishSection) {
                 addFishHintLink.addEventListener('click', () => {
                     addFishSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    // Only auto-focus on non-touch devices. On iOS/Android the keyboard
+                    // would pop up and cover the input (which sits near the bottom of the
+                    // page); letting the user tap the field themselves lets the OS keep it
+                    // visible above the keyboard.
+                    const isTouch = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
                     const fishNameInput = document.getElementById('fishNameInput');
-                    if (fishNameInput && !fishNameInput.disabled) {
+                    if (!isTouch && fishNameInput && !fishNameInput.disabled) {
                         fishNameInput.focus();
                     }
                 });
