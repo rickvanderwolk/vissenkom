@@ -1424,8 +1424,11 @@ function steerTowards(f,tx,ty,str){
   const steerX = Math.max(-maxSteer, Math.min(maxSteer, dx/d*str));
   const steerY = Math.max(-maxSteer, Math.min(maxSteer, dy/d*str));
 
-  f.vx += steerX;
-  f.vy += steerY;
+  // Steering is an acceleration, so scale it by frameScale too — otherwise
+  // directed motion (following food/ball/walls) builds up speed slower on low
+  // FPS even though plain coasting is already framerate-corrected.
+  f.vx += steerX * frameScale;
+  f.vy += steerY * frameScale;
 }
 function limitSpeed(f){
   // Validate fish speed property
@@ -4655,7 +4658,7 @@ function handlePlaying(f) {
       if(distToBall > 50) {
         // Ver weg? Zwem nog sneller!
         const boostAngle = Math.atan2(targetY - f.y, targetX - f.x);
-        const boostAmount = rand(0.08, 0.15);
+        const boostAmount = rand(0.08, 0.15) * frameScale;
         f.vx += Math.cos(boostAngle) * boostAmount;
         f.vy += Math.sin(boostAngle) * boostAmount;
       }
