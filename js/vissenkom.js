@@ -2342,13 +2342,13 @@ function drawFood(){for(let i=foods.length-1;i>=0;i--){const p=foods[i];
     p.y = H-16;  // Blijf op de bodem
     p.vy = 0;     // Stop met vallen
   } else {
-    p.y+=p.vy;    // Blijf vallen als nog niet op bodem
+    p.y+=p.vy*frameScale;    // Blijf vallen als nog niet op bodem
   }
   p.ttl--;
   ctx.fillStyle=p.color||'#ffb37a';ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fill();
   // Verwijder alleen als ttl verloopt (niet meer als het de bodem raakt)
   if(p.ttl<=0){foods.splice(i,1)}}}
-function drawBubbles(){if(bubbles.length===0)return;const bubbleColor=(THEMES[currentTheme]||THEMES.normal).bubbleColor;ctx.globalAlpha=lightsOn?0.7:0.5;ctx.fillStyle=bubbleColor;for(let i=bubbles.length-1;i>=0;i--){const b=bubbles[i];b.y-=b.vy;b.x+=b.vx;b.ttl--;ctx.beginPath();ctx.arc(b.x,b.y,b.r,0,Math.PI*2);ctx.fill();if(b.y<-10||b.ttl<=0){releaseBubble(b);bubbles.splice(i,1)}}ctx.globalAlpha=1}
+function drawBubbles(){if(bubbles.length===0)return;const bubbleColor=(THEMES[currentTheme]||THEMES.normal).bubbleColor;ctx.globalAlpha=lightsOn?0.7:0.5;ctx.fillStyle=bubbleColor;for(let i=bubbles.length-1;i>=0;i--){const b=bubbles[i];b.y-=b.vy*frameScale;b.x+=b.vx*frameScale;b.ttl--;ctx.beginPath();ctx.arc(b.x,b.y,b.r,0,Math.PI*2);ctx.fill();if(b.y<-10||b.ttl<=0){releaseBubble(b);bubbles.splice(i,1)}}ctx.globalAlpha=1}
 
 function drawPoops(){
   for(const p of poops) {
@@ -2451,9 +2451,9 @@ function updatePlayBalls(){
     // Physics: buoyancy (drijven) vs gravity
     ball.vy += ball.gravity - ball.buoyancy;
 
-    // Update positie
-    ball.x += ball.vx;
-    ball.y += ball.vy;
+    // Update positie (scaled to 60fps baseline so the ball moves at full speed on low FPS)
+    ball.x += ball.vx * frameScale;
+    ball.y += ball.vy * frameScale;
 
     // Friction in water
     ball.vx *= 0.98;
