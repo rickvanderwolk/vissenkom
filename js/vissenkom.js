@@ -5015,9 +5015,9 @@ function updateFish(f,dt,now){
   if(isNaN(f.x)) f.x = W / 2;
   if(isNaN(f.y)) f.y = H / 2;
 
-  // Update position
-  f.x += f.vx;
-  f.y += f.vy;
+  // Update position (scaled to 60fps baseline so swim speed is FPS-independent)
+  f.x += f.vx * frameScale;
+  f.y += f.vy * frameScale;
 
   // Hard clamp position to viewport bounds (safety net)
   f.x = clamp(f.x, 0, W);
@@ -6840,7 +6840,7 @@ function regenerateDecor(){
   console.log('Nieuwe decoratie gegenereerd!');
 }
 
-let t=0;let lastListUpdate=0;let lastCooldownUpdate=0;let lastDecorUpdate=0;let lastBallStateSync=0;
+let t=0;let lastListUpdate=0;let lastCooldownUpdate=0;let lastDecorUpdate=0;let lastBallStateSync=0;let frameScale=1;
 let fadeState='idle';let fadeAlpha=1;let fadeStartTime=0;
 const LIST_UPDATE_INTERVAL=5000;const COOLDOWN_UPDATE_INTERVAL=1000;const DECOR_UPDATE_INTERVAL=3600000;const BALL_STATE_SYNC_INTERVAL=10000; // Sync ball state every 10 seconds
 const FADE_DURATION=1500; // 1.5 seconds for each fade phase
@@ -6892,14 +6892,21 @@ if(!gameLoopStarted){
   return;
 }
 
-const now=Date.now();const dt=Math.min(0.05,(now-lastT)/1000);lastT=now;t++;
+const now=Date.now();t++;
 measureFPS(); // Measure FPS for adaptive performance
 
-// Skip frame if performance is low
+// Skip frame if performance is low. Don't advance lastT here, so the skipped
+// frame's time carries into the next processed frame (keeps swim speed correct).
 if(performanceProfile.skipFrames>0&&t%2===0){
   requestAnimationFrame(loop);
   return;
 }
+
+// Time since the last *processed* frame. Clamped to 0.05s to prevent huge jumps.
+const dt=Math.min(0.05,(now-lastT)/1000);lastT=now;
+// Framerate-independent movement: scale per-frame motion to a 60fps baseline.
+// dt is clamped above, so frameScale caps at 3 (prevents teleporting on very low FPS).
+frameScale=dt*60;
 
 // Smooth interpolation for waterGreenness (fade effect)
 const lerpSpeed=0.02; // Lower = slower fade, smoother transition
@@ -6950,7 +6957,7 @@ for(let i=0;i<fishes.length;i++){
     updateFish(f,dt*updateRate,now);
   }else{
     // Still move fish smoothly even when logic updates are skipped
-    f.x+=f.vx;f.y+=f.vy;
+    f.x+=f.vx*frameScale;f.y+=f.vy*frameScale;
     bounceOffWalls(f);
   }
   drawFish(f,t,now);
