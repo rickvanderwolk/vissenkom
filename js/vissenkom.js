@@ -217,8 +217,8 @@ const THEMES={
   summer:{
     name:'Zomer',
     emoji:'☀️',
-    bgLight:['#1e88e5','#1976d2','#1565c0','#0d47a1'],
-    bgDark:['#0d3d70','#0a3060','#082450','#051840'],
+    bgLight:['#22a7e6','#1b93d6','#137fc0','#0a66a3'],
+    bgDark:['#0e5487','#0b4670','#083759','#052a44'],
     vignette:0.10,
     foodColors:['#ffb37a','#ff9800','#ffeb3b'],
     bubbleColor:'#81d4fa',
@@ -389,7 +389,7 @@ function updateAlgenParticles(){
 function setupPlants(){
   plants.length=0;
   const sandHeight=70;
-  const numPlants=isChristmas()?Math.floor(rand(2,4)):Math.floor(rand(4,7)); // Minder bomen bij kerst
+  const numPlants=isChristmas()?Math.floor(rand(2,4)):isSummer()?0:Math.floor(rand(4,7)); // Geen gewone planten in de zomer (alleen parasol+palmbomen), iets minder bij kerst
   for(let i=0;i<numPlants;i++){
     const plantTypes=['seaweed','kelp','fern','grass','anubias','vallisneria'];
     const type=plantTypes[Math.floor(Math.random()*plantTypes.length)];
@@ -459,7 +459,7 @@ function setupDecorations(){
   if(shouldAddDecoration){
     const x=rand(80,W-80);
     // Pompoen kan groter zijn dan kasteel: 80-280 (soms 2x zo groot)
-    const size=isHalloween()?rand(80,280):isNewYear()?rand(120,240):rand(80,140);
+    const size=isHalloween()?rand(80,280):isNewYear()?rand(120,240):isSummer()?(Math.random()<0.3?rand(200,320):rand(90,150)):rand(80,140); // Zomer: 30% kans op een fors zandkasteel
     const bobPhase=rand(0,Math.PI*2);
     const zIndex=Math.random()<0.7?'back':'front';
     const minY=H-size/2;
@@ -474,6 +474,8 @@ function setupDecorations(){
       decorations.push({type:decoType,x,y,size,bobPhase,zIndex});
     }else if(isNewYear()){
       decorations.push({type:'oliebollen',x,y,size,bobPhase,zIndex});
+    }else if(isSummer()){
+      decorations.push({type:'sandcastle',x,y,size,bobPhase,zIndex});
     }else{
       decorations.push({type:'castle',x,y,size,hue:rand(200,220),bobPhase,zIndex});
     }
@@ -521,14 +523,40 @@ function setupDecorations(){
     decorations.push({type:'champagne',x,y,size,bobPhase,zIndex});
   }
 
-  // Zomer: parasol
+  // Zomer: parasol + meerdere palmbomen; strand-sfeer met weinig gewone planten.
   if(isSummer()){
-    const x=rand(100,W-100);
-    const size=rand(80,120);
-    const bobPhase=rand(0,Math.PI*2);
-    const zIndex='back';
     const y=H-sandHeight+15;
-    decorations.push({type:'parasol',x,y,size,bobPhase,zIndex});
+    // Parasol ergens in het midden
+    decorations.push({type:'parasol',x:rand(W*0.35,W*0.65),y,size:rand(80,120),bobPhase:rand(0,Math.PI*2),zIndex:'back'});
+    // Twee palmbomen, elk met eigen maat, leunrichting, bladeren en kokosnoten
+    for(let p=0;p<2;p++){
+      const fronds=Math.floor(rand(6,10)); // 6-9 bladeren per boom
+      const frondData=[];
+      for(let f=0;f<fronds;f++){
+        frondData.push({lenMul:rand(0.72,1.0),lift:rand(-0.28,-0.02),droop:rand(0.26,0.44),hue:rand(110,145),lightAdd:rand(-4,6)});
+      }
+      const coconuts=[];
+      const nCoco=Math.floor(rand(1,4)); // 1-3 kokosnoten per boom (altijd minimaal 1)
+      for(let c=0;c<nCoco;c++){
+        coconuts.push({dx:rand(-0.1,0.09),dy:rand(0.02,0.11),r:rand(0.038,0.07)});
+      }
+      const palmX=p===0?rand(80,W*0.42):rand(W*0.58,W-80);
+      decorations.push({type:'palmtree',x:palmX,y:H-sandHeight+20,size:rand(120,260),lean:Math.random()<0.5?-1:1,bobPhase:rand(0,Math.PI*2),zIndex:'back',frondData,coconuts});
+    }
+    // Af en toe wat schelpjes op het zand (0-4, verspreid)
+    const numShells=Math.floor(rand(0,5));
+    for(let s=0;s<numShells;s++){
+      const hue=Math.random()<0.35?rand(345,360):rand(20,45); // soms roze, meestal crème/zand
+      decorations.push({type:'shell',x:rand(40,W-40),y:rand(H-sandHeight+25,H-12),size:rand(16,30),hue,ribs:Math.floor(rand(6,9)),flip:Math.random()<0.5?-1:1,bobPhase:rand(0,Math.PI*2),zIndex:Math.random()<0.6?'front':'back'});
+    }
+    // IJsje (tijdelijk uitgeschakeld - nog niet tevreden over het uiterlijk).
+    // De teken-code (deco.type==='icecream') blijft bewaard; om weer aan te zetten
+    // onderstaand blok uncommenten.
+    // const flavors=[350,45,140,25,300]; // aardbei, vanille, munt, chocolade, framboos
+    // const nScoops=Math.random()<0.5?1:2;
+    // const scoops=[];
+    // for(let i=0;i<nScoops;i++) scoops.push(flavors[Math.floor(Math.random()*flavors.length)]);
+    // decorations.push({type:'icecream',x:rand(90,W-90),y:rand(H-sandHeight+22,H-12),size:rand(80,140),scoops,tilt:rand(-0.5,0.5),bobPhase:rand(0,Math.PI*2),zIndex:'front'});
   }
 }
 function lampHueFor(L,time){
@@ -2393,6 +2421,7 @@ function makePlayBall(){
     y: rand(50, H/2), // Start in bovenste helft
     vx: rand(-1, 1),
     vy: 0,
+    rotation: rand(0, Math.PI * 2), // Huidige rotatie (voor strandbal die "rolt")
     radius: 100, // NOG VEEL GROTER! (was 50, nu 100 - 2x zo groot!)
     ttl: 7200, // 120 seconden = 2 minuten bij 60fps (was 3600 = 60 sec)
     bounceDamping: 0.7, // Energie verlies bij bounce
@@ -2458,6 +2487,26 @@ function updatePlayBalls(){
     // Friction in water
     ball.vx *= 0.98;
     ball.vy *= 0.98;
+
+    // Rotatie: bal "rolt" op basis van horizontale snelheid (rolt zonder slippen).
+    // vx keert om bij een wand-bounce, dus de bal draait dan zichtbaar terug.
+    if(ball.rotation===undefined) ball.rotation = 0;
+    ball.rotation += (ball.vx / ball.radius) * 2.2 * frameScale;
+
+    // Anti-vastklem: als de bal bijna stilligt vlak tegen een wand/hoek, geef 'm een
+    // zacht zetje richting open water. Anders raakt de bal (door de opwaartse druk)
+    // in bijv. de rechterbovenhoek geklemd waar de vissen er niet tussen kunnen en
+    // 'm dus niet meer los krijgen. Werkt alleen als de bal (bijna) stilligt, dus
+    // normaal stuiteren blijft onaangetast.
+    const ballSpeed2 = ball.vx*ball.vx + ball.vy*ball.vy;
+    if(ballSpeed2 < 0.25){
+      const m = ball.radius + 35;
+      const nudge = 0.14 * frameScale;
+      if(ball.x < m) ball.vx += nudge;
+      else if(ball.x > W - m) ball.vx -= nudge;
+      if(ball.y < m) ball.vy += nudge;
+      else if(ball.y > H - 20 - m) ball.vy -= nudge;
+    }
 
     // Bounce tegen wanden (links/rechts)
     if(ball.x - ball.radius < 0){
@@ -2644,10 +2693,12 @@ function drawPlayBalls(){
       ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
       ctx.fill();
 
-      // Afwisselend rode en witte strepen (3 rood, 3 wit)
+      // Afwisselend rode en witte strepen (3 rood, 3 wit).
+      // De strepen draaien mee met ball.rotation zodat de bal zichtbaar "rolt".
       const numStripes = 6;
+      const rot = ball.rotation || 0;
       for(let i = 0; i < numStripes; i++){
-        const startAngle = (i * 2 * Math.PI / numStripes);
+        const startAngle = rot + (i * 2 * Math.PI / numStripes);
         const endAngle = startAngle + (2 * Math.PI / numStripes);
         ctx.fillStyle = i % 2 === 0 ? `rgba(220,20,60,${lightMul})` : `rgba(255,255,255,${lightMul})`;
         ctx.beginPath();
@@ -2657,7 +2708,8 @@ function drawPlayBalls(){
         ctx.fill();
       }
 
-      // Witte glans (linksboven)
+      // Witte glans (linksboven) - blijft vast t.o.v. het licht, dus de strepen
+      // draaien er zichtbaar onderdoor.
       ctx.fillStyle = `rgba(255,255,255,${0.5*lightMul})`;
       ctx.beginPath();
       ctx.arc(ball.x - ball.radius * 0.35, ball.y - ball.radius * 0.35, ball.radius * 0.25, 0, Math.PI * 2);
@@ -3830,45 +3882,279 @@ function drawDecoration(deco,time){
   else if(deco.type==='parasol'){
     const x=deco.x;
     const y=deco.y+bobAmount;
+    const poleHeight=deco.size*1.25;
+    const poleWidth=deco.size*0.05;
+    const rimY=y-poleHeight;              // waar het doek op de paal zit
+    const rx=deco.size*0.82;              // halve breedte van het doek
+    const canopyH=deco.size*0.6;          // hoogte van het doek boven de rand
+    const apexY=rimY-canopyH;             // top
+    const scallop=deco.size*0.12;         // doorzakking van de geschulpte rand
+    const numPanels=8;
+    const hemX=(i)=>x-rx+(2*rx)*(i/numPanels);
 
-    // Stok (houten paal)
-    const poleHeight=deco.size*1.2;
-    const poleWidth=deco.size*0.06;
-    ctx.fillStyle=`hsla(30,40%,${35*lightMul}%,1)`;
-    ctx.fillRect(x-poleWidth/2,y-poleHeight,poleWidth,poleHeight);
+    // Stok (hout, vlakke vulling net als de rest van de decoraties)
+    ctx.fillStyle=`hsla(30,40%,${38*lightMul}%,1)`;
+    ctx.fillRect(x-poleWidth/2,rimY,poleWidth,poleHeight);
 
-    // Parasol scherm (driehoekige kegel met strepen)
-    const umbrellaWidth=deco.size*1.2;
-    const umbrellaHeight=deco.size*0.4;
-    const topY=y-poleHeight-umbrellaHeight;
-    const bottomY=y-poleHeight+umbrellaHeight*0.1;
-
-    // Afwisselend rode en witte strepen (8 segmenten)
-    const numStripes=8;
-    for(let i=0;i<numStripes;i++){
-      const leftX=x-umbrellaWidth/2+(i*umbrellaWidth/numStripes);
-      const rightX=x-umbrellaWidth/2+((i+1)*umbrellaWidth/numStripes);
-      ctx.fillStyle=i%2===0?`rgba(220,20,60,${lightMul})`:`rgba(255,255,255,${lightMul})`;
+    // Doekpanelen: om-en-om rood/wit, radiaal vanuit de top met geschulpte onderrand.
+    // Strakke kegel - geen koepel-halo aan de zijkanten.
+    for(let i=0;i<numPanels;i++){
+      ctx.fillStyle=i%2===0?`rgba(220,20,60,${lightMul})`:`rgba(240,240,240,${lightMul})`;
       ctx.beginPath();
-      ctx.moveTo(x,topY);
-      ctx.lineTo(leftX,bottomY);
-      ctx.lineTo(rightX,bottomY);
+      ctx.moveTo(x,apexY);
+      ctx.lineTo(hemX(i),rimY);
+      ctx.quadraticCurveTo((hemX(i)+hemX(i+1))/2,rimY+scallop,hemX(i+1),rimY);
       ctx.closePath();
       ctx.fill();
     }
 
-    // Lichte schaduwlijn onderaan voor diepte
-    ctx.strokeStyle=`rgba(150,20,40,${0.5*lightMul})`;
-    ctx.lineWidth=1.5;
+    // Topknop
+    ctx.fillStyle=`rgba(200,15,50,${lightMul})`;
     ctx.beginPath();
-    ctx.moveTo(x-umbrellaWidth/2,bottomY);
-    ctx.lineTo(x+umbrellaWidth/2,bottomY);
-    ctx.stroke();
+    ctx.arc(x,apexY,deco.size*0.05,0,Math.PI*2);
+    ctx.fill();
+  }
+  else if(deco.type==='palmtree'){
+    const x=deco.x;
+    const y=deco.y+bobAmount;
+    const trunkH=deco.size*1.15;
+    const trunkBaseW=deco.size*0.14;
+    const trunkTopW=deco.size*0.08;
+    // Stam buigt willekeurig naar links of rechts (deco.lean = -1 of 1)
+    const bend=deco.size*0.22*(deco.lean||1);
+    const topX=x+bend;
+    const topY=y-trunkH;
 
-    // Topje van de parasol
-    ctx.fillStyle=`rgba(220,20,60,${lightMul})`;
+    // Stam (gebogen) - warme, lichtere bruintint (niet te donker)
+    ctx.fillStyle=`hsla(30,38%,${52*lightMul}%,1)`;
     ctx.beginPath();
-    ctx.arc(x,topY,deco.size*0.06,0,Math.PI*2);
+    ctx.moveTo(x-trunkBaseW/2,y);
+    ctx.quadraticCurveTo(x-trunkBaseW*0.3+bend*0.4,y-trunkH*0.55,topX-trunkTopW/2,topY);
+    ctx.lineTo(topX+trunkTopW/2,topY);
+    ctx.quadraticCurveTo(x+trunkBaseW*0.3+bend*0.4,y-trunkH*0.55,x+trunkBaseW/2,y);
+    ctx.closePath();
+    ctx.fill();
+    // Segmentringen: exact tussen de stamranden berekend zodat ze de kromming
+    // volgen en niet buiten de stam vallen.
+    ctx.strokeStyle=`hsla(28,35%,${40*lightMul}%,0.5)`;
+    ctx.lineWidth=1.5;
+    for(let s=1;s<=4;s++){
+      const t=s/5, mt=1-t;
+      const yr=mt*mt*y+2*mt*t*(y-trunkH*0.55)+t*t*topY;
+      const lx=mt*mt*(x-trunkBaseW/2)+2*mt*t*(x-trunkBaseW*0.3+bend*0.4)+t*t*(topX-trunkTopW/2);
+      const rx2=mt*mt*(x+trunkBaseW/2)+2*mt*t*(x+trunkBaseW*0.3+bend*0.4)+t*t*(topX+trunkTopW/2);
+      const cx=(lx+rx2)/2, hw=(rx2-lx)/2*0.75;
+      ctx.beginPath();
+      ctx.moveTo(cx-hw,yr);
+      ctx.quadraticCurveTo(cx,yr+2,cx+hw,yr);
+      ctx.stroke();
+    }
+
+    // Palmbladeren (bogen die vanuit de top naar buiten waaieren). Elk blad heeft
+    // per boom eigen lengte/kromming/kleur (deco.frondData), dus geen twee bomen gelijk.
+    const frondData=deco.frondData||[{lenMul:0.85,lift:-0.15,droop:0.35,hue:120,lightAdd:0}];
+    const fronds=frondData.length;
+    const baseW=deco.size*0.12; // breedte van het blad aan de voet (bold, past bij de rest)
+    for(let f=0;f<fronds;f++){
+      const fd=frondData[f];
+      const ang=Math.PI + (f/Math.max(1,fronds-1))*Math.PI; // van links (PI) naar rechts (2PI)
+      const dx=Math.cos(ang), dy=Math.sin(ang)*0.75+fd.lift; // iets omhoog getild
+      const flen=deco.size*fd.lenMul;
+      const tipX=topX+dx*flen;
+      const tipY=topY+dy*flen;
+      const ctrlX=topX+dx*flen*0.5;
+      const ctrlY=topY+dy*flen*0.5-flen*fd.droop; // blad buigt door
+      const edge=Math.abs(f-(fronds-1)/2)/Math.max(1,(fronds-1)/2); // 0 midden, 1 buitenrand
+      const light=(50-edge*6+fd.lightAdd)*lightMul;
+      // Loodrecht op de bladrichting voor de breedte
+      let ddx=ctrlX-topX, ddy=ctrlY-topY; const dl=Math.hypot(ddx,ddy)||1; ddx/=dl; ddy/=dl;
+      const px=-ddy, py=ddx;
+      // Gevuld, taps toelopend blad (breed aan de voet, punt aan de top)
+      ctx.fillStyle=`hsla(${fd.hue},50%,${light}%,1)`; // fris maar natuurlijk zomergroen
+      ctx.beginPath();
+      ctx.moveTo(topX+px*baseW/2,topY+py*baseW/2);
+      ctx.quadraticCurveTo(ctrlX+px*baseW*0.5,ctrlY+py*baseW*0.5,tipX,tipY);
+      ctx.quadraticCurveTo(ctrlX-px*baseW*0.5,ctrlY-py*baseW*0.5,topX-px*baseW/2,topY-py*baseW/2);
+      ctx.closePath();
+      ctx.fill();
+      // Nerf (subtiele middenlijn) - laag contrast zodat het niet hard oogt
+      ctx.strokeStyle=`hsla(${fd.hue},40%,${(light-7)}%,0.3)`;
+      ctx.lineWidth=Math.max(1,deco.size*0.008);
+      ctx.beginPath();
+      ctx.moveTo(topX,topY);
+      ctx.quadraticCurveTo(ctrlX,ctrlY,tipX,tipY);
+      ctx.stroke();
+    }
+    // Kokosnoten (donker verzadigd bruin) - aantal/plek/grootte varieert per boom
+    const cocos=deco.coconuts||[];
+    if(cocos.length){
+      ctx.fillStyle=`hsla(24,55%,${30*lightMul}%,1)`;
+      ctx.beginPath();
+      for(const c of cocos){
+        const cx2=topX+deco.size*c.dx, cy2=topY+deco.size*c.dy, cr=deco.size*c.r;
+        ctx.moveTo(cx2+cr,cy2);
+        ctx.arc(cx2,cy2,cr,0,Math.PI*2);
+      }
+      ctx.fill();
+      // Kleine glans op elke kokosnoot
+      ctx.fillStyle=`hsla(34,45%,${52*lightMul}%,0.6)`;
+      ctx.beginPath();
+      for(const c of cocos){
+        const cx2=topX+deco.size*c.dx-deco.size*c.r*0.3, cy2=topY+deco.size*c.dy-deco.size*c.r*0.3, hr=deco.size*c.r*0.32;
+        ctx.moveTo(cx2+hr,cy2);
+        ctx.arc(cx2,cy2,hr,0,Math.PI*2);
+      }
+      ctx.fill();
+    }
+  }
+  else if(deco.type==='shell'){
+    const x=deco.x;
+    const y=deco.y+bobAmount;
+    const R=deco.size;
+    const ribs=deco.ribs||7;
+    ctx.save();
+    ctx.translate(x,y);
+    ctx.rotate((deco.flip||1)*0.12); // lichte kanteling voor variatie
+    const spread=Math.PI*0.8;
+    const a0=-Math.PI/2-spread/2, a1=-Math.PI/2+spread/2;
+    const steps=ribs*4;
+    // Waaier met geschulpte rand (punten bij de ribben, dipjes ertussen)
+    ctx.fillStyle=`hsla(${deco.hue},40%,${76*lightMul}%,${fadeAlpha})`;
+    ctx.beginPath();
+    ctx.moveTo(0,0);
+    for(let i=0;i<=steps;i++){
+      const t=i/steps;
+      const a=a0+(a1-a0)*t;
+      const scallop=1-0.08*Math.pow(Math.sin(t*ribs*Math.PI),2);
+      ctx.lineTo(Math.cos(a)*R*scallop,Math.sin(a)*R*scallop);
+    }
+    ctx.closePath();
+    ctx.fill();
+    // Ribben vanuit het scharnier
+    ctx.strokeStyle=`hsla(${deco.hue},35%,${58*lightMul}%,${fadeAlpha*0.55})`;
+    ctx.lineWidth=Math.max(1,R*0.05);
+    for(let i=1;i<ribs;i++){
+      const a=a0+(a1-a0)*(i/ribs);
+      ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(Math.cos(a)*R*0.9,Math.sin(a)*R*0.9);ctx.stroke();
+    }
+    // Scharnier-knobbeltje onderaan
+    ctx.fillStyle=`hsla(${deco.hue},42%,${66*lightMul}%,${fadeAlpha})`;
+    ctx.beginPath();ctx.arc(0,0,R*0.14,0,Math.PI*2);ctx.fill();
+    ctx.restore();
+  }
+  else if(deco.type==='icecream'){
+    const s=deco.size;
+    const coneW=s*0.8, coneH=s*1.3;
+    ctx.save();
+    ctx.translate(deco.x,deco.y+bobAmount);  // punt van de hoorn in het zand = oorsprong
+    ctx.rotate(deco.tilt||0);                // willekeurige kanteling links/rechts
+    const topY=-coneH;                        // opening van de hoorn
+    const scoopR=coneW*0.52;                  // bol net iets breder dan de hoornmond
+    const scoops=deco.scoops||[350,45];
+
+    // 1. Hoorn EERST. Gearceerd (licht links, schaduw rechts) zodat de hoorn net als
+    //    de bol 3D oogt. De bollen komen er daarna bovenop, zodat je hun ronde
+    //    onderkant op de hoorn ziet rusten (geen rechte afsnijding waar de bal 'achter valt').
+    const conePath=()=>{ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(-coneW/2,topY);ctx.lineTo(coneW/2,topY);ctx.closePath();};
+    const cg=ctx.createLinearGradient(-coneW/2,0,coneW/2,0);
+    cg.addColorStop(0,`hsla(35,55%,${70*lightMul}%,${fadeAlpha})`);
+    cg.addColorStop(0.5,`hsla(34,54%,${61*lightMul}%,${fadeAlpha})`);
+    cg.addColorStop(1,`hsla(31,50%,${47*lightMul}%,${fadeAlpha})`);
+    ctx.fillStyle=cg;conePath();ctx.fill();
+    // Wafel-ruitpatroon (geclipt binnen de hoorn)
+    ctx.save();conePath();ctx.clip();
+    ctx.strokeStyle=`hsla(30,45%,${40*lightMul}%,${fadeAlpha*0.45})`;
+    ctx.lineWidth=Math.max(1,s*0.022);
+    for(let i=-4;i<=4;i++){
+      ctx.beginPath();ctx.moveTo(i*coneW*0.26,topY);ctx.lineTo(i*coneW*0.26+coneH*0.55,0);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(i*coneW*0.26,topY);ctx.lineTo(i*coneW*0.26-coneH*0.55,0);ctx.stroke();
+    }
+    ctx.restore();
+
+    // 2. Bollen bovenop (onderste rust op de hoornmond, dan omhoog gestapeld)
+    const centers=[]; let cyS;
+    for(let i=0;i<scoops.length;i++){ cyS = i===0 ? topY-scoopR*0.1 : cyS-scoopR*0.9; centers.push(cyS); }
+    for(let i=0;i<scoops.length;i++){
+      ctx.fillStyle=`hsla(${scoops[i]},58%,${70*lightMul}%,${fadeAlpha})`;
+      ctx.beginPath();ctx.arc(0,centers[i],scoopR,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle=`hsla(${scoops[i]},50%,${86*lightMul}%,${fadeAlpha*0.55})`;
+      ctx.beginPath();ctx.arc(-scoopR*0.32,centers[i]-scoopR*0.32,scoopR*0.26,0,Math.PI*2);ctx.fill();
+    }
+    // Kersje op de bovenste bol
+    const topC=centers[centers.length-1];
+    ctx.fillStyle=`hsla(355,72%,${54*lightMul}%,${fadeAlpha})`;
+    ctx.beginPath();ctx.arc(0,topC-scoopR*0.85,scoopR*0.26,0,Math.PI*2);ctx.fill();
+    ctx.restore();
+  }
+  else if(deco.type==='sandcastle'){
+    const x=deco.x;
+    const y=deco.y+bobAmount;
+    const baseW=deco.size*0.9;
+    const baseH=deco.size*0.42;
+    const towerW=deco.size*0.26;
+    const towerH=deco.size*0.5;
+
+    const sand=(l)=>`hsla(42,55%,${l*lightMul}%,${fadeAlpha})`;
+
+    // Basis (zandkleurig blok met licht bolle bovenkant)
+    ctx.fillStyle=sand(64);
+    ctx.beginPath();
+    ctx.moveTo(x-baseW/2,y+baseH/2);
+    ctx.lineTo(x-baseW/2,y-baseH/2);
+    ctx.quadraticCurveTo(x,y-baseH/2-baseH*0.12,x+baseW/2,y-baseH/2);
+    ctx.lineTo(x+baseW/2,y+baseH/2);
+    ctx.closePath();
+    ctx.fill();
+
+    // Kantelen op de basis
+    ctx.fillStyle=sand(58);
+    const merlonW=baseW/9;
+    for(let i=0;i<5;i++){
+      const mx=x-baseW/2+merlonW*(0.5+i*1.8);
+      ctx.fillRect(mx,y-baseH/2-merlonW*0.7,merlonW,merlonW*0.8);
+    }
+
+    // Twee zijtorens + middentoren
+    const towers=[{tx:x-baseW*0.32,h:towerH*0.8,w:towerW*0.8},{tx:x+baseW*0.32,h:towerH*0.8,w:towerW*0.8},{tx:x,h:towerH,w:towerW}];
+    for(const t of towers){
+      ctx.fillStyle=sand(60);
+      ctx.fillRect(t.tx-t.w/2,y-baseH/2-t.h,t.w,t.h);
+      // Kantelen bovenop de toren
+      ctx.fillStyle=sand(54);
+      const mw=t.w/5;
+      for(let i=0;i<3;i++){
+        ctx.fillRect(t.tx-t.w/2+mw*(0.5+i*1.6),y-baseH/2-t.h-mw*0.9,mw,mw);
+      }
+      // Deurtje/raampje (donker)
+      ctx.fillStyle=`hsla(35,45%,${28*lightMul}%,${fadeAlpha})`;
+      ctx.beginPath();
+      ctx.arc(t.tx,y-baseH/2-t.h*0.3,t.w*0.16,Math.PI,2*Math.PI);
+      ctx.fillRect(t.tx-t.w*0.16,y-baseH/2-t.h*0.3,t.w*0.32,t.h*0.3);
+      ctx.fill();
+    }
+
+    // Zandkorrel-textuur (paar lichte stippen)
+    ctx.fillStyle=`hsla(45,60%,${78*lightMul}%,${fadeAlpha*0.5})`;
+    for(let i=0;i<6;i++){
+      const px=x-baseW*0.4+((i*97)%100)/100*baseW*0.8;
+      const py=y-baseH*0.3+((i*53)%100)/100*baseH*0.6;
+      ctx.fillRect(px,py,1.5,1.5);
+    }
+
+    // Vlaggetje op de middentoren
+    const flagX=x,flagTop=y-baseH/2-towerH-deco.size*0.16;
+    ctx.strokeStyle=`hsla(30,40%,${30*lightMul}%,${fadeAlpha})`;
+    ctx.lineWidth=2;
+    ctx.beginPath();
+    ctx.moveTo(flagX,y-baseH/2-towerH);
+    ctx.lineTo(flagX,flagTop);
+    ctx.stroke();
+    ctx.fillStyle=`hsla(0,75%,${58*lightMul}%,${fadeAlpha})`;
+    ctx.beginPath();
+    ctx.moveTo(flagX,flagTop);
+    ctx.lineTo(flagX+deco.size*0.12,flagTop+deco.size*0.03);
+    ctx.lineTo(flagX,flagTop+deco.size*0.06);
+    ctx.closePath();
     ctx.fill();
   }
 }
