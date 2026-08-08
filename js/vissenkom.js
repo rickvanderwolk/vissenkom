@@ -36,20 +36,44 @@ const PERF_PROFILES=[
 let currentPerfLevel=1; // Start low, scale up based on device capability
 let lastTargetLevel=-1;
 let framesAtTarget=0;
+// FPS below which a level is considered too heavy to sustain (index = level).
+const DOWNGRADE_FPS=[0,25,40,55];
+// Minimum FPS before we even consider stepping up (index = current level).
+// Kept well above the downgrade line of the level above so a borderline device
+// doesn't sit in a band where both directions look correct.
+const UPGRADE_FPS=[35,52,58]; // verylow→low, low→medium, medium→high
+const UPGRADE_MARGIN=3;       // headroom we want on top of a measured cost
+const MAX_UPGRADE_COST=25;    // cap so one bad reading can't lock a level out forever
+// Upgrade backoff. An upgrade that gets undone within a minute was a mistake, so
+// remember what that level actually cost in FPS and demand that much headroom
+// before retrying. A retry then predicts success instead of re-taking the same gamble.
+let upgradeCost=[0,0,0,0];    // measured FPS drop caused by running at this level
+let upgradeRetryAt=[0,0,0,0]; // don't retry this level before this timestamp
+let lastCostDecay=Date.now();
+let pendingUpgrade=null;      // {level,fpsBefore,at} — an upgrade still on probation
 function applyPerfLevel(level){
   currentPerfLevel=level;
   performanceProfile=PERF_PROFILES[currentPerfLevel];
+  // Drop the measurement window: it still holds ~10s of the previous level and
+  // would otherwise make the next decision on stale data (which is what made the
+  // quality flip back and forth around a threshold).
+  fpsHistory.length=0;
+  framesAtTarget=0;lastTargetLevel=-1;
 }
 function updatePerformanceProfile(){
-  if(fpsHistory.length<5)return;
+  const now=Date.now();
+  // Slowly forget measured costs, so a kom that genuinely got lighter (fish died,
+  // disco off, other theme) can earn its quality back instead of being stuck.
+  if(now-lastCostDecay>=300000){
+    lastCostDecay=now;
+    for(let i=0;i<upgradeCost.length;i++)upgradeCost[i]=Math.max(0,upgradeCost[i]-1);
+  }
+  if(fpsHistory.length<5)return; // after a switch: always re-measure before deciding
   const avgFPS=fpsHistory.reduce((a,b)=>a+b,0)/fpsHistory.length;
 
   // Determine what level the FPS suggests
-  let targetLevel;
-  if(avgFPS>=55)targetLevel=3;
-  else if(avgFPS>=40)targetLevel=2;
-  else if(avgFPS>=25)targetLevel=1;
-  else targetLevel=0;
+  let targetLevel=0;
+  for(let i=3;i>0;i--){if(avgFPS>=DOWNGRADE_FPS[i]){targetLevel=i;break}}
 
   // Reset counter when target changes
   if(targetLevel!==lastTargetLevel){framesAtTarget=0;lastTargetLevel=targetLevel}
@@ -58,16 +82,28 @@ function updatePerformanceProfile(){
   if(targetLevel<currentPerfLevel){
     // Downgrade: react after 2 consistent seconds
     if(framesAtTarget>=2){
+      // Was this level one we just stepped up to? Then the upgrade failed: record
+      // what it cost us and hold off on retrying it.
+      if(pendingUpgrade&&pendingUpgrade.level===currentPerfLevel&&now-pendingUpgrade.at<60000){
+        upgradeCost[currentPerfLevel]=Math.min(MAX_UPGRADE_COST,
+          Math.max(upgradeCost[currentPerfLevel],pendingUpgrade.fpsBefore-avgFPS));
+        upgradeRetryAt[currentPerfLevel]=now+60000;
+      }
+      pendingUpgrade=null;
       applyPerfLevel(targetLevel);
-      framesAtTarget=0;
     }
   }else if(targetLevel>currentPerfLevel){
-    // Upgrade: conservative — 8 consistent seconds, one step at a time
-    const upgradeThresholds=[30,45,58]; // verylow→low, low→medium, medium→high
-    if(avgFPS>=upgradeThresholds[currentPerfLevel]&&framesAtTarget>=8){
-      applyPerfLevel(Math.min(currentPerfLevel+1,3));
-      framesAtTarget=0;
+    // Upgrade: conservative — 8 consistent seconds, one step at a time, and only
+    // with enough headroom to cover what this level cost the last time we tried.
+    const next=Math.min(currentPerfLevel+1,3);
+    const required=Math.max(UPGRADE_FPS[currentPerfLevel],DOWNGRADE_FPS[next]+upgradeCost[next]+UPGRADE_MARGIN);
+    if(avgFPS>=required&&framesAtTarget>=8&&now>=upgradeRetryAt[next]){
+      pendingUpgrade={level:next,fpsBefore:avgFPS,at:now};
+      applyPerfLevel(next);
     }
+  }else if(pendingUpgrade&&now-pendingUpgrade.at>=60000){
+    // Survived a minute at the new level — the upgrade stuck.
+    pendingUpgrade=null;
   }
 }
 
@@ -93,12 +129,23 @@ function showStats(){
     const maxFrameTime=frameTimeHistory.length>0?Math.max(...frameTimeHistory):0;
     const on='<span style="color:#0f0">ON</span>';
     const off='<span style="color:#f00">OFF</span>';
+    // What the next quality step is waiting for (see updatePerformanceProfile)
+    let upgradeInfo='<span style="color:#888">at max</span>';
+    if(currentPerfLevel<3){
+      const next=currentPerfLevel+1;
+      const required=Math.max(UPGRADE_FPS[currentPerfLevel],DOWNGRADE_FPS[next]+upgradeCost[next]+UPGRADE_MARGIN);
+      const cooling=Math.max(0,Math.round((upgradeRetryAt[next]-Date.now())/1000));
+      upgradeInfo=`${PERF_PROFILES[next].quality} needs <span style="color:${avgFPS>=required?'#0f0':'#ff0'}">${required}</span> fps`+
+        (upgradeCost[next]>0?` <span style="color:#888">(cost ${Math.round(upgradeCost[next])})</span>`:'')+
+        (cooling>0?` <span style="color:#f80">wait ${cooling}s</span>`:'');
+    }
     overlay.innerHTML=`
       <div style="border-bottom:1px solid #0f0;margin-bottom:6px;padding-bottom:4px;font-weight:bold">🐟 Stats</div>
       <div style="color:#888;font-size:10px;margin-bottom:4px">PERFORMANCE</div>
       <div>FPS: <span style="color:${fpsColor}">${currentFPS}</span> (avg: ${avgFPS})</div>
       <div>Frame: <span style="color:${avgFrameTime>12?'#f00':avgFrameTime>8?'#ff0':'#0f0'}">${avgFrameTime.toFixed(1)}ms</span> (max: ${maxFrameTime.toFixed(1)}ms) <span style="color:#888">/ 16.6ms</span></div>
-      <div>Quality: <span style="color:#0ff">${performanceProfile.quality}</span></div>
+      <div>Quality: <span style="color:#0ff">${performanceProfile.quality}</span> <span style="color:#888">(lvl ${currentPerfLevel})</span></div>
+      <div>Upgrade: ${upgradeInfo}</div>
       <div>Particles: ${Math.round(performanceProfile.particleCount*100)}% | Detail: ${Math.round(performanceProfile.detailLevel*100)}%</div>
       <div style="color:#888;font-size:10px;margin-top:6px;margin-bottom:4px">VISSENKOM</div>
       <div>Theme: <span style="color:#ff0">${currentTheme}</span></div>
