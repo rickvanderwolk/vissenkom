@@ -6537,7 +6537,6 @@ function updatePumpUI() {
 
 function feed(){const now=Date.now();if(now-lastFed<FEED_CD)return;lastFed=now;makeFood();updateCooldown()}
 function addFish(nameOrData, newCounter){
-    if(fishes.length>=36)return;
     if(newCounter)fishCounter=newCounter;
 
     if(typeof nameOrData === 'object') {
