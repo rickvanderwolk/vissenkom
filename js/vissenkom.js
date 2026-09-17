@@ -1123,15 +1123,20 @@ function drawCatchPopup(time){
 
   // Bereken vis-grootte vooraf om banner dynamisch te maken
   const visGrootte=fishSize(fish,now);
-  const visBannerGrootte=Math.min(visGrootte*2.5,160); // Cap op 160px max, 2.5x schaling
 
   // Popup box (centered) - dynamische hoogte op basis van vis-grootte
   const boxW=Math.min(480,W*0.7);
   const minBoxH=240; // Minimum hoogte voor kleine vissen
   const maxBoxH=400; // Maximum hoogte voor zeer grote vissen
 
+  // Soorten verschillen sterk in verhouding (een maanvis is ruim twee keer zo hoog
+  // als een danio), dus cap op de werkelijk getekende sprite en niet op de basismaat.
+  const soort=fishSpecies(fish).species;
+  const visBannerGrootte=Math.min(visGrootte*2.5,160,260/soort.ph,(boxW-40)/soort.pw);
+  const visBannerHoogte=visBannerGrootte*soort.ph;
+
   // Bereken benodigde hoogte: pad + titel(~30) + vis + ruimte + gewicht(~30) + pad
-  const neededH=18+30+visBannerGrootte+20+30+18;
+  const neededH=18+30+visBannerHoogte+20+30+18;
   const boxH=Math.max(minBoxH,Math.min(maxBoxH,neededH));
 
   const boxX=(cv.width-boxW)/2;
@@ -1174,7 +1179,7 @@ function drawCatchPopup(time){
   fish.vx=-1; // Hoofd naar links
   fish.vy=0;
   // Gebruik gecapte grootte: max 160px na 2.5x schaling
-  const scaleFactor=Math.min(2.5,160/visGrootte);
+  const scaleFactor=visBannerGrootte/visGrootte;
   fish.baseSize=fish.baseSize*scaleFactor;
   fish.hideLabel=true; // Verberg label
   fish.hideShadow=true; // Verberg schaduw in banner
@@ -4215,30 +4220,213 @@ function drawDecorations(time){
 function ageLabelMS(ms){const s=Math.floor(ms/1000);if(s<60)return s+'s';const m=Math.floor(ms/60000);if(m<60)return m+'m';const h=Math.floor(ms/3600000);if(h<24)return h+'u';const d=Math.floor(h/24);if(d<7)return d+'d';if(d<30)return Math.floor(d/7)+'w';const mo=Math.floor(d/30);if(mo<12)return mo+'mnd';return Math.floor(d/365)+'jr'}
 function ageLabel(f,now){return ageLabelMS(now-f.bornAt)}
 
+// ---- Vissoorten -------------------------------------------------------------
+// Elke vis krijgt een soort + patroon, deterministisch afgeleid uit zijn naam,
+// kleur en formaat. Die drie worden al door de server bewaard, dus dezelfde vis
+// ziet er op elk scherm en na elke herstart identiek uit zonder dat er iets
+// extra's opgeslagen hoeft te worden.
+const TAU=Math.PI*2;
+function hashString(str){let h=2166136261;for(let i=0;i<str.length;i++){h^=str.charCodeAt(i);h=Math.imul(h,16777619)}return h>>>0}
+
+const SPECIES=[
+  {
+    id:'gewoon',name:'Gewone vis',pw:3.2,ph:1.6,ox:0.15,oy:0,finHz:1,
+    eye:{x:0.35,y:-0.08,r:0.11},fin:{x:-0.35,y:0.10,w:0.45,h:0.25},
+    body(c,s){c.ellipse(0,0,s*0.9,s*0.55,0,0,TAU)},
+    back(c,s,p){
+      c.fillStyle=p(20,55);
+      c.beginPath();c.moveTo(-s*0.9,0);c.lineTo(-s*1.4,-s*0.35);c.lineTo(-s*1.2,0);c.lineTo(-s*1.4,s*0.35);c.closePath();c.fill();
+    }
+  },
+  {
+    id:'danio',name:'Slanke danio',pw:3.6,ph:1.5,ox:0.2,oy:0,finHz:1.6,
+    eye:{x:0.62,y:-0.04,r:0.09},fin:{x:-0.2,y:0.16,w:0.38,h:0.15},
+    body(c,s){c.ellipse(0,0,s*1.05,s*0.33,0,0,TAU)},
+    back(c,s,p){
+      c.fillStyle=p(20,55);
+      c.beginPath();c.moveTo(-s*1.0,0);c.lineTo(-s*1.6,-s*0.42);c.lineTo(-s*1.28,0);c.lineTo(-s*1.6,s*0.42);c.closePath();c.fill();
+      c.fillStyle=p(35,50,0.9);
+      c.beginPath();c.moveTo(-s*0.1,-s*0.26);c.lineTo(-s*0.45,-s*0.64);c.lineTo(-s*0.62,-s*0.22);c.closePath();c.fill();
+    }
+  },
+  {
+    id:'kogelvis',name:'Kogelvis',pw:2.9,ph:2.1,ox:0.1,oy:0,finHz:2.2,
+    eye:{x:0.44,y:-0.14,r:0.15},fin:{x:-0.05,y:0.34,w:0.32,h:0.19},
+    body(c,s){c.ellipse(0,0,s*0.82,s*0.72,0,0,TAU)},
+    back(c,s,p){
+      c.fillStyle=p(20,55);
+      c.beginPath();c.moveTo(-s*0.8,0);c.lineTo(-s*1.18,-s*0.3);c.lineTo(-s*1.02,0);c.lineTo(-s*1.18,s*0.3);c.closePath();c.fill();
+      c.fillStyle=p(-20,38,0.95);
+      for(let i=0;i<11;i++){
+        const a=i/11*TAU;const bx=Math.cos(a)*s*0.7,by=Math.sin(a)*s*0.6;
+        c.beginPath();c.moveTo(bx+Math.cos(a-0.24)*s*0.22,by+Math.sin(a-0.24)*s*0.22);
+        c.lineTo(bx+Math.cos(a)*s*0.34,by+Math.sin(a)*s*0.34);
+        c.lineTo(bx+Math.cos(a+0.24)*s*0.22,by+Math.sin(a+0.24)*s*0.22);
+        c.closePath();c.fill();
+      }
+    }
+  },
+  {
+    id:'maanvis',name:'Maanvis',pw:3.0,ph:3.2,ox:0.25,oy:0,finHz:0.7,
+    eye:{x:0.34,y:-0.30,r:0.10},fin:{x:-0.05,y:0.38,w:0.24,h:0.48},
+    body(c,s){c.ellipse(0,0,s*0.66,s*0.92,0,0,TAU)},
+    back(c,s,p){
+      c.fillStyle=p(45,58,0.6);
+      c.beginPath();c.moveTo(s*0.3,-s*0.72);c.quadraticCurveTo(s*0.1,-s*1.48,-s*0.5,-s*1.32);c.quadraticCurveTo(-s*0.66,-s*0.9,-s*0.55,-s*0.55);c.closePath();c.fill();
+      c.beginPath();c.moveTo(s*0.25,s*0.76);c.quadraticCurveTo(s*0.05,s*1.44,-s*0.5,s*1.28);c.quadraticCurveTo(-s*0.66,s*0.9,-s*0.55,s*0.55);c.closePath();c.fill();
+      c.fillStyle=p(20,55);
+      c.beginPath();c.moveTo(-s*0.6,0);c.lineTo(-s*1.25,-s*0.5);c.lineTo(-s*1.05,0);c.lineTo(-s*1.25,s*0.5);c.closePath();c.fill();
+    }
+  },
+  {
+    id:'sluier',name:'Sluierstaart',pw:4.2,ph:2.6,ox:0.45,oy:0,finHz:0.6,
+    eye:{x:0.42,y:-0.14,r:0.12},fin:{x:-0.1,y:0.34,w:0.34,h:0.26},
+    body(c,s){c.ellipse(0,0,s*0.8,s*0.64,0,0,TAU)},
+    back(c,s,p){
+      c.fillStyle=p(25,62,0.42);
+      // Elke lob is een echte wig: voorrand naar de punt, buitenrand terug naar de romp.
+      const veil=(dy,len,tip,inner)=>{
+        c.beginPath();c.moveTo(-s*0.7,0);
+        c.quadraticCurveTo(-s*len*0.55,dy*s*tip*0.45,-s*len,dy*s*tip);
+        c.quadraticCurveTo(-s*len*1.02,dy*s*(tip+inner)*0.5,-s*len*0.88,dy*s*inner);
+        c.quadraticCurveTo(-s*len*0.45,dy*s*inner*0.5,-s*0.7,0);
+        c.closePath();c.fill();
+      };
+      veil(-1,1.88,1.02,0.34);veil(1,1.88,1.02,0.34);
+      veil(-1,1.6,0.44,0.02);veil(1,1.6,0.44,0.02);
+      c.beginPath();c.moveTo(s*0.25,-s*0.48);c.quadraticCurveTo(-s*0.2,-s*1.12,-s*0.88,-s*0.42);c.closePath();c.fill();
+    }
+  },
+  {
+    id:'meerval',name:'Meerval',pw:3.8,ph:1.7,ox:0.1,oy:0.2,finHz:0.8,
+    eye:{x:0.52,y:-0.18,r:0.09},fin:{x:0.05,y:0.30,w:0.42,h:0.15},
+    body(c,s){
+      c.moveTo(s*1.0,-s*0.05);
+      c.quadraticCurveTo(s*0.85,-s*0.42,s*0.15,-s*0.44);
+      c.quadraticCurveTo(-s*0.6,-s*0.44,-s*1.0,-s*0.2);
+      c.lineTo(-s*1.0,s*0.2);
+      c.quadraticCurveTo(-s*0.5,s*0.42,s*0.2,s*0.4);
+      c.quadraticCurveTo(s*0.9,s*0.38,s*1.0,-s*0.05);
+      c.closePath();
+    },
+    back(c,s,p){
+      c.fillStyle=p(20,52);
+      c.beginPath();c.moveTo(-s*0.95,0);c.lineTo(-s*1.5,-s*0.42);c.lineTo(-s*1.32,0);c.lineTo(-s*1.5,s*0.42);c.closePath();c.fill();
+      c.fillStyle=p(30,48,0.9);
+      c.beginPath();c.moveTo(s*0.1,-s*0.4);c.lineTo(-s*0.25,-s*0.84);c.lineTo(-s*0.45,-s*0.34);c.closePath();c.fill();
+    },
+    front(c,s,p){
+      c.strokeStyle=p(0,70,0.75);c.lineWidth=Math.max(1,s*0.05);c.lineCap='round';
+      c.beginPath();c.moveTo(s*0.95,-s*0.05);c.quadraticCurveTo(s*1.35,-s*0.15,s*1.48,-s*0.45);c.stroke();
+      c.beginPath();c.moveTo(s*0.95,s*0.05);c.quadraticCurveTo(s*1.4,s*0.2,s*1.48,s*0.5);c.stroke();
+    }
+  },
+  {
+    id:'pijlvis',name:'Pijlvis',pw:3.8,ph:1.6,ox:0.3,oy:0,finHz:1.8,
+    eye:{x:0.55,y:-0.06,r:0.09},fin:{x:-0.15,y:0.18,w:0.4,h:0.15},
+    body(c,s){
+      c.moveTo(s*1.15,0);
+      c.quadraticCurveTo(s*0.4,-s*0.44,-s*0.45,-s*0.3);
+      c.quadraticCurveTo(-s*0.9,-s*0.2,-s*1.0,0);
+      c.quadraticCurveTo(-s*0.9,s*0.2,-s*0.45,s*0.3);
+      c.quadraticCurveTo(s*0.4,s*0.44,s*1.15,0);
+      c.closePath();
+    },
+    back(c,s,p){
+      c.fillStyle=p(20,55);
+      c.beginPath();c.moveTo(-s*0.95,0);c.lineTo(-s*1.58,-s*0.62);c.quadraticCurveTo(-s*1.3,0,-s*1.58,s*0.62);c.closePath();c.fill();
+      c.fillStyle=p(35,50,0.9);
+      c.beginPath();c.moveTo(s*0.15,-s*0.3);c.lineTo(-s*0.3,-s*0.72);c.lineTo(-s*0.5,-s*0.26);c.closePath();c.fill();
+    }
+  },
+  {
+    id:'zeilvis',name:'Zeilvis',pw:3.6,ph:2.8,ox:0.2,oy:0.3,finHz:1.2,
+    eye:{x:0.55,y:-0.08,r:0.10},fin:{x:-0.15,y:0.24,w:0.42,h:0.19},
+    body(c,s){c.ellipse(0,0,s*0.95,s*0.42,0,0,TAU)},
+    back(c,s,p){
+      c.fillStyle=p(40,58,0.6);
+      c.beginPath();c.moveTo(s*0.72,-s*0.2);
+      c.quadraticCurveTo(s*0.64,-s*0.95,s*0.36,-s*1.16);
+      c.quadraticCurveTo(s*0.16,-s*0.82,-s*0.02,-s*1.2);
+      c.quadraticCurveTo(-s*0.22,-s*0.82,-s*0.42,-s*1.1);
+      c.quadraticCurveTo(-s*0.62,-s*0.7,-s*0.82,-s*0.18);
+      c.closePath();c.fill();
+      c.fillStyle=p(20,55);
+      c.beginPath();c.moveTo(-s*0.9,0);c.lineTo(-s*1.5,-s*0.5);c.lineTo(-s*1.2,0);c.lineTo(-s*1.5,s*0.5);c.closePath();c.fill();
+    }
+  }
+];
+
+const PATTERNS=['effen','strepen','stippen','tweekleurig','zadel'];
+
+// Soort + patroon zijn stabiel per vis, dus we cachen ze op het visobject zelf.
+// Seed alleen op naam + kleur: baseSize wordt in de vangst- en race-popup tijdelijk
+// opgeschaald, en daar mag de vis niet ineens van soort veranderen.
+function fishSpecies(f){
+  const seed=`${f.name}|${Math.round(f.hue)}`;
+  if(f._species&&f._species.seed===seed)return f._species;
+  const h=hashString(seed);
+  const si=h%SPECIES.length;
+  const pi=(h>>>8)%PATTERNS.length;
+  f._species={seed,species:SPECIES[si],pattern:PATTERNS[pi],flip:((h>>>16)&1)===1,key:si*PATTERNS.length+pi};
+  return f._species;
+}
+
+// Patroon wordt binnen het silhouet geclipt getekend
+function drawFishPattern(c,s,pat,flip,p){
+  if(pat==='effen')return;
+  c.globalAlpha=0.5;
+  if(pat==='strepen'){
+    c.fillStyle=p(160,38);
+    for(let i=-3;i<=3;i++){const x=i*s*0.42+(flip?s*0.2:0);c.fillRect(x-s*0.09,-s*1.8,s*0.18,s*3.6)}
+  }else if(pat==='stippen'){
+    c.fillStyle=p(180,80);
+    for(let ix=-4;ix<=4;ix++)for(let iy=-4;iy<=4;iy++){
+      const x=ix*s*0.3+((iy&1)?s*0.15:0);const y=iy*s*0.26;
+      c.beginPath();c.arc(x,y,s*0.07,0,TAU);c.fill();
+    }
+  }else if(pat==='tweekleurig'){
+    c.fillStyle=p(150,45);
+    c.fillRect(flip?s*0.1:-s*2.2,-s*1.8,s*2.1,s*3.6);
+  }else if(pat==='zadel'){
+    c.fillStyle=p(140,42);
+    c.beginPath();c.ellipse(flip?s*0.25:-s*0.25,-s*0.45,s*0.55,s*0.42,0,0,TAU);c.fill();
+    c.beginPath();c.ellipse(flip?-s*0.45:s*0.45,s*0.38,s*0.3,s*0.24,0,0,TAU);c.fill();
+  }
+  c.globalAlpha=1;
+}
+
 // Get or create fish body sprite (cached offscreen canvas)
 function getFishSprite(f,s,fishHue,dim){
+  const meta=fishSpecies(f);const S=meta.species;
   const hueKey=Math.round(fishHue);const dimKey=Math.round(dim*100);const sKey=Math.round(s*10);
-  if(f._sprite&&f._sprite.h===hueKey&&f._sprite.d===dimKey&&f._sprite.s===sKey)return f._sprite;
-  // Sprite canvas sized to fit body + tail with padding
-  const pw=Math.ceil(s*3.2);const ph=Math.ceil(s*1.6);
+  if(f._sprite&&f._sprite.h===hueKey&&f._sprite.d===dimKey&&f._sprite.s===sKey&&f._sprite.k===meta.key)return f._sprite;
+  // Sprite canvas sized per species to fit body, tail and fins with padding
+  const pw=Math.ceil(s*S.pw);const ph=Math.ceil(s*S.ph);
   let sc=f._sprite&&f._sprite.cv;
   if(!sc||sc.width!==pw||sc.height!==ph){sc=document.createElement('canvas');sc.width=pw;sc.height=ph}
   const c=sc.getContext('2d');
   c.clearRect(0,0,pw,ph);
-  const cx=pw/2+s*0.15;const cy=ph/2; // Center point offset to accommodate tail
-  // Body gradient
-  const bodyGrad=c.createLinearGradient(cx-s*0.6,cy,cx+s*0.6,cy);
-  bodyGrad.addColorStop(0,`hsla(${hueKey},90%,${60*dim}%,1)`);
-  bodyGrad.addColorStop(1,`hsla(${Math.round((fishHue+50)%360)},80%,${50*dim}%,1)`);
-  c.fillStyle=bodyGrad;c.beginPath();c.ellipse(cx,cy,s*0.9,s*0.55,0,0,Math.PI*2);c.fill();
-  // Tail
-  c.fillStyle=`hsla(${Math.round((fishHue+20)%360)},80%,${55*dim}%,1)`;
-  c.beginPath();c.moveTo(cx-s*0.9,cy);c.lineTo(cx-s*1.4,cy-s*0.35);c.lineTo(cx-s*1.2,cy);c.lineTo(cx-s*1.4,cy+s*0.35);c.closePath();c.fill();
-  // Eye
-  const eyeLight=dim>0.5;
-  c.fillStyle=eyeLight?'#fff':'#d8e1e8';c.beginPath();c.arc(cx+s*0.35,cy-s*0.08,s*0.11,0,Math.PI*2);c.fill();
-  c.fillStyle=eyeLight?'#000':'#24323c';c.beginPath();c.arc(cx+s*0.37,cy-s*0.08,s*0.05,0,Math.PI*2);c.fill();
-  f._sprite={cv:sc,h:hueKey,d:dimKey,s:sKey,pw,ph,cx,cy};
+  const cx=pw/2+s*S.ox;const cy=ph/2+s*(S.oy||0);
+  const paint=(dh,l,a)=>`hsla(${(((Math.round(fishHue+dh))%360)+360)%360},85%,${clamp(l*dim,0,100)}%,${a===undefined?1:a})`;
+  c.save();c.translate(cx,cy);
+  // Staart en vinnen achter het lichaam
+  if(S.back)S.back(c,s,paint);
+  // Lichaam met kleurverloop
+  c.beginPath();S.body(c,s);
+  const bodyGrad=c.createLinearGradient(-s*0.6,0,s*0.6,0);
+  bodyGrad.addColorStop(0,paint(0,60));
+  bodyGrad.addColorStop(1,paint(50,50));
+  c.fillStyle=bodyGrad;c.fill();
+  // Patroon netjes binnen het silhouet
+  c.save();c.clip();drawFishPattern(c,s,meta.pattern,meta.flip,paint);c.restore();
+  if(S.front)S.front(c,s,paint);
+  // Oog
+  const eyeLight=dim>0.5;const E=S.eye;
+  c.fillStyle=eyeLight?'#fff':'#d8e1e8';c.beginPath();c.arc(s*E.x,s*E.y,s*E.r,0,TAU);c.fill();
+  c.fillStyle=eyeLight?'#000':'#24323c';c.beginPath();c.arc(s*(E.x+0.02),s*E.y,s*E.r*0.45,0,TAU);c.fill();
+  c.restore();
+  f._sprite={cv:sc,h:hueKey,d:dimKey,s:sKey,k:meta.key,pw,ph,cx,cy,fin:S.fin,finHz:S.finHz};
   return f._sprite;
 }
 
@@ -4257,7 +4445,10 @@ function drawFish(f,t,now){
     ctx.globalAlpha=1;
   }
 
-  ctx.save();ctx.translate(f.x,f.y);ctx.rotate(a);
+  // Vissen die naar links zwemmen spiegelen we in plaats van ze 180 graden te
+  // kantelen, anders hangen rugvinnen, zeilen en buiken ondersteboven.
+  const faceLeft=Math.abs(a)>Math.PI/2;
+  ctx.save();ctx.translate(f.x,f.y);ctx.rotate(a);if(faceLeft)ctx.scale(1,-1);
   const hp=healthPct(f,now); // Unified health (includes hunger, disease, temp effects)
   const dimBase=1-(1-hp/100)*0.4;const lightMul=lightsOn?1:0.6;let dim=dimBase*lightMul;
 
@@ -4299,9 +4490,10 @@ function drawFish(f,t,now){
   const sprite=getFishSprite(f,s,fishHue,dim);
   ctx.drawImage(sprite.cv,-sprite.cx,-sprite.cy);
 
-  // Animated fin (drawn live for smooth animation)
-  const finW=s*0.45;const finH=s*0.25;const finWave=Math.sin(t*(discoOn?0.04:0.02)+f.x*0.03)*0.5+0.5;
-  ctx.save();ctx.translate(-s*0.35,0);ctx.rotate((finWave-0.5)*(discoOn?1.2:0.6));ctx.fillStyle=`hsla(${Math.round((fishHue+70)%360)},85%,${65*dim}%,1)`;ctx.beginPath();ctx.ellipse(0,0,finW,finH,0,0,Math.PI*2);ctx.fill();ctx.restore();
+  // Animated fin (drawn live for smooth animation) - positie en tempo per soort
+  const FIN=sprite.fin;
+  const finW=s*FIN.w;const finH=s*FIN.h;const finWave=Math.sin(t*(discoOn?0.04:0.02)*sprite.finHz+f.x*0.03)*0.5+0.5;
+  ctx.save();ctx.translate(s*FIN.x,s*FIN.y);ctx.rotate((finWave-0.5)*(discoOn?1.2:0.6));ctx.fillStyle=`hsla(${((Math.round(fishHue+70)%360)+360)%360},85%,${65*dim}%,1)`;ctx.beginPath();ctx.ellipse(0,0,finW,finH,0,0,Math.PI*2);ctx.fill();ctx.restore();
 
   // Af en toe een glinsterend sterretje op de vis (alleen als gezond en licht aan) - skip on low performance
   if(lightsOn && performanceProfile.quality!=='low' && performanceProfile.quality!=='verylow' && healthPct(f,now)>50 && Math.sin(t*0.1+f.x*0.05)>0.85){
@@ -4330,7 +4522,7 @@ function drawFish(f,t,now){
   const behaviorEmoji=appConfig.showBehaviorEmoji ? getBehaviorEmoji(f.behaviorState || 'normal', f) : '';
   const emojiPrefix = (sickEmoji ? sickEmoji + ' ' : '') + (behaviorEmoji ? behaviorEmoji + ' ' : '');
   const label1=emojiPrefix + f.name;
-  const label2=ageLabel(f,now);
+  const label2=ageLabel(f,now)+' · '+fishSpecies(f).species.name;
   const labelAlpha=lightsOn?0.92:0.7;
   const pad=6;
   const nameFont='600 14px system-ui,Segoe UI,Roboto,Arial';
@@ -5460,7 +5652,7 @@ function drawLists(){
 
   // Newest list
   const newest=[...fishes].sort((a,b)=>b.bornAt-a.bornAt).slice(0,TOP_N);
-  const newestItems=newest.map((f,i)=>({idx:i+1,label:`${f.name} · ${ageLabelMS(now-f.bornAt)}`}));
+  const newestItems=newest.map((f,i)=>({idx:i+1,label:`${f.name} · ${fishSpecies(f).species.name} · ${ageLabelMS(now-f.bornAt)}`}));
   updateListItems(newestListEl,newestItems);
 }
 
@@ -7016,13 +7208,15 @@ function drawRaceWinnerPopup(time) {
 
   // Bereken vis-grootte vooraf om banner dynamisch te maken
   const visGrootte = fishSize(fish, now);
-  const visBannerGrootte = Math.min(visGrootte * 2.5, 160);
 
   // Popup box (centered)
   const boxW = Math.min(480, cv.width * 0.7);
   const minBoxH = 260;
   const maxBoxH = 420;
-  const neededH = 18 + 30 + visBannerGrootte + 20 + 50 + 18;
+  // Cap op de werkelijk getekende sprite, want soorten verschillen sterk in verhouding
+  const soort = fishSpecies(fish).species;
+  const visBannerGrootte = Math.min(visGrootte * 2.5, 160, 280 / soort.ph, (boxW - 40) / soort.pw);
+  const neededH = 18 + 30 + visBannerGrootte * soort.ph + 20 + 50 + 18;
   const boxH = Math.max(minBoxH, Math.min(maxBoxH, neededH));
 
   const boxX = (cv.width - boxW) / 2;
@@ -7063,7 +7257,7 @@ function drawRaceWinnerPopup(time) {
   fish.y = visY;
   fish.vx = -1;
   fish.vy = 0;
-  const scaleFactor = Math.min(2.5, 160 / visGrootte);
+  const scaleFactor = visBannerGrootte / visGrootte;
   fish.baseSize = fish.baseSize * scaleFactor;
   fish.hideLabel = true;
   fish.hideShadow = true;

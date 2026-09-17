@@ -20,6 +20,13 @@ Vissenkom bestaat uit drie onderdelen: een server (draait op de achtergrond), ee
 
 Vissen leven in de kom en moeten eten om in leven te blijven. Ze kunnen ziek worden en elkaar besmetten, dus genees ze op tijd door medicijnen te geven. De omgeving (zoals temperatuur, pomp en andere factoren) heeft invloed op hun gezondheid en gedrag.
 
+Elke vis is er één van acht soorten, met een eigen lichaamsvorm, staart, vinnen en patroon:
+
+- **Gewone vis**, **Slanke danio**, **Kogelvis**, **Maanvis**, **Sluierstaart**, **Meerval**, **Pijlvis** en **Zeilvis**
+- Daaroverheen komt een patroon: effen, strepen, stippen, tweekleurig of een zadelvlek
+
+Soort en patroon worden afgeleid uit de naam en kleur van de vis. Dezelfde vis ziet er dus op elk scherm en na elke herstart precies hetzelfde uit. De soort staat ook onder het naamlabel in de kom.
+
 Vissen vertonen uiteenlopend gedrag:
 - **Schooling**: samenzwemmen met andere vissen
 - **Jagen**: achtervolgen van andere vissen
