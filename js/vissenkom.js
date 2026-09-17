@@ -195,7 +195,7 @@ function resize(){
   H=fullH-(viewportConfig.offsetTop+viewportConfig.offsetBottom);
   pumpPos.x=W-70; // Altijd initialiseren voor champagnefles
   updateUIPositions();
-  setupLamps();setupDiscoBall();setupFishingRod();setupPlants();setupDecorations();setupStars();setupParticles();setupSpiderWebs();
+  setupLamps();setupDiscoBall();setupFishingRod();setupPlants();setupDecorations();setupStars();setupParticles();setupSpiderWebs();setupFallingLeaves();
   updateLayerCache();
   drawQR();
 }
@@ -237,6 +237,7 @@ function isChristmas(){return currentTheme==='christmas'}
 function isNewYear(){return currentTheme==='newyear'}
 function isWinter(){return currentTheme==='winter'}
 function isSummer(){return currentTheme==='summer'}
+function isAutumn(){return currentTheme==='autumn'}
 function hasDecoration(type){return getThemeConfig().decorations.includes(type)}
 
 // Theme configurations
@@ -279,8 +280,10 @@ const THEMES={
     vignette:0.15,
     foodColors:['#ff8c42','#ffa07a','#ff6347'],
     bubbleColor:'#bfeaf5',
-    decorations:['leaf'],
-    plantHueRange:[15,45]
+    decorations:['leafpile','branch','mushroom','acorn','chestnut'],
+    plantHueRange:[15,45],
+    lampHue:34,       // Lage, warme herfstzon ipv koel wit-geel licht
+    lampHueShift:16   // Lichtbundel blijft goud in plaats van naar cyaan te draaien
   },
   winter:{
     name:'Winter',
@@ -477,7 +480,7 @@ function setupPlants(){
 
     const theme=getThemeConfig();
     const hueRange=theme.plantHueRange||[80,160];
-    const hue=type==='anubias'?rand(100,140):rand(hueRange[0],hueRange[1]);
+    const hue=type==='anubias'&&!theme.plantHueRange?rand(100,140):rand(hueRange[0],hueRange[1]);
     const swayPhase=rand(0,Math.PI*2);
     const movePhase=rand(0,Math.PI*2);
     const branchiness=rand(0.5,0.9);
@@ -501,12 +504,12 @@ function setupDecorations(){
   // In Christmas mode: altijd huisje OF sneeuwpop
   // In NewYear mode: oliebollen
   // Anders: 30% kans op kasteel
-  const shouldAddDecoration=isHalloween()||isChristmas()||isNewYear()||Math.random()<0.3;
+  const shouldAddDecoration=isHalloween()||isChristmas()||isNewYear()||isAutumn()||Math.random()<0.3;
 
   if(shouldAddDecoration){
     const x=rand(80,W-80);
     // Pompoen kan groter zijn dan kasteel: 80-280 (soms 2x zo groot)
-    const size=isHalloween()?rand(80,280):isNewYear()?rand(120,240):isSummer()?(Math.random()<0.3?rand(200,320):rand(90,150)):rand(80,140); // Zomer: 30% kans op een fors zandkasteel
+    const size=isHalloween()?rand(80,280):isNewYear()?rand(120,240):isAutumn()?rand(120,210):isSummer()?(Math.random()<0.3?rand(200,320):rand(90,150)):rand(80,140); // Zomer: 30% kans op een fors zandkasteel
     const bobPhase=rand(0,Math.PI*2);
     const zIndex=Math.random()<0.7?'back':'front';
     const minY=H-size/2;
@@ -521,6 +524,13 @@ function setupDecorations(){
       decorations.push({type:decoType,x,y,size,bobPhase,zIndex});
     }else if(isNewYear()){
       decorations.push({type:'oliebollen',x,y,size,bobPhase,zIndex});
+    }else if(isAutumn()){
+      // Herfst: een opgewaaide bladerhoop of een kale tak op de bodem
+      if(Math.random()<0.5){
+        decorations.push({type:'leafpile',x,y:H-sandHeight+14,size,bobPhase,zIndex,leaves:makeLeafPile(Math.floor(rand(16,24)))});
+      }else{
+        decorations.push(Object.assign({type:'branch',x,y:H-sandHeight+18,size:size*1.1,bobPhase,zIndex:'back'},makeBranch()));
+      }
     }else if(isSummer()){
       decorations.push({type:'sandcastle',x,y,size,bobPhase,zIndex});
     }else{
@@ -570,6 +580,25 @@ function setupDecorations(){
     decorations.push({type:'champagne',x,y,size,bobPhase,zIndex});
   }
 
+  // Herfst: cluster paddenstoelen op het zand (70% kans)
+  if(isAutumn()&&Math.random()<0.7){
+    const caps=[];
+    const n=Math.floor(rand(2,5));
+    for(let i=0;i<n;i++){
+      caps.push({dx:rand(-0.5,0.5),h:rand(0.55,1),w:rand(0.5,1),red:Math.random()<0.6,lean:rand(-0.18,0.18),dots:Math.floor(rand(3,6))});
+    }
+    decorations.push({type:'mushroom',x:rand(70,W-70),y:H-sandHeight+22,size:rand(50,90),bobPhase:rand(0,Math.PI*2),zIndex:Math.random()<0.5?'front':'back',caps});
+  }
+
+  // Herfst: eikels en kastanjes verspreid over het zand (2-5)
+  if(isAutumn()){
+    const numNuts=Math.floor(rand(2,6));
+    for(let i=0;i<numNuts;i++){
+      const type=Math.random()<0.55?'acorn':'chestnut';
+      decorations.push({type,x:rand(40,W-40),y:rand(H-sandHeight+26,H-12),size:rand(15,27),tilt:rand(-0.6,0.6),bobPhase:rand(0,Math.PI*2),zIndex:Math.random()<0.6?'front':'back'});
+    }
+  }
+
   // Zomer: parasol + meerdere palmbomen; strand-sfeer met weinig gewone planten.
   if(isSummer()){
     const y=H-sandHeight+15;
@@ -606,6 +635,29 @@ function setupDecorations(){
     // decorations.push({type:'icecream',x:rand(90,W-90),y:rand(H-sandHeight+22,H-12),size:rand(80,140),scoops,tilt:rand(-0.5,0.5),bobPhase:rand(0,Math.PI*2),zIndex:'front'});
   }
 }
+// Bladerhoop: dichter en hoger in het midden, uitlopend naar de randen
+function makeLeafPile(n){
+  const leaves=[];
+  for(let i=0;i<n;i++){
+    const dx=rand(-0.55,0.55);
+    const mound=1-Math.pow(Math.abs(dx/0.55),1.6);
+    const c=LEAF_PALETTE[Math.floor(Math.random()*LEAF_PALETTE.length)];
+    leaves.push({dx,dy:-rand(0.02,0.26)*mound,r:rand(0.15,0.27),rot:rand(-0.9,0.9),hue:c[0],sat:c[1]*rand(0.8,1.05),light:c[2]*rand(0.85,1.25)});
+  }
+  return leaves;
+}
+
+// Kale tak met hier en daar een blad dat nog vasthoudt
+function makeBranch(){
+  const limbs=[];
+  const n=Math.floor(rand(3,6));
+  for(let i=0;i<n;i++){
+    const c=LEAF_PALETTE[Math.floor(Math.random()*LEAF_PALETTE.length)];
+    limbs.push({t:0.3+(i/n)*0.62,dir:Math.random()<0.5?-1:1,len:rand(0.3,0.55),angle:rand(0.5,1.1),leaf:Math.random()<0.6,hue:c[0],sat:c[1],light:c[2],leafSize:rand(0.07,0.13)});
+  }
+  return {limbs,lean:rand(-0.25,0.25),thick:rand(0.05,0.085)};
+}
+
 function lampHueFor(L,time){
   if(isChristmas()){
     // Kerst: wissel tussen rood, groen en blauw
@@ -615,14 +667,15 @@ function lampHueFor(L,time){
     return christmasColors[colorIndex];
   }
   // Blijf disco kleuren tonen als disco aan is OF ball aan het undeployen is
-  if(!discoOn&&!discoBall.undeploying)return L.hueBase;
+  const hueBase=getThemeConfig().lampHue!==undefined?getThemeConfig().lampHue:L.hueBase;
+  if(!discoOn&&!discoBall.undeploying)return hueBase;
   const speed=7.5;const range=340;const wave=(Math.sin(time*speed+L.phase)+1)/2; // 3x sneller!
   // Synchronisatie momenten: alle lampen soms dezelfde kleur
   const syncPulse=Math.sin(time*0.5);
   if(syncPulse>0.9){
     return (time*100)%360; // Alle lampen sync'd
   }
-  return (L.hueBase+wave*range)%360;
+  return (hueBase+wave*range)%360;
 }
 function strobeAlpha(time){if(!discoOn&&!discoBall.undeploying)return 1;const hz=1.5;const duty=0.8;const cycle=(time*hz)%1;return cycle<duty?1:0.75}
 function flickerEffect(L,time){if(!isHalloween())return 1;const baseFlicker=Math.sin(time*8+L.phase)*0.5+0.5;const stutter=Math.random()<0.05?Math.random()*0.3:0;const shortFlash=Math.random()<0.02?0:1;return Math.max(0.3,baseFlicker-stutter)*shortFlash}
@@ -1700,7 +1753,8 @@ function drawLamps(time){
     ctx.globalCompositeOperation='lighter';
     ctx.fillStyle=topGlow;ctx.beginPath();ctx.arc(L.x,0,Math.max(40,L.width*0.6*discoMultiplier),0,Math.PI*2);ctx.fill();
     ctx.globalCompositeOperation='source-over';
-    const hue2=(hue+140)%360;const hue3=(hue+220)%360;
+    const beamShift=discoActive?140:(getThemeConfig().lampHueShift!==undefined?getThemeConfig().lampHueShift:140);
+    const hue2=(hue+beamShift)%360;const hue3=(hue+220)%360;
     const beamGrad=ctx.createLinearGradient(L.x,0,L.x,H*0.9);
     const alphaBoost=discoActive?1.4:1; // Meer alpha in disco mode
     beamGrad.addColorStop(0,`hsla(${hue},95%,78%,${0.2*intensity*stro*alphaBoost})`);
@@ -1809,6 +1863,27 @@ function drawHalloweenMoon(){
   ctx.fill();
 }
 
+let cachedAutumnGlow=null;let cachedAutumnGlowKey='';
+function drawAutumnGlow(time){
+  if(!isAutumn())return;
+  const key=W+'x'+H+lightsOn;
+  if(key!==cachedAutumnGlowKey){
+    const a=lightsOn?0.24:0.08;
+    cachedAutumnGlow=ctx.createLinearGradient(0,0,0,H*0.8);
+    cachedAutumnGlow.addColorStop(0,`rgba(255,158,52,${a})`);
+    cachedAutumnGlow.addColorStop(0.45,`rgba(255,132,36,${a*0.45})`);
+    cachedAutumnGlow.addColorStop(1,'rgba(255,120,30,0)');
+    cachedAutumnGlowKey=key;
+  }
+  // Heel langzame puls: alsof er wolken voor de lage herfstzon schuiven
+  ctx.globalCompositeOperation='lighter';
+  ctx.globalAlpha=0.82+Math.sin(time*0.12)*0.18;
+  ctx.fillStyle=cachedAutumnGlow;
+  ctx.fillRect(0,0,W,H*0.8);
+  ctx.globalAlpha=1;
+  ctx.globalCompositeOperation='source-over';
+}
+
 function setupSpiderWebs(){
   spiderWebs.length=0;
   if(!isHalloween())return;
@@ -1879,10 +1954,225 @@ function drawSpiderWebs(){
   }
 }
 
+// === HERFST: DWARRELENDE BLADEREN ===
+// Bladeren zakken langzaam door het water, tuimelen om hun eigen as en blijven
+// een tijdje op de bodem liggen voordat ze wegspoelen.
+const fallingLeaves=[];
+const LEAF_PALETTE=[[6,70,44],[18,85,50],[28,90,52],[36,85,55],[45,78,52],[24,45,38]]; // [hue,sat,light]
+
+function makeLeaf(fromPlant){
+  const c=LEAF_PALETTE[Math.floor(Math.random()*LEAF_PALETTE.length)];
+  const depth=rand(0.55,1); // Verder weg = kleiner, vager en achter de vissen
+  const leaf={
+    type:Math.random()<0.35?'maple':'simple',
+    hue:c[0],sat:c[1],light:c[2],
+    size:rand(17,29)*depth,
+    depth,
+    zIndex:depth>0.82?'front':'back',
+    x:rand(-20,W+20),
+    y:-rand(10,140),
+    vx:rand(-0.25,0.25),
+    vy:rand(0.25,0.7)*depth,
+    angle:rand(0,Math.PI*2),
+    spin:rand(0,Math.PI*2),
+    spinSpeed:rand(-0.02,0.02),
+    swayPhase:rand(0,Math.PI*2),
+    swaySpeed:rand(0.008,0.02),
+    swayAmp:rand(0.3,0.9),
+    veins:Math.floor(rand(2,4)),
+    state:'falling',
+    settledAt:0,
+    restMs:0,
+    restY:rand(H-60,H-8), // Waar dit blad op de bodem gaat liggen
+    restAngle:0,
+    spinTarget:0,
+    alpha:1
+  };
+  if(fromPlant&&plants.length>0){
+    // Blad dat van een plant loslaat: begint bij de top en dwarrelt eerst nog wat op
+    const pl=plants[Math.floor(Math.random()*plants.length)];
+    leaf.x=pl.x+rand(-pl.width*0.5,pl.width*0.5);
+    leaf.y=pl.y-pl.height*rand(0.55,1);
+    leaf.vy=rand(-0.15,0.1);
+    leaf.alpha=0; // Komt midden in het water in beeld, dus invaden
+  }
+  return leaf;
+}
+
+let leafBaseCount=16; // Aantal bij vol profiel; schaalt mee omlaag op zwakke hardware
+function targetLeafCount(){
+  return Math.max(5,Math.round(leafBaseCount*performanceProfile.particleCount));
+}
+
+function setupFallingLeaves(){
+  fallingLeaves.length=0;
+  if(!isAutumn())return;
+  leafBaseCount=Math.round(rand(13,19));
+  const count=targetLeafCount();
+  for(let i=0;i<count;i++){
+    const l=makeLeaf(false);
+    l.y=rand(0,H*0.9); // Bij het opstarten verspreid, niet allemaal tegelijk bovenaan
+    fallingLeaves.push(l);
+  }
+}
+
+function resetLeaf(l){
+  Object.assign(l,makeLeaf(Math.random()<0.35)); // Soms laat een plant een blad los
+}
+
+function updateFallingLeaves(){
+  if(!isAutumn()){
+    if(fallingLeaves.length>0)fallingLeaves.length=0;
+    return;
+  }
+  // Het thema komt pas na de eerste setup van de server binnen
+  if(fallingLeaves.length===0){setupFallingLeaves();return}
+
+  // Meegroeien/krimpen met het performance-profiel (dat zich pas na een paar
+  // seconden meten instelt)
+  const target=targetLeafCount();
+  if(fallingLeaves.length<target)fallingLeaves.push(makeLeaf(false));
+  else if(fallingLeaves.length>target){
+    let hi=0;
+    for(let i=1;i<fallingLeaves.length;i++)if(fallingLeaves[i].y<fallingLeaves[hi].y)hi=i;
+    fallingLeaves.splice(hi,1);
+  }
+
+  const sandTop=H-70;
+  const now=Date.now();
+  // Hoogstens een kwart van de bladeren mag op de bodem blijven liggen, anders
+  // dwarrelt er nauwelijks nog iets in het water
+  const maxSettled=clamp(Math.round(fallingLeaves.length*0.25),1,4);
+  let settled=0;
+  for(let i=0;i<fallingLeaves.length;i++)if(fallingLeaves[i].state==='settled')settled++;
+  // Vissen die langs zwemmen duwen bladeren weg - alleen als er ruimte voor is
+  const nudge=performanceProfile.quality==='high'||performanceProfile.quality==='medium';
+
+  for(const l of fallingLeaves){
+    if(l.state==='settled'){
+      // Soepel naar de rustpositie draaien: in één frame omklappen las als een sprong
+      const ease=Math.min(1,0.06*frameScale);
+      l.angle+=(l.restAngle-l.angle)*ease+Math.sin(now*0.0006+l.swayPhase)*0.0015*frameScale;
+      l.spin+=(l.spinTarget-l.spin)*ease;
+      if(now-l.settledAt>l.restMs){
+        l.alpha-=0.006*frameScale; // Spoelt langzaam weg
+        // Terwijl het wegspoelt schuift het nog wat mee met de stroming
+        l.x+=((pumpOn?-0.25:0)+Math.sin(now*0.0004+l.swayPhase)*0.08)*frameScale;
+        if(l.alpha<=0)resetLeaf(l);
+      }
+      continue;
+    }
+
+    if(l.alpha<1)l.alpha=Math.min(1,l.alpha+0.02*frameScale); // Invaden na het loslaten
+    l.swayPhase+=l.swaySpeed*frameScale;
+    const flow=pumpOn?-0.18:0; // Pomp aan: de stroming neemt de bladeren mee
+    l.x+=(Math.sin(l.swayPhase)*l.swayAmp+l.vx+flow)*frameScale;
+    l.y+=l.vy*frameScale;
+    l.vy=Math.min(0.85,l.vy+0.004*frameScale);
+    l.angle+=(l.spinSpeed+Math.cos(l.swayPhase)*0.004)*frameScale;
+    l.spin+=l.spinSpeed*0.6*frameScale;
+    l.vx*=0.985; // Demping, anders werkt een duwtje eeuwig door
+
+    if(nudge){
+      for(let i=0;i<fishes.length;i++){
+        const f=fishes[i];
+        const dx=l.x-f.x;const dy=l.y-f.y;
+        const d2=dx*dx+dy*dy;
+        if(d2<2000&&d2>1){
+          const push=0.5/Math.sqrt(d2);
+          l.vx+=dx*push*0.12;
+          l.vy+=dy*push*0.06;
+          l.spinSpeed=clamp(l.spinSpeed+(dx>0?0.004:-0.004),-0.06,0.06);
+        }
+      }
+    }
+
+    if(l.x<-40||l.x>W+40){resetLeaf(l);continue}
+    // Landen op de eigen rustdiepte (geclamped, want H kan veranderd zijn)
+    const restY=clamp(l.restY,sandTop+10,H-8);
+    if(l.y>=restY){
+      l.state='settled';
+      l.settledAt=now;
+      l.y=restY;
+      l.vx=0;l.vy=0;l.spinSpeed=0;
+      // Plat gaan liggen: draai naar de dichtstbijzijnde stand waarin het blad
+      // op z'n volle breedte te zien is, dus zonder extra rondjes
+      l.spinTarget=Math.round(l.spin/Math.PI)*Math.PI;
+      l.restAngle=Math.round(l.angle/Math.PI)*Math.PI+rand(-0.35,0.35);
+      // Ligt er al genoeg? Dan begint dit blad direct aan zijn fade in plaats
+      // van ter plekke te verdwijnen
+      l.restMs=settled<maxSettled?rand(9000,22000):0;
+      if(l.restMs>0)settled++;
+    }
+  }
+}
+
+// Amandelvormig blad met een punt aan beide kanten, gericht langs de x-as
+function leafPath(rx,ry){
+  ctx.beginPath();
+  ctx.moveTo(-rx,0);
+  ctx.quadraticCurveTo(-rx*0.2,-ry,rx,0);
+  ctx.quadraticCurveTo(-rx*0.2,ry,-rx,0);
+  ctx.closePath();
+}
+
+function drawLeafShape(l){
+  const s=l.size;
+  const lightMul=lightsOn?1:0.55;
+  const alpha=l.alpha*(0.55+l.depth*0.45);
+  ctx.fillStyle=`hsla(${l.hue},${l.sat}%,${l.light*lightMul}%,${alpha})`;
+  if(l.type==='maple'){
+    // Breed vijflobbig esdoornblad
+    ctx.beginPath();
+    const steps=30;
+    for(let i=0;i<=steps;i++){
+      const a=(i/steps)*Math.PI*2;
+      const r=s*0.92*(0.88+0.12*Math.cos(5*a));
+      const px=Math.cos(a)*r;const py=Math.sin(a)*r*0.82;
+      if(i===0)ctx.moveTo(px,py);else ctx.lineTo(px,py);
+    }
+    ctx.closePath();
+    ctx.fill();
+  }else{
+    leafPath(s,s*0.6);
+    ctx.fill();
+  }
+  // Steeltje + hoofdnerf
+  ctx.strokeStyle=`hsla(${l.hue},${Math.min(95,l.sat+5)}%,${Math.max(12,l.light*lightMul-18)}%,${l.alpha*0.7})`;
+  ctx.lineWidth=Math.max(0.6,s*0.07);
+  ctx.beginPath();ctx.moveTo(-s*1.25,0);ctx.lineTo(s*0.8,0);ctx.stroke();
+  if(l.type==='simple'){
+    for(let i=1;i<=l.veins;i++){
+      const vx=-s*0.5+(i/(l.veins+1))*s*1.2;
+      ctx.beginPath();ctx.moveTo(vx,0);ctx.lineTo(vx+s*0.3,-s*0.32);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(vx,0);ctx.lineTo(vx+s*0.3,s*0.32);ctx.stroke();
+    }
+  }
+}
+
+// layer: 'sand' (blijft op de bodem liggen), 'back' of 'front'
+function drawFallingLeaves(layer){
+  if(!isAutumn()||fallingLeaves.length===0)return;
+  for(const l of fallingLeaves){
+    if(l.state==='settled'?layer!=='sand':l.zIndex!==layer)continue;
+    ctx.save();
+    ctx.translate(l.x,l.y);
+    ctx.rotate(l.angle);
+    // Tuimelen: het blad draait om zijn lengteas, dus soms zie je het op z'n kant
+    ctx.scale(1,0.45+0.55*Math.abs(Math.cos(l.spin)));
+    drawLeafShape(l);
+    ctx.restore();
+  }
+}
+
 function drawSandBottom(time){
   // Cache sand to offscreen canvas, redraw every ~100ms for subtle wave animation
   const sandKey=W+'x'+H+lightsOn+currentTheme;
-  const timeKey=Math.floor(time*10); // Update ~6x per second (time is t/60)
+  // De golf in de zandlijn beweegt 0,03 px per seconde, dus die 10x/sec hertekenen
+  // (elke 6 frames) leverde geen zichtbare animatie op terwijl het de zwaarste
+  // teken-actie van het frame is. 1x/sec is niet van het origineel te onderscheiden.
+  // Wil je de golf wel zien bewegen, verhoog dan time*0.003 in renderSandToCanvas.
+  const timeKey=Math.floor(time); // Herteken hoogstens 1x per seconde (time is t/60)
   if(!sandCanvas||sandCacheKey!==sandKey||timeKey!==lastSandTime){
     if(!sandCanvas||sandCanvas.width!==W||sandCanvas.height!==H){
       sandCanvas=document.createElement('canvas');
@@ -2394,6 +2684,7 @@ function clearFrame(time){
 
   drawStars(time);
   drawHalloweenMoon();
+  drawAutumnGlow(time);
   // Vuurwerk alleen na nieuwjaar (1-6 januari)
   const nowDate=new Date();
   if(isNewYear()&&nowDate.getMonth()===0&&nowDate.getDate()<=6){
@@ -2762,6 +3053,55 @@ function drawPlayBalls(){
       ctx.arc(ball.x - ball.radius * 0.35, ball.y - ball.radius * 0.35, ball.radius * 0.25, 0, Math.PI * 2);
       ctx.fill();
 
+    } else if(isAutumn()){
+      // Herfst: glanzende kastanje die zichtbaar rolt
+      const lightMul = lightsOn ? 1 : 0.7;
+      const rot = ball.rotation || 0;
+
+      const nutGrad = ctx.createRadialGradient(
+        ball.x - ball.radius * 0.35,
+        ball.y - ball.radius * 0.35,
+        ball.radius * 0.1,
+        ball.x,
+        ball.y,
+        ball.radius
+      );
+      nutGrad.addColorStop(0, `hsla(28,55%,${46*lightMul}%,1)`);
+      nutGrad.addColorStop(0.6, `hsla(24,60%,${30*lightMul}%,1)`);
+      nutGrad.addColorStop(1, `hsla(20,55%,${18*lightMul}%,1)`);
+      ctx.fillStyle = nutGrad;
+      ctx.beginPath();
+      ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Lichte voet van de kastanje: draait mee, dus je ziet de bal rollen
+      const footX = ball.x + Math.cos(rot + Math.PI/2) * ball.radius * 0.45;
+      const footY = ball.y + Math.sin(rot + Math.PI/2) * ball.radius * 0.45;
+      ctx.save();
+      ctx.translate(footX, footY);
+      ctx.rotate(rot);
+      ctx.fillStyle = `hsla(36,30%,${62*lightMul}%,0.85)`;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, ball.radius * 0.44, ball.radius * 0.2, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+
+      // Zachte glans, vast t.o.v. het licht
+      const shine = ctx.createRadialGradient(
+        ball.x - ball.radius * 0.35,
+        ball.y - ball.radius * 0.4,
+        0,
+        ball.x - ball.radius * 0.35,
+        ball.y - ball.radius * 0.4,
+        ball.radius * 0.6
+      );
+      shine.addColorStop(0, `rgba(255,240,215,${0.3*lightMul})`);
+      shine.addColorStop(1, 'rgba(255,240,215,0)');
+      ctx.fillStyle = shine;
+      ctx.beginPath();
+      ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+      ctx.fill();
+
     } else if(isChristmas()){
       // Kerst: echte kerstbal met kroontje
       const lightMul = lightsOn ? 1 : 0.7;
@@ -2839,7 +3179,7 @@ function drawPlayBalls(){
     // Fade out effect in laatste seconden
     if(ball.ttl < 120){ // Laatste 2 seconden
       ctx.globalAlpha = ball.ttl / 120;
-      ctx.strokeStyle = isHalloween() ? '#ff8c42' : isNewYear() ? '#d4a056' : ball.color.light;
+      ctx.strokeStyle = isHalloween() ? '#ff8c42' : isNewYear() ? '#d4a056' : isAutumn() ? '#e08a3c' : ball.color.light;
       ctx.lineWidth = 3;
       ctx.setLineDash([8, 8]);
       ctx.beginPath();
@@ -3693,6 +4033,152 @@ function drawDecoration(deco,time){
 
       ctx.globalAlpha=1;
     }
+  }
+  else if(deco.type==='leafpile'){
+    // Herfst: hoopje opgewaaide bladeren, wiegt licht mee met de stroming
+    const lightMul=lightsOn?1:0.55;
+    const s=deco.size;
+    const bob=Math.sin(time*0.01+deco.bobPhase)*1.5;
+    for(const lf of deco.leaves){
+      ctx.save();
+      ctx.translate(deco.x+lf.dx*s,deco.y+lf.dy*s+bob);
+      ctx.rotate(lf.rot);
+      ctx.fillStyle=`hsla(${lf.hue},${lf.sat}%,${lf.light*lightMul}%,0.95)`;
+      ctx.beginPath();ctx.ellipse(0,0,s*lf.r,s*lf.r*0.5,0,0,Math.PI*2);ctx.fill();
+      ctx.strokeStyle=`hsla(${lf.hue},${lf.sat}%,${Math.max(10,lf.light*lightMul-16)}%,0.8)`;
+      ctx.lineWidth=Math.max(0.7,s*0.012);
+      ctx.beginPath();ctx.moveTo(-s*lf.r,0);ctx.lineTo(s*lf.r*0.85,0);ctx.stroke();
+      ctx.restore();
+    }
+  }
+  else if(deco.type==='branch'){
+    // Herfst: kale tak met een paar bladeren die nog vasthouden
+    const lightMul=lightsOn?1:0.5;
+    const s=deco.size;
+    const sway=Math.sin(time*0.006+deco.bobPhase)*0.03;
+    ctx.save();
+    ctx.translate(deco.x,deco.y);
+    ctx.rotate(deco.lean+sway);
+    ctx.lineCap='round';
+    ctx.strokeStyle=`hsla(25,30%,${30*lightMul}%,1)`;
+    ctx.lineWidth=Math.max(2,s*deco.thick);
+    ctx.beginPath();ctx.moveTo(0,0);ctx.quadraticCurveTo(s*0.1,-s*0.5,s*0.05,-s);ctx.stroke();
+    for(const lb of deco.limbs){
+      const by=-s*lb.t;
+      const bx=s*0.08*lb.t;
+      const ex=bx+Math.sin(lb.angle)*s*lb.len*lb.dir;
+      const ey=by-Math.cos(lb.angle)*s*lb.len;
+      ctx.strokeStyle=`hsla(25,28%,${26*lightMul}%,1)`;
+      ctx.lineWidth=Math.max(1.2,s*deco.thick*0.55);
+      ctx.beginPath();ctx.moveTo(bx,by);ctx.quadraticCurveTo((bx+ex)/2,by-s*0.08,ex,ey);ctx.stroke();
+      if(lb.leaf){
+        ctx.save();
+        ctx.translate(ex,ey);
+        ctx.rotate(Math.sin(time*0.012+lb.t*7)*0.35+lb.dir*0.6);
+        ctx.fillStyle=`hsla(${lb.hue},${lb.sat}%,${lb.light*lightMul}%,0.95)`;
+        ctx.beginPath();ctx.ellipse(s*lb.leafSize*0.9,0,s*lb.leafSize,s*lb.leafSize*0.5,0,0,Math.PI*2);ctx.fill();
+        ctx.strokeStyle=`hsla(${lb.hue},${lb.sat}%,${Math.max(10,lb.light*lightMul-16)}%,0.8)`;
+        ctx.lineWidth=Math.max(0.6,s*0.01);
+        ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(s*lb.leafSize*1.8,0);ctx.stroke();
+        ctx.restore();
+      }
+    }
+    ctx.restore();
+  }
+  else if(deco.type==='mushroom'){
+    // Herfst: clusterje paddenstoelen (rode met stippen en bruine)
+    const lightMul=lightsOn?1:0.55;
+    const s=deco.size;
+    const sway=Math.sin(time*0.008+deco.bobPhase)*0.02;
+    for(const m of deco.caps){
+      const stemH=s*0.55*m.h;
+      const capW=s*0.42*m.w;
+      const capH=capW*0.62;
+      ctx.save();
+      ctx.translate(deco.x+m.dx*s,deco.y);
+      ctx.rotate(m.lean+sway);
+      // Steel
+      ctx.fillStyle=`hsla(40,25%,${80*lightMul}%,1)`;
+      ctx.beginPath();
+      ctx.moveTo(-capW*0.22,0);
+      ctx.quadraticCurveTo(-capW*0.15,-stemH*0.6,-capW*0.18,-stemH);
+      ctx.lineTo(capW*0.18,-stemH);
+      ctx.quadraticCurveTo(capW*0.15,-stemH*0.6,capW*0.22,0);
+      ctx.closePath();ctx.fill();
+      // Hoed
+      const capHue=m.red?358:26;
+      const capSat=m.red?70:45;
+      const capGrad=ctx.createLinearGradient(0,-stemH-capH,0,-stemH+capH*0.2);
+      capGrad.addColorStop(0,`hsla(${capHue},${capSat}%,${(m.red?54:44)*lightMul}%,1)`);
+      capGrad.addColorStop(1,`hsla(${capHue},${capSat}%,${(m.red?34:28)*lightMul}%,1)`);
+      ctx.fillStyle=capGrad;
+      ctx.beginPath();ctx.ellipse(0,-stemH,capW,capH,0,Math.PI,0);ctx.closePath();ctx.fill();
+      // Donker randje onder de hoed
+      ctx.fillStyle=`hsla(${capHue},${capSat*0.6}%,${(m.red?24:20)*lightMul}%,0.55)`;
+      ctx.beginPath();ctx.ellipse(0,-stemH,capW,capH*0.16,0,0,Math.PI*2);ctx.fill();
+      // Witte stippen op de rode hoeden
+      if(m.red){
+        ctx.fillStyle=`hsla(40,20%,${94*lightMul}%,0.9)`;
+        for(let i=0;i<m.dots;i++){
+          const a=Math.PI+((i+0.5)/m.dots)*Math.PI;
+          const dr=0.5+((i*37)%10)/26;
+          ctx.beginPath();
+          ctx.ellipse(Math.cos(a)*capW*dr*0.72,-stemH+Math.sin(a)*capH*dr*0.78,capW*0.09,capW*0.07,0,0,Math.PI*2);
+          ctx.fill();
+        }
+      }
+      ctx.restore();
+    }
+  }
+  else if(deco.type==='acorn'){
+    // Herfst: eikeltje op het zand
+    const lightMul=lightsOn?1:0.55;
+    const s=deco.size;
+    ctx.save();
+    ctx.translate(deco.x,deco.y);
+    ctx.rotate(deco.tilt);
+    const nutGrad=ctx.createLinearGradient(-s*0.4,0,s*0.4,0);
+    nutGrad.addColorStop(0,`hsla(32,55%,${52*lightMul}%,1)`);
+    nutGrad.addColorStop(1,`hsla(30,50%,${34*lightMul}%,1)`);
+    ctx.fillStyle=nutGrad;
+    ctx.beginPath();ctx.ellipse(0,0,s*0.42,s*0.52,0,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.moveTo(-s*0.1,s*0.46);ctx.lineTo(0,s*0.72);ctx.lineTo(s*0.1,s*0.46);ctx.closePath();ctx.fill();
+    // Napje
+    ctx.fillStyle=`hsla(26,45%,${28*lightMul}%,1)`;
+    ctx.beginPath();ctx.ellipse(0,-s*0.3,s*0.48,s*0.3,0,Math.PI,0);ctx.closePath();ctx.fill();
+    ctx.fillStyle=`hsla(26,45%,${22*lightMul}%,1)`;
+    ctx.beginPath();ctx.ellipse(0,-s*0.28,s*0.48,s*0.1,0,0,Math.PI*2);ctx.fill();
+    // Steeltje
+    ctx.strokeStyle=`hsla(28,40%,${24*lightMul}%,1)`;
+    ctx.lineWidth=Math.max(1,s*0.1);
+    ctx.beginPath();ctx.moveTo(0,-s*0.52);ctx.lineTo(0,-s*0.76);ctx.stroke();
+    ctx.restore();
+  }
+  else if(deco.type==='chestnut'){
+    // Herfst: glanzende kastanje met lichte voet
+    const lightMul=lightsOn?1:0.55;
+    const s=deco.size;
+    ctx.save();
+    ctx.translate(deco.x,deco.y);
+    ctx.rotate(deco.tilt);
+    const grad=ctx.createRadialGradient(-s*0.2,-s*0.25,s*0.05,0,0,s*0.6);
+    grad.addColorStop(0,`hsla(28,55%,${44*lightMul}%,1)`);
+    grad.addColorStop(0.6,`hsla(24,60%,${28*lightMul}%,1)`);
+    grad.addColorStop(1,`hsla(20,55%,${17*lightMul}%,1)`);
+    ctx.fillStyle=grad;
+    ctx.beginPath();
+    ctx.moveTo(0,-s*0.5);
+    ctx.quadraticCurveTo(s*0.52,-s*0.35,s*0.45,s*0.25);
+    ctx.quadraticCurveTo(0,s*0.6,-s*0.45,s*0.25);
+    ctx.quadraticCurveTo(-s*0.52,-s*0.35,0,-s*0.5);
+    ctx.closePath();ctx.fill();
+    // Lichte voet
+    ctx.fillStyle=`hsla(38,35%,${70*lightMul}%,0.9)`;
+    ctx.beginPath();ctx.ellipse(0,s*0.34,s*0.2,s*0.11,0,0,Math.PI*2);ctx.fill();
+    // Glans
+    ctx.fillStyle=`rgba(255,235,205,${0.3*lightMul})`;
+    ctx.beginPath();ctx.ellipse(-s*0.15,-s*0.22,s*0.16,s*0.09,-0.5,0,Math.PI*2);ctx.fill();
+    ctx.restore();
   }
   else if(deco.type==='chest'){
     const x=deco.x;
@@ -7171,6 +7657,7 @@ function updateSickFishStatus(){
 function regenerateDecor(){
   setupPlants();
   setupDecorations();
+  setupFallingLeaves();
   updateLayerCache();
   console.log('Nieuwe decoratie gegenereerd!');
 }
@@ -7268,8 +7755,11 @@ if((wsConnectedOnce&&!wsConnected)||alreadyActiveError){
   return;
 }
 
+drawFallingLeaves('sand'); // Bladeren die op de bodem liggen
+
 for(let i=0;i<backPlants.length;i++){drawPlant(backPlants[i],t)}
 for(let i=0;i<backDecorations.length;i++){drawDecoration(backDecorations[i],t)}
+updateFallingLeaves();drawFallingLeaves('back');
 
 if(pumpOn&&Math.random()<0.6*performanceProfile.particleCount){for(let i=0;i<2;i++)makeBubble()}
 drawPumpChampagne(); // Champagne fles bij pump (nieuwjaar)
@@ -7307,6 +7797,7 @@ updateFishingRod(t);
 // Foreground layer
 for(let i=0;i<frontPlants.length;i++){drawPlant(frontPlants[i],t)}
 for(let i=0;i<frontDecorations.length;i++){drawDecoration(frontDecorations[i],t)}
+drawFallingLeaves('front');
 
 // Water greenness overlay and algae particles
 updateAlgenParticles();
