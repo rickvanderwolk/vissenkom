@@ -72,6 +72,9 @@ let config = {
     showControllerStatusBlocks: false,
     showAddFishTip: true,
     fishSpecies: false,
+    uiStyle: 'classic',
+    showBanner: true,
+    showPanels: { qr: true, newest: true, stars: true, legends: true, memorial: true, activity: true, version: true },
     hungerRate: 0.167,
     diseaseRate: 0.083,
     viewport: {

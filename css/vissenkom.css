@@ -27,6 +27,16 @@ body.light .pill.status-warn{background:rgba(255,159,67,.3);color:#0b1e2d;border
 body.light .pill.status-danger{background:rgba(235,87,87,.3);color:#0b1e2d;border:1px solid rgba(235,87,87,.5)}
 #cooldown.ready{background:rgba(255,215,0,.85);color:#0b1e2d;box-shadow:0 0 12px rgba(255,215,0,.4);border:1px solid rgba(255,215,0,.6)}
 body.light #cooldown.ready{background:rgba(255,215,0,.9);color:#0b1e2d;box-shadow:0 0 8px rgba(255,215,0,.3);border:1px solid rgba(255,215,0,.7)}
+/* uiStyle 'minimal': panelen en pillen blijven donker glas, ook met het licht aan,
+   zodat ze net zo terughoudend zijn als de naamlabels in de kom */
+body.light.ui-minimal{color:#e9f1f7}
+body.light.ui-minimal .panel{background:rgba(0,0,0,.35)}
+body.light.ui-minimal .pill{background:rgba(0,0,0,.35);color:#e9f1f7;border:1px solid rgba(255,255,255,.15)}
+body.light.ui-minimal .pill.status-warn{background:rgba(255,159,67,.25);color:#e9f1f7;border:1px solid rgba(255,159,67,.4)}
+body.light.ui-minimal .pill.status-danger{background:rgba(235,87,87,.25);color:#e9f1f7;border:1px solid rgba(235,87,87,.4)}
+/* Blokken die via config.showPanels uit staan (wint van de display die de lijst-code zet) */
+.panel.panel-off{display:none!important}
+.top-banner.banner-off{display:none}
 .qrbox #qrLink{display:block;text-decoration:none;cursor:pointer}
 .qrbox canvas{display:block;width:50%;margin:0 auto;aspect-ratio:1/1;border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,.25);background:#fff}
 .qrbox .caption{margin-top:4px;text-align:center;font-size:11px;opacity:.85}

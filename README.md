@@ -116,6 +116,9 @@ Beschikbare opties:
 | `showControllerStatusBlocks` | Toon statusblokken in de controller (temperatuur, pomp, etc.) | `false` |
 | `showAddFishTip` | Toon de tip-badge bovenin de controller die naar de "Vis toevoegen"-sectie linkt | `true` |
 | `fishSpecies` | Geef elke vis een eigen soort (vorm, staart, vinnen en patroon), afgeleid uit naam en kleur. Uit = alle vissen hebben het klassieke uiterlijk | `false` |
+| `uiStyle` | Uiterlijk van labels en panelen. `classic`: kaartjes met naam, gezondheidsbalk en leeftijd bij elke vis, lichte panelen als het licht aan is. `minimal`: naam met drie gezondheidsstipjes en daaronder de leeftijd, als losse tekst vlak boven de vis, zonder kaartje (bij honger of ziekte kleurt de naam geel of rood), en de panelen en statusbalk blijven ook met het licht aan donker. Rustiger bij veel vissen | `classic` |
+| `showBanner` | Toon de balk bovenaan met "Scan de QR-code om je eigen vis toe te voegen". Uit = de kom wordt iets hoger | `true` |
+| `showPanels` | Blokken links per stuk aan- of uitzetten: `qr`, `newest` (nieuwste bewoners), `stars` (sterren van de kom), `legends` (legenden van de kom), `memorial` (in onze harten), `activity` (laatste activiteiten) en `version`. Een blok dat je weglaat staat aan. "Legenden" verschijnt alleen als er een overleden vis bij de oudste drie hoort, "In onze harten" alleen als er een vis is overleden | alles `true` |
 | `hungerRate` | Gezondheidsverlies per 10 minuten door honger | `0.167` (~4 dagen tot dood) |
 | `diseaseRate` | Extra gezondheidsverlies per 10 minuten bij ziekte zonder medicijnen | `0.083` |
 | `viewport` | Object met `offsetTop`, `offsetBottom`, `offsetLeft`, `offsetRight` om het zichtbare gebied aan te passen (handig voor schermen met randen) | `0` voor alle waarden |
