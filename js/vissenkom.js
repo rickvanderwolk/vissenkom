@@ -6540,14 +6540,15 @@ function initWebSocket() {
             wsConnectedOnce = true;
             wsReconnectAttempts = 0; // Reset counter on successful connection
 
+            // Request config first: the server answers in order, so viewport and
+            // fishSpecies are applied before the first fish are drawn
+            ws.send(JSON.stringify({ command: 'getConfig' }));
             // Request current game state from server
             ws.send(JSON.stringify({ command: 'getGameState' }));
             // Request access code for QR
             ws.send(JSON.stringify({ command: 'getAccessCode' }));
             // Request version info
             ws.send(JSON.stringify({ command: 'getVersion' }));
-            // Request config for viewport settings
-            ws.send(JSON.stringify({ command: 'getConfig' }));
             // Request recent activity for activity list
             ws.send(JSON.stringify({ command: 'getRecentActivity' }));
 
