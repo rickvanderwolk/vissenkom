@@ -196,6 +196,7 @@ function resize(){
   pumpPos.x=W-70; // Altijd initialiseren voor champagnefles
   updateUIPositions();
   setupLamps();setupDiscoBall();setupFishingRod();setupPlants();setupDecorations();setupStars();setupParticles();setupSpiderWebs();setupFallingLeaves();
+  keepClearOfQrSign();
   updateLayerCache();
   drawQR();
 }
@@ -428,7 +429,8 @@ function updateAlgenParticles(){
     algenParticles.pop();
   }
   for(const a of algenParticles){
-    a.x+=a.speedX;a.y+=a.speedY;
+    waterCurrentAt(a.x,a.y);
+    a.x+=a.speedX+curU;a.y+=a.speedY+curV;
     if(a.x<0)a.x=W;
     if(a.x>W)a.x=0;
     if(a.y<0)a.y=H;
@@ -445,37 +447,31 @@ function setupPlants(){
     const type=plantTypes[Math.floor(Math.random()*plantTypes.length)];
     const x=rand(50,W-50);
 
-    let height,width,segments,zIndex;
+    let height,width,segments;
     if(type==='seaweed'){
       height=rand(200,500); // Bigger seaweed
       width=rand(20,45);
       segments=Math.floor(rand(12,25));
-      zIndex=Math.random()<0.7?'back':'front';
     } else if(type==='kelp'){
       height=rand(300,600); // Very large kelp forests
       width=rand(30,60);
       segments=Math.floor(rand(15,30));
-      zIndex='back';
     } else if(type==='fern'){
       height=rand(150,300);
       width=rand(40,80);
       segments=Math.floor(rand(10,18));
-      zIndex=Math.random()<0.6?'back':'front';
     } else if(type==='grass'){
       height=rand(120,220);
       width=rand(8,18);
       segments=Math.floor(rand(25,40));
-      zIndex=Math.random()<0.8?'back':'front';
     } else if(type==='anubias'){
       height=rand(80,160);
       width=rand(50,100);
       segments=Math.floor(rand(5,10));
-      zIndex='front';
     } else if(type==='vallisneria'){
       height=rand(250,450);
       width=rand(10,20);
       segments=Math.floor(rand(20,35));
-      zIndex='back';
     }
 
     const theme=getThemeConfig();
@@ -491,6 +487,9 @@ function setupPlants(){
     const maxY=H-sandHeight+15; // Tot wat boven het zand
     const plantY=rand(minY,maxY);
 
+    // Planten staan met hun voet in het zand en daarom achter de vissen, net als decoraties:
+    // met een vis erachter zwemt die anders onder de plant uit, als het ware door de bodem.
+    const zIndex='back';
     plants.push({type,x,y:plantY,height,width,segments,hue,swayPhase,movePhase,branchiness,zIndex});
   }
 }
@@ -500,8 +499,8 @@ function setupDecorations(){
   const sandHeight=70;
   // Decoraties staan op de bodem en daarom altijd achter de vissen. Vissen zwemmen tot
   // vlak boven de onderrand, dus met een decoratie ervoor zwemt een vis er van boven naar
-  // onder achter langs, als het ware door de bodem. Alleen planten (dun, wuivend) en
-  // vallende blaadjes mogen voor de vissen.
+  // onder achter langs, als het ware door de bodem. Planten ook; alleen vallende blaadjes
+  // (die in het water zweven) mogen voor de vissen.
   const zIndex='back';
 
   // Theme-based decoration or normal castle
@@ -1511,7 +1510,7 @@ function checkFishBite(){
 function makeFish(x=rand(50,W-50),y=rand(50,H-50),name){const base=rand(18,30);let hue=Math.floor(rand(0,360));if(isNaN(hue))hue=0;const initialVx=rand(-2.5,2.5);const initialVy=rand(-.3,.3);const f={x,y,vx:initialVx,vy:initialVy,speed:rand(1.5,3.0),baseSize:base,hue,dir:Math.random()*Math.PI*2,turnTimer:Math.floor(rand(600,1800)),blink:0,name:name||`Vis ${fishCounter++}`,lastEat:Date.now(),bornAt:Date.now(),eats:0,sickTop:Math.random()<0.5,hungerWindow:DAY*rand(0.9,1.1),behaviorState:'normal',behaviorTimer:0,wallFollowTarget:null,lastPoop:Date.now(),targetVx:initialVx,targetVy:initialVy,ballApproachSide:Math.random()<0.5?-1:1};fishes.push(f)}
 // Dummy vissen verwijderd - vissen komen nu alleen van server na gameState
 
-function makeFood(){const n=Math.max(8,fishes.length);const theme=getThemeConfig();const foodColors=theme.foodColors;for(let i=0;i<n;i++){const color=foodColors[Math.floor(Math.random()*foodColors.length)];foods.push({x:rand(40,W-40),y:50+rand(0,30),vy:rand(0.7,1.5),r:7,ttl:6000,color})}}
+function makeFood(){const n=Math.max(8,fishes.length);const theme=getThemeConfig();const foodColors=theme.foodColors;for(let i=0;i<n;i++){const color=foodColors[Math.floor(Math.random()*foodColors.length)];foods.push({x:rand(40,W-40),y:WATER_SURFACE_Y+3,vy:rand(0.7,1.5),r:7,ttl:6000,color,floatUntil:Date.now()+rand(1200,4000),drift:rand(-0.15,0.15)})}}
 function makeBubble(){
   const b=getBubble();
   // Bij nieuwjaar: bubbels uit champagnefles opening
@@ -1598,7 +1597,23 @@ function limitSpeed(f){
     }
   }
 }
+// Hoogste punt waar het midden van een vis mag komen: net onder het wateroppervlak
+function fishTopY(f){return WATER_SURFACE_Y+(f._sizeCache?f._sizeCache.v:24)*0.6+4}
+
 function bounceOffWalls(f){
+  // Niet over de QR-code op het bordje zwemmen: via de kortste kant eruit
+  if(qrSignOn&&QR_SIGN_FISH_AVOID){
+    const z=qrSignZone();const r=(f._sizeCache?f._sizeCache.v:24)*1.0;
+    if(f.x>z.x0-r&&f.x<z.x1+r&&f.y>z.y0-r&&f.y<z.y1+r){
+      const up=f.y-(z.y0-r),down=(z.y1+r)-f.y,right=(z.x1+r)-f.x,left=f.x-(z.x0-r);
+      const leftOk=z.x0-r>21; // links is weinig ruimte tot de wand (marge 20)
+      const m=Math.min(up,down,right,leftOk?left:Infinity);
+      if(m===up){f.y=z.y0-r;f.vy=-Math.abs(f.vy)-0.1}
+      else if(m===down){f.y=z.y1+r;f.vy=Math.abs(f.vy)+0.1}
+      else if(m===right){f.x=z.x1+r;f.vx=Math.abs(f.vx)+0.1}
+      else{f.x=z.x0-r;f.vx=-Math.abs(f.vx)-0.1}
+    }
+  }
   const margin = 20;
 
   // Bounce off left wall
@@ -1629,9 +1644,10 @@ function bounceOffWalls(f){
       f.wallFollowTarget = null;
     }
   }
-  // Bounce off top wall
-  if(f.y < margin) {
-    f.y = margin + 1;
+  // Bounce off the water surface (the fish stays fully under the waterline)
+  const top = fishTopY(f);
+  if(f.y < top) {
+    f.y = top + 1;
     f.vy = Math.abs(f.vy) + 0.1;
     // Update target velocity to match bounce
     f.targetVy = Math.abs(f.targetVy || f.vy);
@@ -1775,6 +1791,7 @@ function drawLamps(time){
     if(discoActive)beamGrad.addColorStop(0.7,`hsla(${hue3},95%,65%,${0.1*intensity*stro*alphaBoost})`);
     beamGrad.addColorStop(1,'rgba(0,0,0,0)');
     const wTop=L.width*0.55*discoMultiplier;const wBottom=L.width*1.1*discoMultiplier;const yBottom=H*0.9;
+    L.beam={wTop,wBottom,intensity:intensity*stro}; // voor de stofjes in de bundel
     ctx.fillStyle=beamGrad;ctx.beginPath();ctx.moveTo(L.x-wTop,0);ctx.lineTo(L.x+wTop,0);ctx.lineTo(L.x+wBottom,yBottom);ctx.lineTo(L.x-wBottom,yBottom);ctx.closePath();ctx.fill();
     const stripes=discoActive?6:3; // Meer stripes in disco mode!
     for(let i=0;i<stripes;i++){
@@ -1795,6 +1812,47 @@ function drawLamps(time){
       ctx.globalCompositeOperation='source-over';
     }
   }
+  drawBeamMotes(time);
+}
+
+// ---- Stofjes in de lichtbundels -----------------------------------------------
+// Kleine zwevende deeltjes die alleen oplichten binnen een lichtbundel, zodat de bundels
+// voelen als licht in water. Goedkoop (een paar tientallen fillRects zonder verloop) en op
+// 'low' en 'verylow' helemaal uit.
+const beamMotes=[];
+function drawBeamMotes(time){
+  const q=performanceProfile.quality;
+  const target=q==='high'?70:q==='medium'?45:0;
+  while(beamMotes.length<target){
+    // Een kwart is groter en zachter, alsof ze onscherp dichter bij het glas zweven
+    const soft=Math.random()<0.25;
+    beamMotes.push({x:rand(0,W),y:rand(0,H*0.9),size:soft?rand(2.6,3.8):rand(1.2,2.2),soft,vx:rand(-0.06,0.06),vy:rand(-0.05,0.03),phase:rand(0,Math.PI*2)});
+  }
+  if(beamMotes.length>target)beamMotes.length=target;
+  if(!target)return;
+  const yMax=H*0.9;
+  ctx.save();
+  ctx.fillStyle='rgb(255,246,222)';
+  for(const m of beamMotes){
+    waterCurrentAt(m.x,m.y);
+    m.x+=(m.vx+Math.sin(time*0.7+m.phase)*0.04+curU)*frameScale;
+    m.y+=(m.vy+curV)*frameScale;
+    if(m.x<0)m.x+=W;else if(m.x>W)m.x-=W;
+    if(m.y<0)m.y+=yMax;else if(m.y>yMax)m.y-=yMax;
+    // Helder in het midden van een bundel, zwakker naar de rand en naar beneden
+    const depth=m.y/yMax;
+    let b=0;
+    for(const L of lamps){
+      const B=L.beam;if(!B)continue;
+      const d=Math.abs(m.x-L.x)/(B.wTop+(B.wBottom-B.wTop)*depth);
+      if(d<1){const v=(1-d*d)*B.intensity;if(v>b)b=v}
+    }
+    if(b<0.04)continue;
+    const a=b*(1-depth*0.7)*(0.65+0.35*Math.sin(time*2+m.phase*3));
+    if(m.soft){ctx.globalAlpha=Math.min(1,a);ctx.beginPath();ctx.arc(m.x,m.y,m.size,0,Math.PI*2);ctx.fill()}
+    else{ctx.globalAlpha=Math.min(1,a*2.2);ctx.fillRect(m.x,m.y,m.size,m.size)}
+  }
+  ctx.restore();
 }
 
 function drawStars(time){
@@ -2322,8 +2380,9 @@ function drawParticles(){
       p.x+=Math.sin(p.y*0.01)*0.3+p.speedX*0.3;
       p.y+=Math.abs(p.speedY)*0.5; // Alleen naar beneden, langzamer
     } else {
-      p.x+=p.speedX;
-      p.y+=p.speedY;
+      waterCurrentAt(p.x,p.y);
+      p.x+=p.speedX+curU;
+      p.y+=p.speedY+curV;
     }
 
     // Wrap around edges
@@ -2657,6 +2716,69 @@ function drawWaterGreenness(){
   ctx.fillRect(0,0,W,H);
 }
 
+// ---- Stroming door de pomp ------------------------------------------------------
+// Een langzame rondgang zoals een luchtsteen die maakt: bij de bubbelkolom omhoog, boven
+// langs het oppervlak van de pomp af en langs de bodem terug. De sterkte loopt zacht op en
+// af als de pomp aan of uit gaat. waterCurrentAt zet curU/curV (px per frame bij 60fps),
+// zo hoeft er per deeltje niets aangemaakt te worden.
+const CURRENT_MAX=0.35;
+let currentStrength=0;let curU=0;let curV=0;
+function waterCurrentAt(x,y){
+  if(currentStrength<0.005){curU=0;curV=0;return}
+  const S=currentStrength*CURRENT_MAX;
+  const dx=pumpPos.x-x;const side=dx>=0?1:-1;
+  const reach=0.3+0.7*Math.exp(-Math.abs(dx)/(W*0.6));
+  const depth=clamp(y/H,0,1);
+  curU=-side*S*Math.cos(Math.PI*depth)*reach; // boven van de kolom af, onder ernaartoe
+  curV=-S*1.5*Math.exp(-(dx*dx)/5000)*(0.5+0.5*depth); // omhoog bij de bubbelkolom
+}
+
+// ---- Wateroppervlak -------------------------------------------------------------
+// Bovenin een zachte, lichtere band direct onder het golvende oppervlak; de golf zelf is
+// de overgang, zonder harde lijn. Met de pomp aan golft het meer. Bubbels knappen hier met een klein
+// ringetje en voer drijft eerst even voordat het zinkt.
+const WATER_SURFACE_Y=4; // helemaal bovenaan; de golf komt een paar pixels onder de rand
+const surfacePts=[];const surfaceRipples=[];
+let surfaceGrad=null;let surfaceGradKey=-1;
+function waterSurfaceY(x,time){
+  const agit=1+currentStrength;
+  return WATER_SURFACE_Y+Math.sin(x*0.018+time*1.3)*1.2*agit+Math.sin(x*0.047-time*0.9*agit)*0.7*agit;
+}
+function addSurfaceRipple(x){
+  surfaceRipples.push({x,t0:Date.now()});
+  if(surfaceRipples.length>16)surfaceRipples.shift();
+}
+function traceSurface(){for(let i=0;i<surfacePts.length;i+=2)ctx.lineTo(surfacePts[i],surfacePts[i+1])}
+function drawWaterSurface(time){
+  const bright=lightsOn?1:0.45;const step=24;
+  surfacePts.length=0;
+  for(let x=0;x<=W+step;x+=step)surfacePts.push(x,waterSurfaceY(x,time));
+  ctx.save();
+  // Lucht tussen deksel en water: een heel lichte waas
+  ctx.fillStyle=`rgba(215,238,248,${0.08*bright})`;
+  ctx.beginPath();ctx.moveTo(0,0);traceSurface();ctx.lineTo(W+step,0);ctx.closePath();ctx.fill();
+  // Onderkant van het oppervlak: lichtere band die naar beneden vervaagt
+  if(surfaceGradKey!==bright){
+    surfaceGrad=ctx.createLinearGradient(0,WATER_SURFACE_Y-3,0,WATER_SURFACE_Y+40);
+    surfaceGrad.addColorStop(0,`rgba(205,242,250,${0.2*bright})`);
+    surfaceGrad.addColorStop(0.25,`rgba(205,242,250,${0.08*bright})`);
+    surfaceGrad.addColorStop(1,'rgba(205,242,250,0)');
+    surfaceGradKey=bright;
+  }
+  ctx.fillStyle=surfaceGrad;
+  ctx.beginPath();ctx.moveTo(0,WATER_SURFACE_Y+40);traceSurface();ctx.lineTo(W+step,WATER_SURFACE_Y+40);ctx.closePath();ctx.fill();
+  // Ringetjes waar een bubbel knapt
+  const now=Date.now();
+  for(let i=surfaceRipples.length-1;i>=0;i--){
+    const r=surfaceRipples[i];const age=(now-r.t0)/700;
+    if(age>=1){surfaceRipples.splice(i,1);continue}
+    const rad=2+age*12;
+    ctx.strokeStyle=`rgba(235,250,255,${0.5*(1-age)*bright})`;ctx.lineWidth=1;
+    ctx.beginPath();ctx.ellipse(r.x,WATER_SURFACE_Y+1,rad,rad*0.3,0,0,Math.PI*2);ctx.stroke();
+  }
+  ctx.restore();
+}
+
 function clearFrame(time){
   const fullW=cv.width;
   const fullH=cv.height;
@@ -2707,6 +2829,7 @@ function clearFrame(time){
   drawNewYearText(time);
   drawAmbientGlow(time);
   drawLamps(time);
+  drawWaterSurface(time);
   drawSpiderWebs();
   drawDiscoFog(time);
   discoEffects(time);
@@ -2716,18 +2839,24 @@ function clearFrame(time){
   ctx.restore();
 }
 function drawFood(){for(let i=foods.length-1;i>=0;i--){const p=foods[i];
+  // Eerst even drijven aan het oppervlak (zacht deinend), dan zinken
+  if(p.floatUntil&&Date.now()<p.floatUntil){
+    p.x+=p.drift*frameScale;p.y=WATER_SURFACE_Y+3+Math.sin(Date.now()*0.004+p.x)*0.8;
+  }else
   // Als voer de bodem bereikt, stop met vallen
   if(p.y >= H-16){
     p.y = H-16;  // Blijf op de bodem
     p.vy = 0;     // Stop met vallen
   } else {
+    waterCurrentAt(p.x,p.y);
+    p.x+=curU*0.5*frameScale;  // Zinkend voer drijft een beetje mee met de stroming
     p.y+=p.vy*frameScale;    // Blijf vallen als nog niet op bodem
   }
   p.ttl--;
   ctx.fillStyle=p.color||'#ffb37a';ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fill();
   // Verwijder alleen als ttl verloopt (niet meer als het de bodem raakt)
   if(p.ttl<=0){foods.splice(i,1)}}}
-function drawBubbles(){if(bubbles.length===0)return;const bubbleColor=(THEMES[currentTheme]||THEMES.normal).bubbleColor;ctx.globalAlpha=lightsOn?0.7:0.5;ctx.fillStyle=bubbleColor;for(let i=bubbles.length-1;i>=0;i--){const b=bubbles[i];b.y-=b.vy*frameScale;b.x+=b.vx*frameScale;b.ttl--;ctx.beginPath();ctx.arc(b.x,b.y,b.r,0,Math.PI*2);ctx.fill();if(b.y<-10||b.ttl<=0){releaseBubble(b);bubbles.splice(i,1)}}ctx.globalAlpha=1}
+function drawBubbles(){if(bubbles.length===0)return;const bubbleColor=(THEMES[currentTheme]||THEMES.normal).bubbleColor;ctx.globalAlpha=lightsOn?0.7:0.5;ctx.fillStyle=bubbleColor;for(let i=bubbles.length-1;i>=0;i--){const b=bubbles[i];waterCurrentAt(b.x,b.y);b.y-=b.vy*frameScale;b.x+=(b.vx+curU*0.6)*frameScale;b.ttl--;ctx.beginPath();ctx.arc(b.x,b.y,b.r,0,Math.PI*2);ctx.fill();const popped=b.y<WATER_SURFACE_Y+b.r;if(popped||b.ttl<=0){if(popped)addSurfaceRipple(b.x);releaseBubble(b);bubbles.splice(i,1)}}ctx.globalAlpha=1}
 
 function drawPoops(){
   for(const p of poops) {
@@ -3207,8 +3336,11 @@ function drawPlayBalls(){
 function drawPlant(plant,time){
   const lightMul=lightsOn?1:0.6;
   // Heel subtiele sway voor meer leven
-  const swayAmount=Math.sin(time*0.015+plant.swayPhase)*3;
+  const swayAmount=Math.sin(time*0.015+plant.swayPhase)*3*(1+currentStrength*0.8);
   const moveAmount=Math.sin(time*0.008+plant.movePhase)*2;
+  // Met de stroming buigt de plant mee: bijna niets aan de voet, het meest in de top
+  waterCurrentAt(plant.x,plant.y-plant.height*0.6);
+  const lean=curU*plant.height*0.12;
 
   // Kerst: teken vrolijke kerstboom ipv normale plant
   if(isChristmas()){
@@ -3349,7 +3481,8 @@ function drawPlant(plant,time){
 
     for(let i=0;i<plant.segments;i++){
       const y=plant.y-i*segmentHeight;
-      const sway=(i/plant.segments)*swayAmount*swayMultiplier;
+      const frac=i/plant.segments;
+      const sway=frac*swayAmount*swayMultiplier+frac*frac*lean;
       const x=plant.x+sway;
       const width=plant.width*(1-i*0.02/plant.segments);
       const alpha=(lightsOn?0.9:0.6)*fadeAlpha;
@@ -3375,7 +3508,7 @@ function drawPlant(plant,time){
 
     for(let i=0;i<plant.segments;i++){
       const y=plant.y-i*segmentHeight;
-      const x=plant.x;
+      const x=plant.x+(i/plant.segments)**2*lean;
       const width=plant.width*(1-i*0.04/plant.segments);
       const alpha=(lightsOn?0.8:0.5)*fadeAlpha;
 
@@ -3407,7 +3540,7 @@ function drawPlant(plant,time){
       const offsetX=(i-plant.segments/2)*bladeSpacing;
       const x=plant.x+offsetX;
       const bladeHeight=plant.height*(0.8+0.2*(i%3)/2);
-      const topX=x+swayAmount*0.6; // Subtiele sway aan de top
+      const topX=x+swayAmount*0.6+lean*0.8; // Subtiele sway aan de top, plus de stroming
       const alpha=(lightsOn?0.8:0.5)*fadeAlpha;
 
       ctx.strokeStyle=`hsla(${plant.hue},80%,${40*lightMul}%,${alpha})`;
@@ -3424,7 +3557,7 @@ function drawPlant(plant,time){
     const leafSpacing=plant.height/plant.segments;
     for(let i=0;i<plant.segments;i++){
       const y=plant.y-i*leafSpacing;
-      const x=plant.x;
+      const x=plant.x+(i/plant.segments)*lean*0.4;
       const leafWidth=plant.width*plant.branchiness*(1-i*0.1/plant.segments);
       const leafHeight=leafSpacing*0.8;
       const alpha=(lightsOn?0.9:0.6)*fadeAlpha;
@@ -3448,7 +3581,8 @@ function drawPlant(plant,time){
     const segmentHeight=plant.height/plant.segments;
     for(let i=0;i<plant.segments;i++){
       const y=plant.y-i*segmentHeight;
-      const sway=(i/plant.segments)*swayAmount*0.8;
+      const frac=i/plant.segments;
+      const sway=frac*swayAmount*0.8+frac*frac*lean;
       const x=plant.x+sway;
       const width=plant.width*(1-i*0.01/plant.segments);
       const alpha=(lightsOn?0.8:0.5)*fadeAlpha;
@@ -5399,11 +5533,11 @@ function handleJumping(f) {
 
   if(f.jumpPhase === 'up') {
     // Swim up towards surface
-    const targetY = 30;
+    const targetY = fishTopY(f) - 10;
     steerTowards(f, f.x + rand(-20, 20), targetY, 0.08);
 
     // When near surface, switch to down
-    if(f.y < 50) {
+    if(f.y < fishTopY(f) + 20) {
       f.jumpPhase = 'down';
       f.jumpTimer = Math.floor(rand(60, 120));
     }
@@ -6541,6 +6675,7 @@ function updateQRWithCode(accessCode) {
     });
 
     console.log('✅ Local QR code generated successfully with QRious');
+    renderQrSign(controllerUrl);
 
     // Restore visual clarity with smooth transition
     el.style.transition = 'opacity 0.3s ease, filter 0.3s ease';
@@ -6559,6 +6694,102 @@ function updateQRWithCode(accessCode) {
     // Fallback to old method if local generation fails
     fallbackToExternalQR(el, controllerUrl, accessCode);
   }
+}
+
+// ---- QR-bordje in de kom (uiStyle 'minimal') -------------------------------------------
+// Een houten bordje op een paaltje in het zand, linksonder, zoals een decoratiebordje in een
+// aquarium. Met de QR-code (zelfde link als het QR-blok), "Voeg je vis toe" en of je kunt
+// voeren (dan is de voer-pil onderin niet nodig). Wordt alleen opnieuw opgebouwd als de code
+// of de voertekst verandert, en verder als plaatje getekend. Het staat achter de vissen zoals de andere
+// bodemdecoraties (anders zwemmen vissen er "door het zand" achterlangs), dus vissen zwemmen
+// er gewoon voor langs. Planten en decoraties blijven uit de buurt van het bordje.
+let qrSignOn=false;let qrSignUrl='';let qrSignQr=null;let qrSignQrBounds=null;let qrSignFeed='';let qrSignCache=null;let qrSignCacheKey='';let qrSignVersion=0;
+// Vissen om de QR-code heen laten zwemmen. Tijdelijk uit: het werkt, maar het wegduwen
+// voelde onrustig. Zet op true om het weer aan te zetten.
+const QR_SIGN_FISH_AVOID=false;
+const QR_SIGN_QR=140,QR_SIGN_BORDER=12,QR_SIGN_PAD=10,QR_SIGN_CAPTION=28,QR_SIGN_FEED=20,QR_SIGN_POST=70;
+function renderQrSign(url){
+  qrSignUrl=url;
+  if(!qrSignQr)qrSignQr=document.createElement('canvas');
+  try{new QRious({element:qrSignQr,value:url,size:QR_SIGN_QR,level:'M',foreground:'#2b1a0c',background:'#f4efe1',padding:0});qrSignQrBounds=qrSignBounds();qrSignVersion++}
+  catch(e){console.warn('QR-bordje kon niet gemaakt worden:',e)}
+}
+// Omhullende van de donkere blokjes in de gegenereerde QR-code
+function qrSignBounds(){
+  const w=qrSignQr.width,h=qrSignQr.height;const d=qrSignQr.getContext('2d').getImageData(0,0,w,h).data;
+  let x0=w,y0=h,x1=-1,y1=-1;
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){if(d[(y*w+x)*4]<128){if(x<x0)x0=x;if(x>x1)x1=x;if(y<y0)y0=y;if(y>y1)y1=y}}
+  return x1<0?{x:0,y:0,w,h}:{x:x0,y:y0,w:x1-x0+1,h:y1-y0+1};
+}
+function buildQrSign(){
+  const plateW=QR_SIGN_QR+QR_SIGN_PAD*2,plateH=QR_SIGN_QR+QR_SIGN_PAD+QR_SIGN_CAPTION+QR_SIGN_FEED;
+  const bw=plateW+QR_SIGN_BORDER*2,bh=plateH+QR_SIGN_BORDER*2;
+  const c=document.createElement('canvas');c.width=bw+20;c.height=bh+QR_SIGN_POST+12;
+  const g=c.getContext('2d');const ox=10,oy=2;
+  const rr=(x,y,w,h,r)=>{g.beginPath();g.moveTo(x+r,y);g.arcTo(x+w,y,x+w,y+h,r);g.arcTo(x+w,y+h,x,y+h,r);g.arcTo(x,y+h,x,y,r);g.arcTo(x,y,x+w,y,r);g.closePath()};
+  // Paaltje met een zacht schaduwtje aan de voet
+  const postX=ox+bw/2;
+  g.fillStyle='#6b4220';g.fillRect(postX-8,oy+bh-4,16,QR_SIGN_POST+4);
+  g.fillStyle='rgba(0,0,0,0.18)';g.fillRect(postX+3,oy+bh-4,5,QR_SIGN_POST+4);
+  g.fillStyle='rgba(90,60,30,0.22)';g.beginPath();g.ellipse(postX,oy+bh+QR_SIGN_POST,26,6,0,0,Math.PI*2);g.fill();
+  // Houten bord met planken
+  const wood=g.createLinearGradient(0,oy,0,oy+bh);wood.addColorStop(0,'#a36b36');wood.addColorStop(1,'#7c4c22');
+  rr(ox,oy,bw,bh,10);g.fillStyle=wood;g.fill();g.lineWidth=2;g.strokeStyle='#553418';g.stroke();
+  g.strokeStyle='rgba(60,35,15,0.35)';g.lineWidth=1.5;
+  for(let i=1;i<4;i++){const y=oy+bh*i/4;g.beginPath();g.moveTo(ox+3,y);g.lineTo(ox+bw-3,y);g.stroke()}
+  // Licht plaatje met de QR-code en het onderschrift
+  const px=ox+QR_SIGN_BORDER,py=oy+QR_SIGN_BORDER;
+  rr(px,py,plateW,plateH,6);g.fillStyle='#f4efe1';g.fill();
+  // QRious tekent in hele pixels per blokje en laat de rest rechts/onder leeg: snij bij tot
+  // de echte code en zet die precies in het midden van het plaatje
+  const b=qrSignQrBounds;
+  g.drawImage(qrSignQr,b.x,b.y,b.w,b.h,px+(plateW-b.w)/2,py+QR_SIGN_PAD+(QR_SIGN_QR-b.h)/2,b.w,b.h);
+  g.fillStyle='#5a3a1a';g.font='700 14px system-ui,Segoe UI,Roboto,Arial';g.textAlign='center';g.textBaseline='middle';
+  g.fillText('Voeg je vis toe 🐟',px+plateW/2,py+QR_SIGN_PAD+QR_SIGN_QR+QR_SIGN_CAPTION/2);
+  // Voeren: opvallend als het kan, zacht met de wachttijd als het nog niet kan
+  const feedY=py+QR_SIGN_PAD+QR_SIGN_QR+QR_SIGN_CAPTION+QR_SIGN_FEED/2-4;
+  if(qrSignFeed==='ready'){g.fillStyle='#c0502a';g.font='700 13px system-ui,Segoe UI,Roboto,Arial';g.fillText('🍤 Voeren kan nu!',px+plateW/2,feedY)}
+  else if(qrSignFeed){g.fillStyle='#8f7152';g.font='600 12px system-ui,Segoe UI,Roboto,Arial';g.fillText(`🍤 Voeren over ${qrSignFeed}`,px+plateW/2,feedY)}
+  // Spijkertjes in de hoeken
+  g.fillStyle='#3d2510';
+  for(const [nx,ny] of [[ox+6,oy+6],[ox+bw-6,oy+6],[ox+6,oy+bh-6],[ox+bw-6,oy+bh-6]]){g.beginPath();g.arc(nx,ny,2,0,Math.PI*2);g.fill()}
+  // Licht uit: iets donkerder, maar de code blijft scanbaar
+  if(!lightsOn){g.globalCompositeOperation='source-atop';g.fillStyle='rgba(0,10,20,0.3)';g.fillRect(0,0,c.width,c.height)}
+  return c;
+}
+// Planten en decoraties uit de buurt van het bordje houden: ervoor bedekken ze de code, en
+// een plant die lager in het zand staat maar achter het bordje getekend wordt klopt niet.
+function keepClearOfQrSign(){
+  if(!qrSignOn)return;
+  const clearX=qrSignZone().boardX1+30;
+  for(const p of plants){const half=(p.width||40)/2;if(p.x-half<clearX&&clearX+half<W-50)p.x=rand(clearX+half,W-50)}
+  for(const d of decorations){const half=(d.size||60)/2;if(d.x-half<clearX&&clearX+half<W-80)d.x=rand(clearX+half,W-80)}
+}
+
+// Waar de QR-code op het bordje staat; gelijk aan waar drawQrSign het neerzet
+function qrSignZone(){
+  const bw=QR_SIGN_QR+QR_SIGN_PAD*2+QR_SIGN_BORDER*2,bh=QR_SIGN_QR+QR_SIGN_PAD+QR_SIGN_CAPTION+QR_SIGN_FEED+QR_SIGN_BORDER*2;
+  const boardX=50,boardY=H-22-(bh+QR_SIGN_POST+12)+2;const qx=boardX+QR_SIGN_BORDER+QR_SIGN_PAD,qy=boardY+QR_SIGN_BORDER+QR_SIGN_PAD;
+  return{x0:qx,x1:qx+QR_SIGN_QR,y0:qy,y1:qy+QR_SIGN_QR,boardX0:boardX,boardX1:boardX+bw,boardY0:boardY,boardY1:boardY+bh};
+}
+
+// Het bordje is aanklikbaar, net als het QR-blok: opent de controller
+function pointOnQrSign(e){
+  if(!qrSignOn||!qrSignUrl)return false;
+  const z=qrSignZone();const x=e.offsetX-viewportConfig.offsetLeft,y=e.offsetY-viewportConfig.offsetTop;
+  return x>=z.boardX0&&x<=z.boardX1&&y>=z.boardY0&&y<=z.boardY1;
+}
+cv.addEventListener('click',e=>{if(pointOnQrSign(e))window.open(qrSignUrl,'_blank','noopener,noreferrer')});
+cv.addEventListener('mousemove',e=>{cv.style.cursor=pointOnQrSign(e)?'pointer':''});
+function drawQrSign(){
+  if(!qrSignOn||!qrSignQr||!qrSignVersion)return;
+  const key=qrSignVersion+'|'+lightsOn+'|'+qrSignFeed;
+  if(qrSignCacheKey!==key){qrSignCache=buildQrSign();qrSignCacheKey=key}
+  // Paaltje staat in het zand linksonder, bordje een klein beetje scheef
+  const baseX=40+qrSignCache.width/2,baseY=H-22;
+  ctx.save();ctx.translate(baseX,baseY);ctx.rotate(-0.025);
+  ctx.drawImage(qrSignCache,-qrSignCache.width/2,-qrSignCache.height);
+  ctx.restore();
 }
 
 // Fallback function for external QR generation (backup)
@@ -6583,29 +6814,38 @@ function fallbackToExternalQR(canvas, controllerUrl, accessCode) {
 let ws = null;
 let currentVersion = null; // Store current version to detect changes
 let appConfig = { showBehaviorEmoji: true }; // Store config from server
-// Blokken links per stuk aan/uit via config.showPanels; een ontbrekende sleutel staat aan
-const PANEL_IDS = { qr: 'qrPanel', newest: 'newestPanel', stars: 'livingPanel', legends: 'oldestPanel', memorial: 'deadPanel', activity: 'activityPanel', version: 'versionPanel' };
-function applyPanelConfig() {
+// uiStyle bepaalt de hele opzet, zodat elke stijl een getest geheel is:
+// - classic: balk bovenaan, QR-blok links, alle lijstjes
+// - minimal: geen balk, QR-bordje in de kom (met de voerstatus erop), geen lijstjes
+// Er is dus altijd precies één QR-code. Alleen de lijstjes zijn per stuk aan/uit te zetten
+// via config.showPanels; wat je niet noemt volgt de stijl.
+const PANEL_IDS = { newest: 'newestPanel', stars: 'livingPanel', legends: 'oldestPanel', memorial: 'deadPanel', activity: 'activityPanel', version: 'versionPanel' };
+function applyStyleLayout() {
     const panels = appConfig.showPanels || {};
     for (const key in PANEL_IDS) {
         const el = document.getElementById(PANEL_IDS[key]);
-        if (el) el.classList.toggle('panel-off', panels[key] === false);
+        const on = panels[key] !== undefined ? panels[key] === true : !minimalUi;
+        if (el) el.classList.toggle('panel-off', !on);
     }
-}
-// De balk bovenaan ("Scan de QR-code...") via config.showBanner. Hij neemt hoogte van de kom,
-// dus bij een wijziging opnieuw indelen.
-function applyBannerConfig() {
+    document.getElementById('qrPanel')?.classList.toggle('panel-off', minimalUi);
+    // QR-bordje (met voerstatus, dan geen voer-pil) vóór het opnieuw indelen, zodat planten
+    // en decoraties er meteen uit de buurt blijven
+    const signWasOn = qrSignOn;
+    qrSignOn = minimalUi;
+    document.body.classList.toggle('qr-sign-on', qrSignOn);
+    // Balk bovenaan neemt hoogte van de kom, dus bij een wijziging opnieuw indelen
     const banner = document.querySelector('.top-banner');
-    const off = appConfig.showBanner === false;
-    if (banner && banner.classList.contains('banner-off') !== off) {
-        banner.classList.toggle('banner-off', off);
+    if (banner && banner.classList.contains('banner-off') !== minimalUi) {
+        banner.classList.toggle('banner-off', minimalUi);
         resize();
+    } else if (qrSignOn !== signWasOn) {
+        keepClearOfQrSign(); updateLayerCache();
     }
 }
 // Vissoorten staan standaard uit. De vlag wordt één keer afgeleid als de config
 // binnenkomt, zodat de tekenloop per vis alleen een boolean hoeft te checken.
 let fishSpeciesEnabled = false;
-// uiStyle 'minimal': compacte naamlabels zonder bordje en donkere panelen, ook met het licht aan
+// uiStyle 'minimal': compacte naamlabels, donkere panelen, QR-bordje in de kom (zie applyStyleLayout)
 let minimalUi = false;
 let gameLoopStarted = false; // Track if game loop has been started
 let wsReconnectAttempts = 0; // Track reconnection attempts
@@ -6841,8 +7081,7 @@ function handleRemoteCommand(data) {
                 fishSpeciesEnabled = appConfig.fishSpecies === true;
                 minimalUi = appConfig.uiStyle === 'minimal';
                 document.body.classList.toggle('ui-minimal', minimalUi);
-                applyPanelConfig();
-                applyBannerConfig();
+                applyStyleLayout();
                 // Handle viewport config
                 if(data.config.viewport) {
                     viewportConfig = data.config.viewport;
@@ -7950,6 +8189,7 @@ function updateCooldown(){
     const cd=document.getElementById('cooldown');
     const left=Math.max(0,FEED_CD-(Date.now()-lastFed));
 
+    qrSignFeed=left<=0?'ready':ageLabelMS(left); // ook op het QR-bordje
     if(left<=0){
         cd.textContent='🍤 Voeren: beschikbaar';
         cd.classList.add('ready');
@@ -8022,6 +8262,7 @@ function regenerateDecor(){
   setupPlants();
   setupDecorations();
   setupFallingLeaves();
+  keepClearOfQrSign();
   updateLayerCache();
   console.log('Nieuwe decoratie gegenereerd!');
 }
@@ -8097,6 +8338,8 @@ frameScale=dt*60;
 // Smooth interpolation for waterGreenness (fade effect)
 const lerpSpeed=0.02; // Lower = slower fade, smoother transition
 waterGreenness+=(waterGreennessTarget-waterGreenness)*lerpSpeed;
+// Stroming loopt in een paar seconden op en af met de pomp
+currentStrength+=((pumpOn?1:0)-currentStrength)*Math.min(1,0.012*frameScale);
 
 clearFrame(t/60);
 
@@ -8124,6 +8367,7 @@ drawFallingLeaves('sand'); // Bladeren die op de bodem liggen
 for(let i=0;i<backPlants.length;i++){drawPlant(backPlants[i],t)}
 for(let i=0;i<backDecorations.length;i++){drawDecoration(backDecorations[i],t)}
 updateFallingLeaves();drawFallingLeaves('back');
+drawQrSign(); // achter de vissen, net als de andere bodemdecoraties; vissen zwemmen er omheen
 
 if(pumpOn&&Math.random()<0.6*performanceProfile.particleCount){for(let i=0;i<2;i++)makeBubble()}
 drawPumpChampagne(); // Champagne fles bij pump (nieuwjaar)
@@ -8149,6 +8393,8 @@ for(let i=0;i<fishes.length;i++){
     f.x+=f.vx*frameScale;f.y+=f.vy*frameScale;
     bounceOffWalls(f);
   }
+  // De stroming duwt vissen een klein beetje mee
+  if(currentStrength>0.005){waterCurrentAt(f.x,f.y);f.x+=curU*0.3*frameScale;f.y+=curV*0.3*frameScale}
   drawFish(f,t,now);
 }
 
