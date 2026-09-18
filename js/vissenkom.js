@@ -5068,6 +5068,8 @@ function drawFish(f,t,now){
 
   // Verberg label als hideLabel flag gezet is (voor banner display)
   if(f.hideLabel)return;
+  // Compacte labels komen in een aparte ronde na alle vissen, zodat geen vis een naam bedekt
+  if(minimalUi){compactLabelQueue.push(f,s,hp);return}
 
   // hp already calculated above - reuse it for label and health bar
   // Sick emoji is always shown, behavior emoji only if enabled
@@ -5101,6 +5103,73 @@ function drawFish(f,t,now){
 }
 
 function roundRect(x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath()}
+
+// ---- Compacte labels (uiStyle: 'minimal') ------------------------------------
+// In een volle kom zijn 40-50 witte naambordjes drukker dan de vissen zelf. Compact is
+// het losse tekst vlak boven de vis: naam met drie gezondheidsstipjes, daaronder klein de
+// leeftijd. De soort zie je aan de vorm. Vissen die aandacht nodig hebben krijgen een
+// gekleurde naam.
+const COMPACT_NAME_FONT='600 13px system-ui,Segoe UI,Roboto,Arial';
+const COMPACT_INFO_FONT='500 11px system-ui,Segoe UI,Roboto,Arial';
+let compactLabelQueue=[]; // plat: f, s, hp per vis, gevuld door drawFish
+
+function healthColor(hp){return hp>50?'#3ecf5c':hp>25?'#f2c94c':'#eb5757'}
+
+// Drie stipjes: vol = gezond, leeg = kwijt. x = linkerkant, y = midden.
+function drawHealthDots(x,y,hp,r){
+  const n=hp>66?3:hp>33?2:hp>0?1:0;const col=healthColor(hp);
+  for(let i=0;i<3;i++){
+    ctx.beginPath();ctx.arc(x+r+i*(r*2+3),y,r,0,Math.PI*2);
+    ctx.fillStyle=i<n?col:'rgba(255,255,255,0.3)';ctx.fill();
+  }
+}
+
+function drawCompactOverlay(now){
+  const q=compactLabelQueue;
+  for(let i=0;i<q.length;i+=3)drawCompactLabel(q[i],q[i+1],q[i+2],now);
+  q.length=0;
+}
+
+function drawCompactLabel(f,s,hp,now){
+  const sick=f.sick&&!f.medicated;
+  const sickEmoji=getSickEmoji(f);
+  const behaviorEmoji=appConfig.showBehaviorEmoji?getBehaviorEmoji(f.behaviorState||'normal',f):'';
+  const name=(sickEmoji?sickEmoji+' ':'')+(behaviorEmoji?behaviorEmoji+' ':'')+f.name;
+  const info=ageLabel(f,now);
+  const c=f._compactLabel;
+  if(!c||c.name!==name||c.info!==info){
+    ctx.font=COMPACT_NAME_FONT;const wName=ctx.measureText(name).width;
+    ctx.font=COMPACT_INFO_FONT;const wInfo=ctx.measureText(info).width;
+    f._compactLabel={name,info,wName,wInfo,lift:c?c.lift:undefined};
+  }
+  const L=f._compactLabel;
+
+  // Hoe ver de vis boven zijn midden uitsteekt hangt af van hoe hij gedraaid is: horizontaal
+  // alleen de rug, rechtop ook kop of staart. Zacht bijgestuurd zodat het label niet wiebelt.
+  const R=fishSpeciesEnabled?fishSpecies(f).species.reach:CLASSIC_FISH.reach;
+  const a=f.caughtVertical?-Math.PI/2:Math.atan2(f.vy,f.vx);
+  const len=(R[0]+R[3])/2;const up=R[1];
+  const lift=s*Math.sqrt((len*Math.sin(a))**2+(up*Math.cos(a))**2);
+  L.lift=L.lift===undefined?lift:L.lift+(lift-L.lift)*0.1;
+
+  const dotR=3;const dotsW=dotR*6+6;const gap=5;
+  const w1=L.wName+gap+dotsW;
+  let nameY=f.y-L.lift-26;let infoY=nameY+15;
+  if(nameY<10){nameY=f.y+L.lift+10;infoY=nameY+15} // tegen de bovenrand: onder de vis
+  const x1=Math.round(clamp(f.x-w1/2,8,W-w1-8));
+  const x2=Math.round(clamp(f.x-L.wInfo/2,8,W-L.wInfo-8));
+  nameY=Math.round(nameY);infoY=Math.round(infoY);
+
+  ctx.save();
+  ctx.globalAlpha=lightsOn?0.95:0.8;
+  ctx.textBaseline='middle';ctx.lineJoin='round';ctx.strokeStyle='rgba(5,20,30,0.6)';
+  ctx.font=COMPACT_NAME_FONT;ctx.lineWidth=3;ctx.strokeText(name,x1,nameY);
+  ctx.fillStyle=hp<=25?'#ff8a80':hp<=50||sick?'#ffd166':'#fff';ctx.fillText(name,x1,nameY);
+  drawHealthDots(x1+L.wName+gap,nameY,hp,dotR);
+  ctx.font=COMPACT_INFO_FONT;ctx.lineWidth=2.5;ctx.strokeText(info,x2,infoY);
+  ctx.fillStyle='rgba(255,255,255,0.7)';ctx.fillText(info,x2,infoY);
+  ctx.restore();
+}
 
 // Sick emoji mapping - shown separately from behavior
 function getSickEmoji(fish) {
@@ -6199,6 +6268,10 @@ function drawLists(){
     label:`${x.name} · ${ageLabelMS(x.age)} ${x.type==='live'?'levend':'†'}`
   }));
   updateListItems(oldestListEl,oldestItems);
+  // Alleen tonen als het iets toevoegt: zolang de oudste vissen nog leven, staan hier
+  // precies dezelfde vissen als in "Sterren van de kom".
+  const legendsAddSomething=combined.slice(0,TOP_N).some(x=>x.type==='dead');
+  document.getElementById('oldestPanel').style.display=legendsAddSomething?'':'none';
 
   // Living list
   const livingAges=[...fishes].map(f=>({name:f.name,age:now-f.bornAt})).sort((a,b)=>b.age-a.age).slice(0,TOP_N);
@@ -6510,9 +6583,30 @@ function fallbackToExternalQR(canvas, controllerUrl, accessCode) {
 let ws = null;
 let currentVersion = null; // Store current version to detect changes
 let appConfig = { showBehaviorEmoji: true }; // Store config from server
+// Blokken links per stuk aan/uit via config.showPanels; een ontbrekende sleutel staat aan
+const PANEL_IDS = { qr: 'qrPanel', newest: 'newestPanel', stars: 'livingPanel', legends: 'oldestPanel', memorial: 'deadPanel', activity: 'activityPanel', version: 'versionPanel' };
+function applyPanelConfig() {
+    const panels = appConfig.showPanels || {};
+    for (const key in PANEL_IDS) {
+        const el = document.getElementById(PANEL_IDS[key]);
+        if (el) el.classList.toggle('panel-off', panels[key] === false);
+    }
+}
+// De balk bovenaan ("Scan de QR-code...") via config.showBanner. Hij neemt hoogte van de kom,
+// dus bij een wijziging opnieuw indelen.
+function applyBannerConfig() {
+    const banner = document.querySelector('.top-banner');
+    const off = appConfig.showBanner === false;
+    if (banner && banner.classList.contains('banner-off') !== off) {
+        banner.classList.toggle('banner-off', off);
+        resize();
+    }
+}
 // Vissoorten staan standaard uit. De vlag wordt één keer afgeleid als de config
 // binnenkomt, zodat de tekenloop per vis alleen een boolean hoeft te checken.
 let fishSpeciesEnabled = false;
+// uiStyle 'minimal': compacte naamlabels zonder bordje en donkere panelen, ook met het licht aan
+let minimalUi = false;
 let gameLoopStarted = false; // Track if game loop has been started
 let wsReconnectAttempts = 0; // Track reconnection attempts
 let wsConnectedOnce = false; // Track if we've successfully connected before
@@ -6745,6 +6839,10 @@ function handleRemoteCommand(data) {
                 // Store full config
                 appConfig = { ...appConfig, ...data.config };
                 fishSpeciesEnabled = appConfig.fishSpecies === true;
+                minimalUi = appConfig.uiStyle === 'minimal';
+                document.body.classList.toggle('ui-minimal', minimalUi);
+                applyPanelConfig();
+                applyBannerConfig();
                 // Handle viewport config
                 if(data.config.viewport) {
                     viewportConfig = data.config.viewport;
@@ -8064,6 +8162,9 @@ updateFishingRod(t);
 for(let i=0;i<frontPlants.length;i++){drawPlant(frontPlants[i],t)}
 for(let i=0;i<frontDecorations.length;i++){drawDecoration(frontDecorations[i],t)}
 drawFallingLeaves('front');
+
+// Compacte labels boven alles in de kom
+if(minimalUi)drawCompactOverlay(now);
 
 // Water greenness overlay and algae particles
 updateAlgenParticles();
