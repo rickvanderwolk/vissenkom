@@ -71,6 +71,7 @@ let config = {
     showBehaviorEmoji: true,
     showControllerStatusBlocks: false,
     showAddFishTip: true,
+    fishSpecies: false,
     hungerRate: 0.167,
     diseaseRate: 0.083,
     viewport: {
