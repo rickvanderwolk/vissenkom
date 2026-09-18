@@ -498,6 +498,11 @@ function setupPlants(){
 function setupDecorations(){
   decorations.length=0;
   const sandHeight=70;
+  // Decoraties staan op de bodem en daarom altijd achter de vissen. Vissen zwemmen tot
+  // vlak boven de onderrand, dus met een decoratie ervoor zwemt een vis er van boven naar
+  // onder achter langs, als het ware door de bodem. Alleen planten (dun, wuivend) en
+  // vallende blaadjes mogen voor de vissen.
+  const zIndex='back';
 
   // Theme-based decoration or normal castle
   // In Halloween mode: altijd minimaal 1 pompoen
@@ -511,7 +516,6 @@ function setupDecorations(){
     // Pompoen kan groter zijn dan kasteel: 80-280 (soms 2x zo groot)
     const size=isHalloween()?rand(80,280):isNewYear()?rand(120,240):isAutumn()?rand(120,210):isSummer()?(Math.random()<0.3?rand(200,320):rand(90,150)):rand(80,140); // Zomer: 30% kans op een fors zandkasteel
     const bobPhase=rand(0,Math.PI*2);
-    const zIndex=Math.random()<0.7?'back':'front';
     const minY=H-size/2;
     const maxY=H-sandHeight+10;
     const y=rand(minY,maxY);
@@ -543,7 +547,6 @@ function setupDecorations(){
     const x=rand(80,W-80);
     const size=rand(70,250); // Vergelijkbaar met pompoen maar iets kleiner
     const bobPhase=rand(0,Math.PI*2);
-    const zIndex=Math.random()<0.7?'back':'front';
     const minY=H-size/2;
     const maxY=H-sandHeight+10;
     const y=rand(minY,maxY);
@@ -559,7 +562,6 @@ function setupDecorations(){
       const x=rand(80,W-80);
       const size=rand(60,180);
       const bobPhase=rand(0,Math.PI*2);
-      const zIndex=Math.random()<0.7?'back':'front';
       const minY=H-size/2;
       const maxY=H-sandHeight+10;
       const y=rand(minY,maxY);
@@ -573,7 +575,6 @@ function setupDecorations(){
     const x=rand(100,W-100);
     const size=rand(160,220); // Veel groter!
     const bobPhase=rand(0,Math.PI*2);
-    const zIndex='back'; // Altijd achter de vissen
     const minY=H-size*0.4;
     const maxY=H-sandHeight+20;
     const y=rand(minY,maxY);
@@ -587,7 +588,7 @@ function setupDecorations(){
     for(let i=0;i<n;i++){
       caps.push({dx:rand(-0.5,0.5),h:rand(0.55,1),w:rand(0.5,1),red:Math.random()<0.6,lean:rand(-0.18,0.18),dots:Math.floor(rand(3,6))});
     }
-    decorations.push({type:'mushroom',x:rand(70,W-70),y:H-sandHeight+22,size:rand(50,90),bobPhase:rand(0,Math.PI*2),zIndex:Math.random()<0.5?'front':'back',caps});
+    decorations.push({type:'mushroom',x:rand(70,W-70),y:H-sandHeight+22,size:rand(50,90),bobPhase:rand(0,Math.PI*2),zIndex,caps});
   }
 
   // Herfst: eikels en kastanjes verspreid over het zand (2-5)
@@ -595,7 +596,7 @@ function setupDecorations(){
     const numNuts=Math.floor(rand(2,6));
     for(let i=0;i<numNuts;i++){
       const type=Math.random()<0.55?'acorn':'chestnut';
-      decorations.push({type,x:rand(40,W-40),y:rand(H-sandHeight+26,H-12),size:rand(15,27),tilt:rand(-0.6,0.6),bobPhase:rand(0,Math.PI*2),zIndex:Math.random()<0.6?'front':'back'});
+      decorations.push({type,x:rand(40,W-40),y:rand(H-sandHeight+26,H-12),size:rand(15,27),tilt:rand(-0.6,0.6),bobPhase:rand(0,Math.PI*2),zIndex});
     }
   }
 
@@ -623,7 +624,7 @@ function setupDecorations(){
     const numShells=Math.floor(rand(0,5));
     for(let s=0;s<numShells;s++){
       const hue=Math.random()<0.35?rand(345,360):rand(20,45); // soms roze, meestal crème/zand
-      decorations.push({type:'shell',x:rand(40,W-40),y:rand(H-sandHeight+25,H-12),size:rand(16,30),hue,ribs:Math.floor(rand(6,9)),flip:Math.random()<0.5?-1:1,bobPhase:rand(0,Math.PI*2),zIndex:Math.random()<0.6?'front':'back'});
+      decorations.push({type:'shell',x:rand(40,W-40),y:rand(H-sandHeight+25,H-12),size:rand(16,30),hue,ribs:Math.floor(rand(6,9)),flip:Math.random()<0.5?-1:1,bobPhase:rand(0,Math.PI*2),zIndex});
     }
     // IJsje (tijdelijk uitgeschakeld - nog niet tevreden over het uiterlijk).
     // De teken-code (deco.type==='icecream') blijft bewaard; om weer aan te zetten
@@ -632,7 +633,7 @@ function setupDecorations(){
     // const nScoops=Math.random()<0.5?1:2;
     // const scoops=[];
     // for(let i=0;i<nScoops;i++) scoops.push(flavors[Math.floor(Math.random()*flavors.length)]);
-    // decorations.push({type:'icecream',x:rand(90,W-90),y:rand(H-sandHeight+22,H-12),size:rand(80,140),scoops,tilt:rand(-0.5,0.5),bobPhase:rand(0,Math.PI*2),zIndex:'front'});
+    // decorations.push({type:'icecream',x:rand(90,W-90),y:rand(H-sandHeight+22,H-12),size:rand(80,140),scoops,tilt:rand(-0.5,0.5),bobPhase:rand(0,Math.PI*2),zIndex});
   }
 }
 // Bladerhoop: dichter en hoger in het midden, uitlopend naar de randen
