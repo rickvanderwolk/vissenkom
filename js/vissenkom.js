@@ -4724,7 +4724,7 @@ function hashString(str){let h=2166136261;for(let i=0;i<str.length;i++){h^=str.c
 
 const SPECIES=[
   {
-    id:'gewoon',name:'Gewone vis',pw:3.2,ph:1.6,ox:0.15,oy:0,finHz:1,bb:[0.9,0.55],
+    id:'gewoon',name:'Gewone vis',pw:3.2,ph:1.6,ox:0.15,oy:0,finHz:1,bb:[0.9,0.55],reach:[0.89,0.56,0.54,1.31],
     eye:{x:0.35,y:-0.08,r:0.11},fin:{x:-0.35,y:0.10,w:0.45,h:0.25},
     body(c,s){c.ellipse(0,0,s*0.9,s*0.55,0,0,TAU)},
     back(c,s,p){
@@ -4733,7 +4733,7 @@ const SPECIES=[
     }
   },
   {
-    id:'danio',name:'Slanke danio',pw:3.6,ph:1.5,ox:0.2,oy:0,finHz:1.6,bb:[1.05,0.33],
+    id:'danio',name:'Slanke danio',pw:3.6,ph:1.5,ox:0.2,oy:0,finHz:1.6,bb:[1.05,0.33],reach:[1.04,0.49,0.37,1.45],
     eye:{x:0.62,y:-0.04,r:0.09},fin:{x:-0.2,y:0.16,w:0.38,h:0.15},
     body(c,s){c.ellipse(0,0,s*1.05,s*0.33,0,0,TAU)},
     back(c,s,p){
@@ -4744,7 +4744,7 @@ const SPECIES=[
     }
   },
   {
-    id:'kogelvis',name:'Kogelvis',pw:2.9,ph:2.1,ox:0.1,oy:0,finHz:2.2,bb:[0.82,0.72],
+    id:'kogelvis',name:'Kogelvis',pw:2.9,ph:2.1,ox:0.1,oy:0,finHz:2.2,bb:[0.82,0.72],reach:[1.02,0.83,0.82,1.11],
     eye:{x:0.44,y:-0.14,r:0.15},fin:{x:-0.05,y:0.34,w:0.32,h:0.19},
     body(c,s){c.ellipse(0,0,s*0.82,s*0.72,0,0,TAU)},
     back(c,s,p){
@@ -4761,7 +4761,7 @@ const SPECIES=[
     }
   },
   {
-    id:'maanvis',name:'Maanvis',pw:3.0,ph:3.2,ox:0.25,oy:0,finHz:0.7,bb:[0.66,0.92],
+    id:'maanvis',name:'Maanvis',pw:3.0,ph:3.2,ox:0.25,oy:0,finHz:0.7,bb:[0.66,0.92],reach:[0.65,1.30,1.25,1.15],
     eye:{x:0.34,y:-0.30,r:0.10},fin:{x:-0.05,y:0.38,w:0.24,h:0.48},
     body(c,s){c.ellipse(0,0,s*0.66,s*0.92,0,0,TAU)},
     back(c,s,p){
@@ -4773,7 +4773,7 @@ const SPECIES=[
     }
   },
   {
-    id:'sluier',name:'Sluierstaart',pw:4.2,ph:2.6,ox:0.45,oy:0,finHz:0.6,bb:[0.8,0.64],
+    id:'sluier',name:'Sluierstaart',pw:4.2,ph:2.6,ox:0.45,oy:0,finHz:0.6,bb:[0.8,0.64],reach:[0.79,0.87,0.82,1.35],
     eye:{x:0.42,y:-0.14,r:0.12},fin:{x:-0.1,y:0.34,w:0.34,h:0.26},
     body(c,s){c.ellipse(0,0,s*0.8,s*0.64,0,0,TAU)},
     back(c,s,p){
@@ -4792,7 +4792,7 @@ const SPECIES=[
     }
   },
   {
-    id:'meerval',name:'Meerval',pw:3.8,ph:1.7,ox:0.1,oy:0.2,finHz:0.8,bb:[1.0,0.44],
+    id:'meerval',name:'Meerval',pw:3.8,ph:1.7,ox:0.1,oy:0.2,finHz:0.8,bb:[1.0,0.44],reach:[1.24,0.69,0.49,1.41],
     eye:{x:0.52,y:-0.18,r:0.09},fin:{x:0.05,y:0.30,w:0.42,h:0.15},
     body(c,s){
       c.moveTo(s*1.0,-s*0.05);
@@ -4816,7 +4816,7 @@ const SPECIES=[
     }
   },
   {
-    id:'pijlvis',name:'Pijlvis',pw:3.8,ph:1.6,ox:0.3,oy:0,finHz:1.8,bb:[1.15,0.44],
+    id:'pijlvis',name:'Pijlvis',pw:3.8,ph:1.6,ox:0.3,oy:0,finHz:1.8,bb:[1.15,0.44],reach:[1.14,0.59,0.47,1.52],
     eye:{x:0.55,y:-0.06,r:0.09},fin:{x:-0.15,y:0.18,w:0.4,h:0.15},
     body(c,s){
       c.moveTo(s*1.15,0);
@@ -4834,7 +4834,7 @@ const SPECIES=[
     }
   },
   {
-    id:'zeilvis',name:'Zeilvis',pw:3.6,ph:2.8,ox:0.2,oy:0.3,finHz:1.2,bb:[0.95,0.42],
+    id:'zeilvis',name:'Zeilvis',pw:3.6,ph:2.8,ox:0.2,oy:0.3,finHz:1.2,bb:[0.95,0.42],reach:[0.94,1.18,0.45,1.36],
     eye:{x:0.55,y:-0.08,r:0.10},fin:{x:-0.15,y:0.24,w:0.42,h:0.19},
     body(c,s){c.ellipse(0,0,s*0.95,s*0.42,0,0,TAU)},
     back(c,s,p){
@@ -4897,7 +4897,26 @@ function drawFishPattern(c,s,pat,flip,p,bb){
 }
 
 // Klassieke vis (zoals vóór de soorten), gebruikt zolang fishSpecies uit staat
-const CLASSIC_FISH={pw:3.2,ph:1.6,fin:{x:-0.35,y:0,w:0.45,h:0.25},finHz:1};
+const CLASSIC_FISH={pw:3.2,ph:1.6,fin:{x:-0.35,y:0,w:0.45,h:0.25},finHz:1,reach:[0.89,0.56,0.54,1.31]};
+
+// reach = hoe ver de vis vanaf zijn midden zichtbaar reikt naar [kop, rug, buik, staart],
+// in eenheden van de visgrootte. Daartussen rekenen we als ellips. rel = hoek t.o.v. de
+// zwemrichting; een vis die naar links zwemt is gespiegeld, dus dan blijft de rug boven.
+function fishReach(reach,rel,faceLeft){
+  const c=Math.cos(rel);const sn=faceLeft?-Math.sin(rel):Math.sin(rel);
+  const a=c>=0?reach[0]:reach[3];const b=sn<0?reach[1]:reach[2];
+  return 1/Math.sqrt((c/a)*(c/a)+(sn/b)*(sn/b));
+}
+
+// De bal-botsing is een cirkel afgestemd op de klassieke vis. Een soort reikt in de ene
+// richting verder (neus van een pijlvis, vinnen van een maanvis) en in de andere minder,
+// dus corrigeren we de cirkel met dat verschil. Met soorten uit is dit altijd 0.
+function ballReachOffset(f,angleToBall){
+  if(!fishSpeciesEnabled)return 0;
+  const heading=Math.atan2(f.vy,f.vx);
+  const rel=angleToBall-heading;const faceLeft=Math.abs(heading)>Math.PI/2;
+  return fishReach(fishSpecies(f).species.reach,rel,faceLeft)-fishReach(CLASSIC_FISH.reach,rel,faceLeft);
+}
 function drawClassicFishBody(c,s,cx,cy,fishHue,dim){
   const hueKey=Math.round(fishHue);
   // Body gradient
@@ -5632,14 +5651,16 @@ function handlePlaying(f) {
     const dy = closestBall.y - f.y;
     const dist = closestDist;
     const fishSizeNow = fishSize(f, Date.now());
+    const pushAngle = Math.atan2(dy, dx);
+    // Correctie voor de vorm van de vissoort in de richting van de bal (0 bij de klassieke vis)
+    const reachOffset = ballReachOffset(f, pushAngle);
 
     // Iets ruimere collision - vis raakt bal net voordat ze overlapten
-    const collisionRadius = closestBall.radius + fishSizeNow * 0.8; // Beetje meer ruimte
+    const collisionRadius = closestBall.radius + fishSizeNow * (0.8 + reachOffset); // Beetje meer ruimte
 
     if(dist < collisionRadius) {
       // VIS RAAKT DE BAL!
       const pushStrength = rand(0.5, 0.9); // Variabele kracht
-      const pushAngle = Math.atan2(dy, dx);
 
       // Voeg random afwijking toe aan de hoek (tot 30 graden in elke richting)
       const angleDeviation = rand(-Math.PI/6, Math.PI/6); // -30° tot +30°
@@ -5671,7 +5692,7 @@ function handlePlaying(f) {
       f.vy += Math.sin(circleAngle) * rand(0.3, 0.7);
 
       // Voorkom dat vis te diep in bal komt
-      const minDist = closestBall.radius + fishSizeNow * 0.6;
+      const minDist = closestBall.radius + fishSizeNow * (0.6 + reachOffset);
       if(dist < minDist) {
         const pushOut = minDist - dist;
         f.x -= Math.cos(pushAngle) * pushOut;
