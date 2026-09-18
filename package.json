@@ -22,7 +22,7 @@
   "author": "Rick van der Wolk",
   "license": "CC0-1.0",
   "devDependencies": {
-    "@vitest/coverage-v8": "^4.0.7",
-    "vitest": "^4.0.7"
+    "@vitest/coverage-v8": "^4.1.11",
+    "vitest": "^4.1.11"
   }
 }
