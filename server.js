@@ -997,6 +997,9 @@ function handleCommand(data, fromClient) {
         case 'refreshWater':
             handleRefreshWater();
             break;
+        case 'startParty':
+            handleStartParty();
+            break;
         case 'tapGlass':
             handleTapGlass();
             break;
@@ -1024,6 +1027,7 @@ function handleCommand(data, fromClient) {
             sendMedicineCooldownUpdate(fromClient);
             sendBallStatusUpdate(fromClient);
             sendRaceStatusUpdate(fromClient);
+            sendPartyStatus(fromClient);
             break;
         case 'startRace':
             handleStartRace(data.fish1, data.fish2);
@@ -1249,6 +1253,36 @@ function handleRefreshWater() {
     broadcastToMainApp({ command: 'refreshWater' });
     broadcastStatusUpdate(); // Update controllers with new water status (always needed here)
     saveState(); // Save state immediately
+}
+
+// Dansfeest: alle vissen doen samen iets (een formatie of een polonaise). De server kiest de
+// vorm, zodat het scherm en het activiteitenlog hetzelfde zeggen. Niet tijdens een race en
+// niet als er al een feest bezig is.
+const PARTY_DURATION_MS = 20000;
+let partyUntil = 0;
+function handleStartParty() {
+    const now = Date.now();
+    if (appState.raceActive || now < partyUntil) {
+        console.log('🎉 Dansfeest kan nu niet (race of feest bezig)');
+        broadcastPartyStatus();
+        return;
+    }
+    const kinds = ['circle', 'heart', 'wave', 'conga', 'smiley', 'vortex', 'sync'];
+    const kind = kinds[Math.floor(Math.random() * kinds.length)];
+    partyUntil = now + PARTY_DURATION_MS;
+    console.log(`🎉 Dansfeest: ${kind}`);
+    logEvent('party_started', { timestamp: now, kind });
+    broadcastToMainApp({ command: 'startParty', kind });
+    broadcastPartyStatus();
+}
+
+// Controllers krijgen de resterende tijd (niet een klokslag), zodat een telefoon met een
+// afwijkende klok de knop toch op het goede moment weer inschakelt
+function sendPartyStatus(client) {
+    sendToClient(client, { type: 'partyStatus', data: { msLeft: Math.max(0, partyUntil - Date.now()) } });
+}
+function broadcastPartyStatus() {
+    controllers.forEach(client => sendPartyStatus(client));
 }
 
 function handleTapGlass() {

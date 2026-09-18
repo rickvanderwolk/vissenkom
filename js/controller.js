@@ -38,6 +38,7 @@
         const fishNameInput = document.getElementById('fishNameInput');
         const heatingBtn = document.getElementById('heatingBtn');
         const playBallBtn = document.getElementById('playBallBtn');
+        const partyBtn = document.getElementById('partyBtn');
         // const themeBtn = document.getElementById('themeBtn'); // Tijdelijk uitgeschakeld
 
         // Race elements
@@ -199,7 +200,7 @@
             isConnected = connected;
 
             // Enable/disable controls based on connection
-            const controls = [feedBtn, lightBtn, discoBtn, pumpBtn, cleanBtn, refreshWaterBtn, tapGlassBtn, fishingRodBtn, medicineBtn, addFishBtn, fishNameInput, heatingBtn, playBallBtn, raceBtn]; // themeBtn tijdelijk verwijderd
+            const controls = [feedBtn, lightBtn, discoBtn, pumpBtn, cleanBtn, refreshWaterBtn, tapGlassBtn, fishingRodBtn, medicineBtn, addFishBtn, fishNameInput, heatingBtn, playBallBtn, raceBtn, partyBtn]; // themeBtn tijdelijk verwijderd
             controls.forEach(control => {
                 if (control) {
                     control.disabled = !connected;
@@ -308,6 +309,9 @@
                     break;
                 case 'ballStatus':
                     updateBallStatus(message.data);
+                    break;
+                case 'partyStatus':
+                    updatePartyStatus(message.data);
                     break;
                 case 'raceStatus':
                     updateRaceStatus(message.data);
@@ -546,6 +550,15 @@
             }
         }
 
+        // Tijdens het dansen is de knop uit; daarna vanzelf weer aan
+        let partyTimer = null;
+        function updatePartyStatus(statusData) {
+            clearTimeout(partyTimer);
+            const msLeft = statusData.msLeft || 0;
+            partyBtn.disabled = msLeft > 0 || !isConnected;
+            if (msLeft > 0) partyTimer = setTimeout(() => updatePartyStatus({ msLeft: 0 }), msLeft);
+        }
+
         function updateBallStatus(statusData) {
             if (statusData.hasBall) {
                 playBallBtn.disabled = true;
@@ -709,6 +722,7 @@
         medicineBtn.addEventListener('click', () => sendCommand('addMedicine'));
         heatingBtn.addEventListener('click', () => sendCommand('toggleHeating'));
         playBallBtn.addEventListener('click', () => sendCommand('addPlayBall'));
+        partyBtn.addEventListener('click', () => sendCommand('startParty'));
         // themeBtn.addEventListener('click', () => sendCommand('cycleTheme')); // Tijdelijk uitgeschakeld
 
         addFishBtn.addEventListener('click', () => {

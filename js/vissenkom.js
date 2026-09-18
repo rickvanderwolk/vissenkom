@@ -5238,6 +5238,111 @@ function drawFish(f,t,now){
 
 function roundRect(x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath()}
 
+// ---- Dansfeest -------------------------------------------------------------------------
+// Alle vissen doen samen iets: een formatie (kring, hart, wave, smiley, draaikolk), een
+// polonaise, of synchroonzwemmen (verdeeld over de kom en allemaal hetzelfde patroontje). Eerst
+// verzamelen, dan dansen in de maat, dan met vaart uitzwermen. De server kiest de vorm.
+const PARTY_GATHER=4000,PARTY_DANCE=13000; // ms
+const PARTY_NAMES={circle:'kring',heart:'hart',wave:'wave',conga:'polonaise',smiley:'smiley',vortex:'draaikolk',sync:'synchroon'};
+let party=null; // {kind,start,n,points}
+function startParty(kind){
+  if(party||!PARTY_NAMES[kind])return;
+  const members=fishes.filter(f=>!f.racing&&!f.spectating&&!f.dead&&f!==fishingRod.caughtFish);
+  if(members.length<3)return;
+  members.sort((a,b)=>a.bornAt-b.bornAt); // vaste volgorde: de oudste loopt voorop
+  members.forEach((f,i)=>{f._partyIndex=i;f.behaviorState='dancing';f.behaviorTimer=0});
+  party={kind,start:Date.now(),n:members.length,points:null};
+  if(kind==='heart')party.points=heartPoints(members.length);
+  if(kind==='smiley')party.points=smileyPoints(members.length);
+}
+function updatePartyClock(now){
+  if(now-party.start<PARTY_GATHER+PARTY_DANCE)return;
+  // Uitzwermen: iedereen met vaart van het midden af, daarna weer gewoon gedrag
+  for(const f of fishes){
+    if(f._partyIndex===undefined)continue;
+    const a=Math.atan2(f.y-H*0.45,f.x-W/2)+rand(-0.4,0.4);
+    f.vx=Math.cos(a)*f.speed*2.2;f.vy=Math.sin(a)*f.speed*2.2;
+    f.targetVx=f.vx;f.targetVy=f.vy;f.behaviorState='normal';f.behaviorTimer=0;
+    delete f._partyIndex;
+  }
+  party=null;
+}
+// Punten langs een hart (vaste formatie)
+function heartPoints(n){
+  const S=Math.min(W*0.3/16,H*0.3/14.5),cx=W/2,cy=H*0.45,pts=[];
+  for(let i=0;i<n;i++){const a=i/n*Math.PI*2,s=Math.sin(a);
+    pts.push({x:cx+16*s*s*s*S,y:cy-(13*Math.cos(a)-5*Math.cos(2*a)-2*Math.cos(3*a)-Math.cos(4*a)+2.5)*S})}
+  return pts;
+}
+// Smiley: de grote (oude) vissen vormen de rand, de kleine (jonge) de ogen en de mond, zodat
+// de details scherp blijven. Vissen staan van oud naar jong, dus de rand komt eerst.
+function smileyPoints(n){
+  const R=Math.min(W*0.3,H*0.34),cx=W/2,cy=H*0.45,pts=[];
+  const perEye=n>=20?2:1,mouth=Math.max(3,Math.round(n*0.26)),rim=Math.max(6,n-mouth-perEye*2);
+  for(let i=0;i<rim;i++){const a=i/rim*Math.PI*2;pts.push({x:cx+Math.cos(a)*R,y:cy+Math.sin(a)*R})}
+  for(let i=0;i<mouth;i++){const a=Math.PI*(0.2+0.6*(mouth>1?i/(mouth-1):0.5));pts.push({x:cx+Math.cos(a)*R*0.55,y:cy+R*0.05+Math.sin(a)*R*0.42})}
+  for(const side of [-1,1])for(let i=0;i<perEye;i++)pts.push({x:cx+side*R*0.36,y:cy-R*0.32+(i-(perEye-1)/2)*R*0.14});
+  return pts;
+}
+
+// Waar vis k nu hoort en welke kant hij op kijkt (dx,dy)
+function partyTarget(k,t){
+  const n=party.n,cx=W/2,cy=H*0.45;
+  const beatDir=(Math.floor(t/1600)%2)?-1:1; // bij de vaste formaties draaien ze allemaal tegelijk om
+  const bob=Math.sin(t*0.008)*6;              // en wippen ze in de maat
+  switch(party.kind){
+    case 'circle':{
+      const R=Math.min(W*0.35,H*0.33),a=k/n*Math.PI*2+t*0.00035; // draaiende carrousel
+      return{x:cx+Math.cos(a)*R,y:cy+Math.sin(a)*R,dx:-Math.sin(a),dy:Math.cos(a)};
+    }
+    case 'wave':{
+      const x=W*(0.08+0.84*(n>1?k/(n-1):0.5)),ph=t*0.004-k*0.45;
+      return{x,y:cy+Math.sin(ph)*H*0.12,dx:1,dy:Math.cos(ph)*0.35};
+    }
+    case 'vortex':{
+      // Spiraal die ronddraait, binnenin sneller dan buiten, en een beetje in- en uitademt
+      const R=Math.min(W*0.36,H*0.36)*(0.9+0.1*Math.sin(t*0.002));
+      const r=R*(0.12+0.88*Math.sqrt(1-k/n)); // grote oude vissen buiten
+      const a=k*2.39996+t*0.0009*(R/Math.max(r,1))*0.35;
+      return{x:cx+Math.cos(a)*r,y:cy+Math.sin(a)*r,dx:-Math.sin(a),dy:Math.cos(a)};
+    }
+    case 'sync':{
+      // Raster over de kom; iedereen doet tegelijk hetzelfde patroontje. Elke beweging begint
+      // en eindigt op de eigen plek, dan lopen de overgangen vloeiend.
+      const cols=Math.max(1,Math.round(Math.sqrt(n*W/H))),rows=Math.ceil(n/cols);
+      const col=k%cols,row=Math.floor(k/cols);
+      const bx=W*(0.1+0.8*(cols>1?col/(cols-1):0.5)),by=H*(0.15+0.6*(rows>1?row/(rows-1):0.5));
+      const A=Math.min(W*0.8/cols,H*0.6/rows)*0.3;
+      const MOVE=3250,step=Math.floor(t/MOVE)%4,u=(t%MOVE)/MOVE*Math.PI*2;
+      switch(step){
+        case 0: return{x:bx+(Math.cos(u)-1)*A,y:by+Math.sin(u)*A,dx:-Math.sin(u),dy:Math.cos(u)};       // rondje
+        case 1: return{x:bx,y:by-Math.abs(Math.sin(u))*A*1.3,dx:1,dy:Math.cos(u)*0.6};                  // twee keer huppen
+        case 2: return{x:bx+Math.sin(u)*A*1.3,y:by,dx:Math.cos(u)>=0?1:-1,dy:0};                          // links-rechts
+        default:return{x:bx+Math.sin(u)*A,y:by+Math.sin(2*u)*A*0.5,dx:Math.cos(u),dy:Math.cos(2*u)};     // achtje
+      }
+    }
+    case 'conga':{
+      const w=0.0006,gap=Math.min(0.14,Math.PI*2*0.9/n),s=t*w-k*gap,Ax=W*0.38,Ay=H*0.25;
+      return{x:cx+Math.sin(s)*Ax,y:cy+Math.sin(2*s)*Ay+Math.abs(Math.sin(t*0.006))*-4,dx:Math.cos(s)*Ax,dy:2*Math.cos(2*s)*Ay};
+    }
+    default:{ // heart, smiley: vaste punten
+      const p=party.points[k]||{x:cx,y:cy};
+      return{x:p.x,y:p.y+bob,dx:beatDir,dy:0};
+    }
+  }
+}
+function updatePartyFish(f,now){
+  const t=now-party.start;const p=partyTarget(f._partyIndex,t);
+  const gathering=t<PARTY_GATHER;
+  // Eerst rustig ernaartoe, daarna strak op de plek
+  const k=gathering?0.02+0.1*(t/PARTY_GATHER):0.25;
+  const dx=p.x-f.x,dy=p.y-f.y;
+  f.x+=dx*Math.min(1,k*frameScale);f.y+=dy*Math.min(1,k*frameScale);
+  // Kijkrichting: tijdens verzamelen waar hij heen zwemt, daarna de dansrichting
+  if(gathering&&Math.hypot(dx,dy)>30){f.vx=dx*0.02;f.vy=dy*0.02}
+  else{const m=Math.hypot(p.dx,p.dy)||1;f.vx=p.dx/m*1.5;f.vy=p.dy/m*1.5}
+}
+
 // ---- Compacte labels (uiStyle: 'minimal') ------------------------------------
 // In een volle kom zijn 40-50 witte naambordjes drukker dan de vissen zelf. Compact is
 // het losse tekst vlak boven de vis: naam met drie gezondheidsstipjes, daaronder klein de
@@ -6431,8 +6536,9 @@ function drawActivityList(){
 
   activityPanelEl.style.display='block';
 
-  // Process events in reverse order (newest first)
-  const eventsToShow=recentActivity.slice().reverse();
+  // Process events in reverse order (newest first). Interne controles van de server horen
+  // niet in het blok voor bezoekers.
+  const eventsToShow=recentActivity.filter(e=>e.type!=='state_validation_error').reverse();
 
   // Get existing items
   const existingItems=activityListEl.children;
@@ -6460,6 +6566,16 @@ function drawActivityList(){
       case 'glass_tapped':
         emoji='👆';
         label=`Op kom getikt · ${timeStr}`;
+        break;
+      case 'theme_change':{
+        const th=THEMES[event.data&&event.data.to];
+        emoji=th&&th.emoji?th.emoji:'🎨';
+        label=`Thema: ${th&&th.name?th.name:(event.data&&event.data.to)||'anders'} · ${timeStr}`;
+        break;
+      }
+      case 'party_started':
+        emoji='💃';
+        label=`Dansen${PARTY_NAMES[event.data&&event.data.kind]?' ('+PARTY_NAMES[event.data.kind]+')':''} · ${timeStr}`;
         break;
       case 'play_ball_added':
         emoji='🎾';
@@ -7158,6 +7274,9 @@ function handleRemoteCommand(data) {
                     break;
                 case 'tapGlass':
                     tapGlass();
+                    break;
+                case 'startParty':
+                    startParty(data.kind);
                     break;
                 case 'addPlayBall':
                     makePlayBall();
@@ -8378,10 +8497,17 @@ updateRace(dt*1000);
 
 // Fish layer - update and draw with adaptive rate
 const updateRate=performanceProfile.fishUpdateRate;
+if(party)updatePartyClock(now);
 for(let i=0;i<fishes.length;i++){
   const f=fishes[i];
   // Skip normal update for racing/spectating fish - they are controlled by race system
   if(f.racing||f.spectating){
+    drawFish(f,t,now);
+    continue;
+  }
+  // Tijdens een dansfeest volgt de vis zijn plek in de formatie of de polonaise
+  if(party&&f._partyIndex!==undefined){
+    updatePartyFish(f,now);
     drawFish(f,t,now);
     continue;
   }
