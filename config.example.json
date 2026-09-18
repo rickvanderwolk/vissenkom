@@ -7,6 +7,8 @@
   "showBehaviorEmoji": true,
   "showControllerStatusBlocks": false,
   "showAddFishTip": true,
+  "fishSpecies": false,
+  "// fishSpecies": "Give each fish one of eight species with its own shape and pattern, derived from its name (default: false)",
   "hungerRate": 0.167,
   "// hungerRate": "Health loss per 10 min from hunger (default: 0.167, ~4 days to die)",
   "diseaseRate": 0.083,

@@ -20,12 +20,12 @@ Vissenkom bestaat uit drie onderdelen: een server (draait op de achtergrond), ee
 
 Vissen leven in de kom en moeten eten om in leven te blijven. Ze kunnen ziek worden en elkaar besmetten, dus genees ze op tijd door medicijnen te geven. De omgeving (zoals temperatuur, pomp en andere factoren) heeft invloed op hun gezondheid en gedrag.
 
-Elke vis is er één van acht soorten, met een eigen lichaamsvorm, staart, vinnen en patroon:
+Met de optie `fishSpecies` (standaard uit, zie [Configuratie](#configuratie-optioneel)) is elke vis er één van acht soorten, met een eigen lichaamsvorm, staart, vinnen en patroon:
 
 - **Gewone vis**, **Slanke danio**, **Kogelvis**, **Maanvis**, **Sluierstaart**, **Meerval**, **Pijlvis** en **Zeilvis**
 - Daaroverheen komt een patroon: effen, strepen, stippen, tweekleurig of een zadelvlek
 
-Soort en patroon worden afgeleid uit de naam en kleur van de vis. Dezelfde vis ziet er dus op elk scherm en na elke herstart precies hetzelfde uit. De soort staat ook onder het naamlabel in de kom.
+Soort en patroon worden afgeleid uit de naam en kleur van de vis. Dezelfde vis ziet er dus op elk scherm en na elke herstart precies hetzelfde uit. De soort staat ook onder het naamlabel in de kom. Staat de optie uit, dan zien alle vissen er uit zoals vroeger.
 
 Vissen vertonen uiteenlopend gedrag:
 - **Schooling**: samenzwemmen met andere vissen
@@ -115,6 +115,7 @@ Beschikbare opties:
 | `showBehaviorEmoji` | Toon emoji's bij vissen die hun huidige gedrag weergeven (bijv. dansen, rusten, schooling) | `true` |
 | `showControllerStatusBlocks` | Toon statusblokken in de controller (temperatuur, pomp, etc.) | `false` |
 | `showAddFishTip` | Toon de tip-badge bovenin de controller die naar de "Vis toevoegen"-sectie linkt | `true` |
+| `fishSpecies` | Geef elke vis een eigen soort (vorm, staart, vinnen en patroon), afgeleid uit naam en kleur. Uit = alle vissen hebben het klassieke uiterlijk | `false` |
 | `hungerRate` | Gezondheidsverlies per 10 minuten door honger | `0.167` (~4 dagen tot dood) |
 | `diseaseRate` | Extra gezondheidsverlies per 10 minuten bij ziekte zonder medicijnen | `0.083` |
 | `viewport` | Object met `offsetTop`, `offsetBottom`, `offsetLeft`, `offsetRight` om het zichtbare gebied aan te passen (handig voor schermen met randen) | `0` voor alle waarden |

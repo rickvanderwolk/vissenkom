@@ -1102,6 +1102,17 @@ function drawFishingRod(time){
   }
 }
 
+// Formaat van de vis in de vangst- en race-popup: 2.5x, met een cap van 160px.
+// Met soorten aan cappen we ook op de werkelijk getekende sprite, want soorten
+// verschillen sterk in verhouding (een maanvis is ruim twee keer zo hoog als een danio).
+function popupFishSize(fish,visGrootte,boxW,maxSpriteH){
+  const base=Math.min(visGrootte*2.5,160);
+  if(!fishSpeciesEnabled)return{size:base,height:base};
+  const S=fishSpecies(fish).species;
+  const size=Math.min(base,maxSpriteH/S.ph,(boxW-40)/S.pw);
+  return{size,height:size*S.ph};
+}
+
 function drawCatchPopup(time){
   if(fishingRod.state!=='showing')return;
   if(!fishingRod.caughtFish)return;
@@ -1129,11 +1140,7 @@ function drawCatchPopup(time){
   const minBoxH=240; // Minimum hoogte voor kleine vissen
   const maxBoxH=400; // Maximum hoogte voor zeer grote vissen
 
-  // Soorten verschillen sterk in verhouding (een maanvis is ruim twee keer zo hoog
-  // als een danio), dus cap op de werkelijk getekende sprite en niet op de basismaat.
-  const soort=fishSpecies(fish).species;
-  const visBannerGrootte=Math.min(visGrootte*2.5,160,260/soort.ph,(boxW-40)/soort.pw);
-  const visBannerHoogte=visBannerGrootte*soort.ph;
+  const {size:visBannerGrootte,height:visBannerHoogte}=popupFishSize(fish,visGrootte,boxW,260);
 
   // Bereken benodigde hoogte: pad + titel(~30) + vis + ruimte + gewicht(~30) + pad
   const neededH=18+30+visBannerHoogte+20+30+18;
@@ -4230,7 +4237,7 @@ function hashString(str){let h=2166136261;for(let i=0;i<str.length;i++){h^=str.c
 
 const SPECIES=[
   {
-    id:'gewoon',name:'Gewone vis',pw:3.2,ph:1.6,ox:0.15,oy:0,finHz:1,
+    id:'gewoon',name:'Gewone vis',pw:3.2,ph:1.6,ox:0.15,oy:0,finHz:1,bb:[0.9,0.55],
     eye:{x:0.35,y:-0.08,r:0.11},fin:{x:-0.35,y:0.10,w:0.45,h:0.25},
     body(c,s){c.ellipse(0,0,s*0.9,s*0.55,0,0,TAU)},
     back(c,s,p){
@@ -4239,7 +4246,7 @@ const SPECIES=[
     }
   },
   {
-    id:'danio',name:'Slanke danio',pw:3.6,ph:1.5,ox:0.2,oy:0,finHz:1.6,
+    id:'danio',name:'Slanke danio',pw:3.6,ph:1.5,ox:0.2,oy:0,finHz:1.6,bb:[1.05,0.33],
     eye:{x:0.62,y:-0.04,r:0.09},fin:{x:-0.2,y:0.16,w:0.38,h:0.15},
     body(c,s){c.ellipse(0,0,s*1.05,s*0.33,0,0,TAU)},
     back(c,s,p){
@@ -4250,7 +4257,7 @@ const SPECIES=[
     }
   },
   {
-    id:'kogelvis',name:'Kogelvis',pw:2.9,ph:2.1,ox:0.1,oy:0,finHz:2.2,
+    id:'kogelvis',name:'Kogelvis',pw:2.9,ph:2.1,ox:0.1,oy:0,finHz:2.2,bb:[0.82,0.72],
     eye:{x:0.44,y:-0.14,r:0.15},fin:{x:-0.05,y:0.34,w:0.32,h:0.19},
     body(c,s){c.ellipse(0,0,s*0.82,s*0.72,0,0,TAU)},
     back(c,s,p){
@@ -4267,7 +4274,7 @@ const SPECIES=[
     }
   },
   {
-    id:'maanvis',name:'Maanvis',pw:3.0,ph:3.2,ox:0.25,oy:0,finHz:0.7,
+    id:'maanvis',name:'Maanvis',pw:3.0,ph:3.2,ox:0.25,oy:0,finHz:0.7,bb:[0.66,0.92],
     eye:{x:0.34,y:-0.30,r:0.10},fin:{x:-0.05,y:0.38,w:0.24,h:0.48},
     body(c,s){c.ellipse(0,0,s*0.66,s*0.92,0,0,TAU)},
     back(c,s,p){
@@ -4279,7 +4286,7 @@ const SPECIES=[
     }
   },
   {
-    id:'sluier',name:'Sluierstaart',pw:4.2,ph:2.6,ox:0.45,oy:0,finHz:0.6,
+    id:'sluier',name:'Sluierstaart',pw:4.2,ph:2.6,ox:0.45,oy:0,finHz:0.6,bb:[0.8,0.64],
     eye:{x:0.42,y:-0.14,r:0.12},fin:{x:-0.1,y:0.34,w:0.34,h:0.26},
     body(c,s){c.ellipse(0,0,s*0.8,s*0.64,0,0,TAU)},
     back(c,s,p){
@@ -4298,7 +4305,7 @@ const SPECIES=[
     }
   },
   {
-    id:'meerval',name:'Meerval',pw:3.8,ph:1.7,ox:0.1,oy:0.2,finHz:0.8,
+    id:'meerval',name:'Meerval',pw:3.8,ph:1.7,ox:0.1,oy:0.2,finHz:0.8,bb:[1.0,0.44],
     eye:{x:0.52,y:-0.18,r:0.09},fin:{x:0.05,y:0.30,w:0.42,h:0.15},
     body(c,s){
       c.moveTo(s*1.0,-s*0.05);
@@ -4322,7 +4329,7 @@ const SPECIES=[
     }
   },
   {
-    id:'pijlvis',name:'Pijlvis',pw:3.8,ph:1.6,ox:0.3,oy:0,finHz:1.8,
+    id:'pijlvis',name:'Pijlvis',pw:3.8,ph:1.6,ox:0.3,oy:0,finHz:1.8,bb:[1.15,0.44],
     eye:{x:0.55,y:-0.06,r:0.09},fin:{x:-0.15,y:0.18,w:0.4,h:0.15},
     body(c,s){
       c.moveTo(s*1.15,0);
@@ -4340,7 +4347,7 @@ const SPECIES=[
     }
   },
   {
-    id:'zeilvis',name:'Zeilvis',pw:3.6,ph:2.8,ox:0.2,oy:0.3,finHz:1.2,
+    id:'zeilvis',name:'Zeilvis',pw:3.6,ph:2.8,ox:0.2,oy:0.3,finHz:1.2,bb:[0.95,0.42],
     eye:{x:0.55,y:-0.08,r:0.10},fin:{x:-0.15,y:0.24,w:0.42,h:0.19},
     body(c,s){c.ellipse(0,0,s*0.95,s*0.42,0,0,TAU)},
     back(c,s,p){
@@ -4362,18 +4369,22 @@ const PATTERNS=['effen','strepen','stippen','tweekleurig','zadel'];
 // Soort + patroon zijn stabiel per vis, dus we cachen ze op het visobject zelf.
 // Seed alleen op naam + kleur: baseSize wordt in de vangst- en race-popup tijdelijk
 // opgeschaald, en daar mag de vis niet ineens van soort veranderen.
+// De cache-check vergelijkt naam en kleur direct, zodat er per frame geen string ontstaat.
 function fishSpecies(f){
-  const seed=`${f.name}|${Math.round(f.hue)}`;
-  if(f._species&&f._species.seed===seed)return f._species;
-  const h=hashString(seed);
+  const hue=isNaN(f.hue)?0:Math.round(f.hue);
+  const m=f._species;
+  if(m&&m.name===f.name&&m.hue===hue)return m;
+  const h=hashString(`${f.name}|${hue}`);
   const si=h%SPECIES.length;
   const pi=(h>>>8)%PATTERNS.length;
-  f._species={seed,species:SPECIES[si],pattern:PATTERNS[pi],flip:((h>>>16)&1)===1,key:si*PATTERNS.length+pi};
+  f._species={name:f.name,hue,species:SPECIES[si],pattern:PATTERNS[pi],flip:((h>>>16)&1)===1,key:si*PATTERNS.length+pi};
   return f._species;
 }
 
-// Patroon wordt binnen het silhouet geclipt getekend
-function drawFishPattern(c,s,pat,flip,p){
+// Patroon wordt binnen het silhouet geclipt getekend. bb = halve breedte/hoogte van
+// het lijf: stippen die daar helemaal buiten vallen worden toch weggeclipt, dus die
+// slaan we over (scheelt bij smalle soorten zoals de danio tweederde van de stippen).
+function drawFishPattern(c,s,pat,flip,p,bb){
   if(pat==='effen')return;
   c.globalAlpha=0.5;
   if(pat==='strepen'){
@@ -4381,9 +4392,11 @@ function drawFishPattern(c,s,pat,flip,p){
     for(let i=-3;i<=3;i++){const x=i*s*0.42+(flip?s*0.2:0);c.fillRect(x-s*0.09,-s*1.8,s*0.18,s*3.6)}
   }else if(pat==='stippen'){
     c.fillStyle=p(180,80);
+    const r=s*0.07,maxX=s*bb[0]+r+2,maxY=s*bb[1]+r+2; // +2px voor de anti-aliasing van de clip-rand
     for(let ix=-4;ix<=4;ix++)for(let iy=-4;iy<=4;iy++){
       const x=ix*s*0.3+((iy&1)?s*0.15:0);const y=iy*s*0.26;
-      c.beginPath();c.arc(x,y,s*0.07,0,TAU);c.fill();
+      if(Math.abs(x)>maxX||Math.abs(y)>maxY)continue;
+      c.beginPath();c.arc(x,y,r,0,TAU);c.fill();
     }
   }else if(pat==='tweekleurig'){
     c.fillStyle=p(150,45);
@@ -4396,18 +4409,26 @@ function drawFishPattern(c,s,pat,flip,p){
   c.globalAlpha=1;
 }
 
-// Get or create fish body sprite (cached offscreen canvas)
-function getFishSprite(f,s,fishHue,dim){
-  const meta=fishSpecies(f);const S=meta.species;
-  const hueKey=Math.round(fishHue);const dimKey=Math.round(dim*100);const sKey=Math.round(s*10);
-  if(f._sprite&&f._sprite.h===hueKey&&f._sprite.d===dimKey&&f._sprite.s===sKey&&f._sprite.k===meta.key)return f._sprite;
-  // Sprite canvas sized per species to fit body, tail and fins with padding
-  const pw=Math.ceil(s*S.pw);const ph=Math.ceil(s*S.ph);
-  let sc=f._sprite&&f._sprite.cv;
-  if(!sc||sc.width!==pw||sc.height!==ph){sc=document.createElement('canvas');sc.width=pw;sc.height=ph}
-  const c=sc.getContext('2d');
-  c.clearRect(0,0,pw,ph);
-  const cx=pw/2+s*S.ox;const cy=ph/2+s*(S.oy||0);
+// Klassieke vis (zoals vóór de soorten), gebruikt zolang fishSpecies uit staat
+const CLASSIC_FISH={pw:3.2,ph:1.6,fin:{x:-0.35,y:0,w:0.45,h:0.25},finHz:1};
+function drawClassicFishBody(c,s,cx,cy,fishHue,dim){
+  const hueKey=Math.round(fishHue);
+  // Body gradient
+  const bodyGrad=c.createLinearGradient(cx-s*0.6,cy,cx+s*0.6,cy);
+  bodyGrad.addColorStop(0,`hsla(${hueKey},90%,${60*dim}%,1)`);
+  bodyGrad.addColorStop(1,`hsla(${Math.round((fishHue+50)%360)},80%,${50*dim}%,1)`);
+  c.fillStyle=bodyGrad;c.beginPath();c.ellipse(cx,cy,s*0.9,s*0.55,0,0,Math.PI*2);c.fill();
+  // Tail
+  c.fillStyle=`hsla(${Math.round((fishHue+20)%360)},80%,${55*dim}%,1)`;
+  c.beginPath();c.moveTo(cx-s*0.9,cy);c.lineTo(cx-s*1.4,cy-s*0.35);c.lineTo(cx-s*1.2,cy);c.lineTo(cx-s*1.4,cy+s*0.35);c.closePath();c.fill();
+  // Eye
+  const eyeLight=dim>0.5;
+  c.fillStyle=eyeLight?'#fff':'#d8e1e8';c.beginPath();c.arc(cx+s*0.35,cy-s*0.08,s*0.11,0,Math.PI*2);c.fill();
+  c.fillStyle=eyeLight?'#000':'#24323c';c.beginPath();c.arc(cx+s*0.37,cy-s*0.08,s*0.05,0,Math.PI*2);c.fill();
+}
+
+function drawSpeciesFishBody(c,s,cx,cy,meta,fishHue,dim){
+  const S=meta.species;
   const paint=(dh,l,a)=>`hsla(${(((Math.round(fishHue+dh))%360)+360)%360},85%,${clamp(l*dim,0,100)}%,${a===undefined?1:a})`;
   c.save();c.translate(cx,cy);
   // Staart en vinnen achter het lichaam
@@ -4419,14 +4440,37 @@ function getFishSprite(f,s,fishHue,dim){
   bodyGrad.addColorStop(1,paint(50,50));
   c.fillStyle=bodyGrad;c.fill();
   // Patroon netjes binnen het silhouet
-  c.save();c.clip();drawFishPattern(c,s,meta.pattern,meta.flip,paint);c.restore();
+  if(meta.pattern!=='effen'){c.save();c.clip();drawFishPattern(c,s,meta.pattern,meta.flip,paint,S.bb);c.restore()}
   if(S.front)S.front(c,s,paint);
   // Oog
   const eyeLight=dim>0.5;const E=S.eye;
   c.fillStyle=eyeLight?'#fff':'#d8e1e8';c.beginPath();c.arc(s*E.x,s*E.y,s*E.r,0,TAU);c.fill();
   c.fillStyle=eyeLight?'#000':'#24323c';c.beginPath();c.arc(s*(E.x+0.02),s*E.y,s*E.r*0.45,0,TAU);c.fill();
   c.restore();
-  f._sprite={cv:sc,h:hueKey,d:dimKey,s:sKey,k:meta.key,pw,ph,cx,cy,fin:S.fin,finHz:S.finHz};
+}
+
+// Get or create fish body sprite (cached offscreen canvas)
+function getFishSprite(f,s,fishHue,dim){
+  const meta=fishSpeciesEnabled?fishSpecies(f):null;
+  const kind=meta?meta.key:-1; // -1 = klassieke vis
+  const hueKey=Math.round(fishHue);const dimKey=Math.round(dim*100);const sKey=Math.round(s*10);
+  if(f._sprite&&f._sprite.h===hueKey&&f._sprite.d===dimKey&&f._sprite.s===sKey&&f._sprite.k===kind)return f._sprite;
+  // Sprite canvas sized (per species) to fit body, tail and fins with padding
+  const S=meta?meta.species:CLASSIC_FISH;
+  const pw=Math.ceil(s*S.pw);const ph=Math.ceil(s*S.ph);
+  let sc=f._sprite&&f._sprite.cv;
+  if(!sc||sc.width!==pw||sc.height!==ph){sc=document.createElement('canvas');sc.width=pw;sc.height=ph}
+  const c=sc.getContext('2d');
+  c.clearRect(0,0,pw,ph);
+  let cx,cy;
+  if(meta){
+    cx=pw/2+s*S.ox;cy=ph/2+s*(S.oy||0);
+    drawSpeciesFishBody(c,s,cx,cy,meta,fishHue,dim);
+  }else{
+    cx=pw/2+s*0.15;cy=ph/2; // Center point offset to accommodate tail
+    drawClassicFishBody(c,s,cx,cy,fishHue,dim);
+  }
+  f._sprite={cv:sc,h:hueKey,d:dimKey,s:sKey,k:kind,pw,ph,cx,cy,fin:S.fin,finHz:S.finHz};
   return f._sprite;
 }
 
@@ -4445,9 +4489,9 @@ function drawFish(f,t,now){
     ctx.globalAlpha=1;
   }
 
-  // Vissen die naar links zwemmen spiegelen we in plaats van ze 180 graden te
-  // kantelen, anders hangen rugvinnen, zeilen en buiken ondersteboven.
-  const faceLeft=Math.abs(a)>Math.PI/2;
+  // Met soorten aan spiegelen we vissen die naar links zwemmen in plaats van ze
+  // 180 graden te kantelen, anders hangen rugvinnen, zeilen en buiken ondersteboven.
+  const faceLeft=fishSpeciesEnabled&&Math.abs(a)>Math.PI/2;
   ctx.save();ctx.translate(f.x,f.y);ctx.rotate(a);if(faceLeft)ctx.scale(1,-1);
   const hp=healthPct(f,now); // Unified health (includes hunger, disease, temp effects)
   const dimBase=1-(1-hp/100)*0.4;const lightMul=lightsOn?1:0.6;let dim=dimBase*lightMul;
@@ -4478,6 +4522,9 @@ function drawFish(f,t,now){
 
     // Ensure fishHue is still a valid number after calculation
     if(isNaN(fishHue)) fishHue = 0;
+    // Soort-sprites zijn duurder om te tekenen en de disco-kleur verschuift elke frame,
+    // dus schuif in stappen van 10 graden: ~3x minder sprite-rebuilds.
+    if(fishSpeciesEnabled) fishHue = Math.round(fishHue/10)*10;
 
     dim*=1.2;
     const glow=ctx.createRadialGradient(0,0,0,0,0,s*1.5);
@@ -4522,7 +4569,7 @@ function drawFish(f,t,now){
   const behaviorEmoji=appConfig.showBehaviorEmoji ? getBehaviorEmoji(f.behaviorState || 'normal', f) : '';
   const emojiPrefix = (sickEmoji ? sickEmoji + ' ' : '') + (behaviorEmoji ? behaviorEmoji + ' ' : '');
   const label1=emojiPrefix + f.name;
-  const label2=ageLabel(f,now)+' · '+fishSpecies(f).species.name;
+  const label2=fishSpeciesEnabled?ageLabel(f,now)+' · '+fishSpecies(f).species.name:ageLabel(f,now);
   const labelAlpha=lightsOn?0.92:0.7;
   const pad=6;
   const nameFont='600 14px system-ui,Segoe UI,Roboto,Arial';
@@ -5652,7 +5699,7 @@ function drawLists(){
 
   // Newest list
   const newest=[...fishes].sort((a,b)=>b.bornAt-a.bornAt).slice(0,TOP_N);
-  const newestItems=newest.map((f,i)=>({idx:i+1,label:`${f.name} · ${fishSpecies(f).species.name} · ${ageLabelMS(now-f.bornAt)}`}));
+  const newestItems=newest.map((f,i)=>({idx:i+1,label:fishSpeciesEnabled?`${f.name} · ${fishSpecies(f).species.name} · ${ageLabelMS(now-f.bornAt)}`:`${f.name} · ${ageLabelMS(now-f.bornAt)}`}));
   updateListItems(newestListEl,newestItems);
 }
 
@@ -5955,6 +6002,9 @@ function fallbackToExternalQR(canvas, controllerUrl, accessCode) {
 let ws = null;
 let currentVersion = null; // Store current version to detect changes
 let appConfig = { showBehaviorEmoji: true }; // Store config from server
+// Vissoorten staan standaard uit. De vlag wordt één keer afgeleid als de config
+// binnenkomt, zodat de tekenloop per vis alleen een boolean hoeft te checken.
+let fishSpeciesEnabled = false;
 let gameLoopStarted = false; // Track if game loop has been started
 let wsReconnectAttempts = 0; // Track reconnection attempts
 let wsConnectedOnce = false; // Track if we've successfully connected before
@@ -6185,6 +6235,7 @@ function handleRemoteCommand(data) {
             if(data.config) {
                 // Store full config
                 appConfig = { ...appConfig, ...data.config };
+                fishSpeciesEnabled = appConfig.fishSpecies === true;
                 // Handle viewport config
                 if(data.config.viewport) {
                     viewportConfig = data.config.viewport;
@@ -7213,10 +7264,8 @@ function drawRaceWinnerPopup(time) {
   const boxW = Math.min(480, cv.width * 0.7);
   const minBoxH = 260;
   const maxBoxH = 420;
-  // Cap op de werkelijk getekende sprite, want soorten verschillen sterk in verhouding
-  const soort = fishSpecies(fish).species;
-  const visBannerGrootte = Math.min(visGrootte * 2.5, 160, 280 / soort.ph, (boxW - 40) / soort.pw);
-  const neededH = 18 + 30 + visBannerGrootte * soort.ph + 20 + 50 + 18;
+  const { size: visBannerGrootte, height: visBannerHoogte } = popupFishSize(fish, visGrootte, boxW, 280);
+  const neededH = 18 + 30 + visBannerHoogte + 20 + 50 + 18;
   const boxH = Math.max(minBoxH, Math.min(maxBoxH, neededH));
 
   const boxX = (cv.width - boxW) / 2;
