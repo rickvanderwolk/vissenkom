@@ -6007,8 +6007,9 @@ function handlePlaying(f) {
         f.y -= Math.sin(pushAngle) * pushOut;
       }
     } else {
-      // Initialiseer ballPushDirection als die nog niet bestaat
-      if(!f.ballPushDirection) {
+      // Initialiseer ballPushDirection als die nog niet bestaat, en kies ook zonder contact
+      // af en toe opnieuw: anders blijft een 'up'-vis die de bal mist voor altijd rebel
+      if(!f.ballPushDirection || Math.random() < 0.004) {
         f.ballPushDirection = Math.random() < 0.2 ? 'up' : 'down';
       }
 
@@ -6018,7 +6019,7 @@ function handlePlaying(f) {
       if(f.ballPushDirection === 'up') {
         // Rebel vis positioneert zich ONDER de bal om naar boven te duwen
         targetX = closestBall.x + rand(-40, 40); // Wat variatie in x
-        targetY = closestBall.y + closestBall.radius + rand(30, 70); // Onder de bal
+        targetY = closestBall.y + closestBall.radius + rand(0, 15); // Tegen de onderkant, binnen raakafstand
       } else {
         // Normale vis - kies random aanpak: van boven (50%) of van de zijkant (50%)
         // Gebruik ballApproachSide als positief = van zijkant, negatief = van boven
