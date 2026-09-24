@@ -9,7 +9,7 @@ let fpsHistory=[];let frameCount=0;let lastFPSCheck=Date.now();
 // Cached background gradients (invalidated on resize/theme/light change)
 let cachedBgGrad=null;let cachedVignetteGrad=null;let cachedBgKey='';
 // Cached sand offscreen canvas
-let sandCanvas=null;let sandCtx=null;let sandCacheKey='';let lastSandTime=0;
+
 // Pre-generated sand texture dots (regenerated on resize)
 let sandDots=null;let sandDotsKey='';
 // Frame time tracking
@@ -223,7 +223,7 @@ let recentActivity=[];
 let playedAudioEvents=new Set(); // Track welke events al audio hebben afgespeeld
 let plingAudio=null; // Herbruikbaar audio object voor pling geluid
 let lastFed=0;let lastMedicine=0;let feedCooldown=60*60*1000;let medicineCooldown=24*60*60*1000;let fishCounter=1;let lastT=Date.now();let TOP_N=3;let lastSeenSeq=0;
-let lightsOn=true;let discoOn=false;let pumpOn=false;let heatingOn=true;const pumpPos={x:0,y:0};let pumpJustOnUntil=0;
+let lightsOn=true;let lightRaw=1;let lightLevel=1;let discoOn=false;let pumpOn=false;let heatingOn=true;const pumpPos={x:0,y:0};let pumpJustOnUntil=0;
 let discoBall={x:0,y:0,targetY:0,rotation:0,deployed:false,deployStart:0,deployDuration:2500,undeploying:false,undeployStart:0};
 let fishingRod={x:0,y:0,targetY:0,deployed:false,deployStart:0,deployDuration:2000,state:'idle',caughtFish:null,reelingStart:0,showCatchStart:0,baitSwing:0,retractStart:0};
 let race={active:false,fish1:null,fish2:null,startTime:0,duration:15000,startX:0,finishX:0,fish1Speed:0,fish2Speed:0,fish1X:0,fish2X:0,winner:null,spectatorPositions:[],showingWinner:false,winnerFish:null,loserFish:null,winnerShowStart:0};
@@ -421,7 +421,8 @@ function setupParticles(){
 }
 
 function updateAlgenParticles(){
-  const targetCount=Math.floor(waterGreenness/3.3); // ~30 deeltjes bij 100% greenness
+  // Tijdens het poetsen haalt de spons de algen weg waar hij langs komt
+  const targetCount=fresh?algenParticles.length:Math.floor(waterGreenness/3.3); // ~30 deeltjes bij 100% greenness
   while(algenParticles.length<targetCount){
     algenParticles.push({x:rand(0,W),y:rand(0,H),size:rand(2,6),speedX:rand(-0.1,0.1),speedY:rand(-0.15,0.15),hue:rand(90,120)}); // Bruiniger groen (hue 90-120)
   }
@@ -1693,7 +1694,8 @@ function bounceOffWalls(f){
 }
 
 function drawLamps(time){
-  if(!lightsOn)return;
+  const lv=lightLevel;
+  if(lv<=0.001)return;
 
   // Kerst: hangende kerstlichtjes snoeren ipv normale lampen
   if(isChristmas()){
@@ -1704,6 +1706,7 @@ function drawLamps(time){
       const lightColors=['#ffbb44','#ffd166','#ffe699','#ffcc55','#ffd580','#fff0aa']; // Meer variatie in warme gele tinten
 
       // Donkergroen draad/snoer van boven naar beneden
+      ctx.globalAlpha=lv;
       ctx.strokeStyle='hsla(140,30%,15%,0.6)';
       ctx.lineWidth=2;
       ctx.beginPath();
@@ -1746,7 +1749,7 @@ function drawLamps(time){
 
         // Lampje (peervormig)
         ctx.fillStyle=color;
-        ctx.globalAlpha=twinkle;
+        ctx.globalAlpha=twinkle*lv;
         ctx.beginPath();
         ctx.ellipse(lx,ly+20,5,7,0,0,Math.PI*2);
         ctx.fill();
@@ -1761,9 +1764,10 @@ function drawLamps(time){
         ctx.arc(lx,ly+20,25,0,Math.PI*2);
         ctx.fill();
 
-        ctx.globalAlpha=1;
+        ctx.globalAlpha=lv;
       }
     }
+    ctx.globalAlpha=1;
     return; // Skip normale lampen voor kerst
   }
 
@@ -1775,7 +1779,7 @@ function drawLamps(time){
   for(const L of lamps){
     const flicker=flickerEffect(L,time);
     const hue=lampHueFor(L,time);
-    const intensity=L.intensity*(discoActive?1.6:1)*flicker; // 1.6x helderder!
+    const intensity=L.intensity*(discoActive?1.6:1)*flicker*lv; // 1.6x helderder!
     const topGlow=ctx.createRadialGradient(L.x,0,2,L.x,0,Math.max(40,L.width*0.6*discoMultiplier));
     topGlow.addColorStop(0,`hsla(${hue},95%,90%,${0.4*intensity*stro})`);
     topGlow.addColorStop(1,'rgba(0,0,0,0)');
@@ -1805,7 +1809,7 @@ function drawLamps(time){
     }
     if(discoActive){
       const extraGlow=ctx.createRadialGradient(L.x,H*0.2,0,L.x,H*0.2,100);
-      extraGlow.addColorStop(0,`hsla(${(hue+180)%360},100%,75%,${0.12*stro})`);
+      extraGlow.addColorStop(0,`hsla(${(hue+180)%360},100%,75%,${0.12*stro*lv})`);
       extraGlow.addColorStop(1,'rgba(0,0,0,0)');
       ctx.globalCompositeOperation='lighter';
       ctx.fillStyle=extraGlow;ctx.beginPath();ctx.arc(L.x,H*0.2,100,0,Math.PI*2);ctx.fill();
@@ -1858,10 +1862,10 @@ function drawBeamMotes(time){
 function drawStars(time){
   // Bij kerst: altijd sterren tonen (ook met licht aan, maar zachter)
   // Bij andere thema's: alleen met licht uit
-  if(lightsOn && !isChristmas())return;
+  if(lightLevel>=1 && !isChristmas())return;
 
   const christmasMode = isChristmas();
-  const baseDimming = (lightsOn && christmasMode) ? 0.4 : 1.0; // Dimmer met licht aan bij kerst
+  const baseDimming = christmasMode ? 1-0.6*lightLevel : 1-lightLevel; // Dimmer met licht aan bij kerst
 
   for(const star of stars){
     const twinkle=Math.sin(time*star.twinkleSpeed+star.twinklePhase)*0.3+0.7;
@@ -1894,7 +1898,8 @@ function drawStars(time){
 }
 
 function drawHalloweenMoon(){
-  if(!isHalloween()||lightsOn)return;
+  if(!isHalloween()||lightLevel>=1)return;
+  ctx.save();ctx.globalAlpha=1-lightLevel;
 
   // Grote volle maan rechtsboven
   const moonX=W*0.85;
@@ -1932,14 +1937,15 @@ function drawHalloweenMoon(){
   ctx.beginPath();
   ctx.arc(moonX+moonRadius*0.1,moonY+moonRadius*0.35,moonRadius*0.12,0,Math.PI*2);
   ctx.fill();
+  ctx.restore();
 }
 
 let cachedAutumnGlow=null;let cachedAutumnGlowKey='';
 function drawAutumnGlow(time){
   if(!isAutumn())return;
-  const key=W+'x'+H+lightsOn;
+  const key=W+'x'+H+Math.round(lightLevel*20);
   if(key!==cachedAutumnGlowKey){
-    const a=lightsOn?0.24:0.08;
+    const a=lit(0.24,0.08);
     cachedAutumnGlow=ctx.createLinearGradient(0,0,0,H*0.8);
     cachedAutumnGlow.addColorStop(0,`rgba(255,158,52,${a})`);
     cachedAutumnGlow.addColorStop(0.45,`rgba(255,132,36,${a*0.45})`);
@@ -2189,7 +2195,7 @@ function leafPath(rx,ry){
 
 function drawLeafShape(l){
   const s=l.size;
-  const lightMul=lightsOn?1:0.55;
+  const lightMul=lit(1,0.55);
   const alpha=l.alpha*(0.55+l.depth*0.45);
   ctx.fillStyle=`hsla(${l.hue},${l.sat}%,${l.light*lightMul}%,${alpha})`;
   if(l.type==='maple'){
@@ -2237,34 +2243,42 @@ function drawFallingLeaves(layer){
 }
 
 function drawSandBottom(time){
+  // Tijdens het aan/uit gaan van het licht liggen beide versies over elkaar
+  if(lightLevel<1)ctx.drawImage(sandLayer(false,time),0,0);
+  if(lightLevel>0){ctx.globalAlpha=lightLevel;ctx.drawImage(sandLayer(true,time),0,0);ctx.globalAlpha=1}
+}
+const sandCaches={};
+function sandLayer(on,time){
   // Cache sand to offscreen canvas, redraw every ~100ms for subtle wave animation
-  const sandKey=W+'x'+H+lightsOn+currentTheme;
+  let sc=sandCaches[on];if(!sc)sc=sandCaches[on]={canvas:null,ctx:null,key:'',time:0};
+  let sandCanvas=sc.canvas,sandCtx=sc.ctx;
+  const sandKey=W+'x'+H+currentTheme;
   // De golf in de zandlijn beweegt 0,03 px per seconde, dus die 10x/sec hertekenen
   // (elke 6 frames) leverde geen zichtbare animatie op terwijl het de zwaarste
   // teken-actie van het frame is. 1x/sec is niet van het origineel te onderscheiden.
   // Wil je de golf wel zien bewegen, verhoog dan time*0.003 in renderSandToCanvas.
   const timeKey=Math.floor(time); // Herteken hoogstens 1x per seconde (time is t/60)
-  if(!sandCanvas||sandCacheKey!==sandKey||timeKey!==lastSandTime){
+  if(!sandCanvas||sc.key!==sandKey||timeKey!==sc.time){
     if(!sandCanvas||sandCanvas.width!==W||sandCanvas.height!==H){
-      sandCanvas=document.createElement('canvas');
+      sandCanvas=sc.canvas=document.createElement('canvas');
       sandCanvas.width=W;sandCanvas.height=H;
-      sandCtx=sandCanvas.getContext('2d');
+      sandCtx=sc.ctx=sandCanvas.getContext('2d');
     }
     sandCtx.clearRect(0,0,W,H);
-    renderSandToCanvas(sandCtx,time);
-    sandCacheKey=sandKey;
-    lastSandTime=timeKey;
+    renderSandToCanvas(sandCtx,time,on);
+    sc.key=sandKey;
+    sc.time=timeKey;
   }
-  ctx.drawImage(sandCanvas,0,0);
+  return sandCanvas;
 }
-function renderSandToCanvas(c,time){
+function renderSandToCanvas(c,time,on){
   const sandHeight=70;
   const sandTop=H-sandHeight;
 
   // Winter/Kerst: witte sneeuw ipv zand
   if(isWinter()||isChristmas()){
     const snowGrad=c.createLinearGradient(0,sandTop,0,H);
-    if(lightsOn){
+    if(on){
       snowGrad.addColorStop(0,'#FFFFFF');
       snowGrad.addColorStop(0.5,'#F0F8FF');
       snowGrad.addColorStop(1,'#E6F2FF');
@@ -2276,7 +2290,7 @@ function renderSandToCanvas(c,time){
     c.fillStyle=snowGrad;
   } else {
     const sandGrad=c.createLinearGradient(0,sandTop,0,H);
-    if(lightsOn){
+    if(on){
       sandGrad.addColorStop(0,'#E5C89A');
       sandGrad.addColorStop(0.5,'#D4AF7A');
       sandGrad.addColorStop(1,'#B89968');
@@ -2305,14 +2319,14 @@ function renderSandToCanvas(c,time){
   c.closePath();
   c.fill();
 
-  c.strokeStyle=lightsOn?'rgba(0,0,0,0.08)':'rgba(0,0,0,0.15)';
+  c.strokeStyle=on?'rgba(0,0,0,0.08)':'rgba(0,0,0,0.15)';
   c.lineWidth=1.5;
   c.beginPath();
   c.moveTo(wavePoints[0].x,wavePoints[0].y);
   for(let i=1;i<wavePoints.length;i++){c.lineTo(wavePoints[i].x,wavePoints[i].y)}
   c.stroke();
 
-  if(lightsOn){
+  if(on){
     // Generate fixed dot positions once per resize
     const dotKey=W+'x'+H;
     if(!sandDots||sandDotsKey!==dotKey){
@@ -2394,8 +2408,9 @@ function drawParticles(){
 }
 
 function drawAlgenParticles(){
+  const g=fresh?fresh.old:waterGreenness;
   for(const a of algenParticles){
-    const alpha=(waterGreenness/100)*0.8;
+    const alpha=(g/100)*0.8;
     ctx.fillStyle=`hsla(${a.hue},40%,30%,${alpha})`; // Donkerder, minder verzadigd voor natuurlijker effect
     ctx.beginPath();
     ctx.arc(a.x,a.y,a.size,0,Math.PI*2);
@@ -2631,7 +2646,7 @@ function drawNewYearText(time){
 function drawPumpChampagne(){
   if(!isNewYear())return;
 
-  const lightMul=lightsOn?1:0.6;
+  const lightMul=lit(1,0.6);
   const fadeAlpha=1;
 
   // Positie: bij de pump, schuin liggend
@@ -2710,6 +2725,7 @@ function drawPumpChampagne(){
 }
 
 function drawWaterGreenness(){
+  if(fresh){drawFreshWaterFront(Date.now());return}
   if(waterGreenness<=0)return;
   const alpha=(waterGreenness/100)*0.9; // 90% opacity bij 100% greenness
   ctx.fillStyle=`rgba(45,85,45,${alpha})`; // Donker modderig groen (natuurlijk vervuild water)
@@ -2750,7 +2766,7 @@ function addSurfaceRipple(x){
 }
 function traceSurface(){for(let i=0;i<surfacePts.length;i+=2)ctx.lineTo(surfacePts[i],surfacePts[i+1])}
 function drawWaterSurface(time){
-  const bright=lightsOn?1:0.45;const step=24;
+  const bright=lit(1,0.45);const step=24;
   surfacePts.length=0;
   for(let x=0;x<=W+step;x+=step)surfacePts.push(x,waterSurfaceY(x,time));
   ctx.save();
@@ -2795,21 +2811,18 @@ function clearFrame(time){
 
   // Fill viewport area with gradient background for depth - theme based
   const theme=getThemeConfig();
-  const bgColors=lightsOn?theme.bgLight:theme.bgDark;
-  const bgKey=currentTheme+lightsOn+W+H;
+  const bgKey=currentTheme+W+H;
   if(bgKey!==cachedBgKey){
-    cachedBgGrad=ctx.createLinearGradient(0,0,0,H);
-    cachedBgGrad.addColorStop(0,bgColors[0]);
-    cachedBgGrad.addColorStop(0.3,bgColors[1]);
-    cachedBgGrad.addColorStop(0.7,bgColors[2]);
-    cachedBgGrad.addColorStop(1,bgColors[3]);
+    const grad=cols=>{const g=ctx.createLinearGradient(0,0,0,H);g.addColorStop(0,cols[0]);g.addColorStop(0.3,cols[1]);g.addColorStop(0.7,cols[2]);g.addColorStop(1,cols[3]);return g};
+    cachedBgGrad={on:grad(theme.bgLight),off:grad(theme.bgDark)};
     cachedVignetteGrad=ctx.createRadialGradient(W/2,H/2,Math.min(W,H)*0.3,W/2,H/2,Math.max(W,H)*0.8);
     cachedVignetteGrad.addColorStop(0,'rgba(0,0,0,0)');
     cachedVignetteGrad.addColorStop(1,`rgba(0,0,0,${theme.vignette})`);
     cachedBgKey=bgKey;
   }
-  ctx.fillStyle=cachedBgGrad;
-  ctx.fillRect(0,0,W,H);
+  // Licht aan/uit: de donkere achtergrond met de lichte er in wisselende sterkte overheen
+  if(lightLevel<1){ctx.fillStyle=cachedBgGrad.off;ctx.fillRect(0,0,W,H)}
+  if(lightLevel>0){ctx.globalAlpha=lightLevel;ctx.fillStyle=cachedBgGrad.on;ctx.fillRect(0,0,W,H);ctx.globalAlpha=1}
 
   // Extra subtiele radiale gradient voor meer diepte (donkerder in hoeken) - skip on low performance
   if(performanceProfile.quality!=='low'&&performanceProfile.quality!=='verylow'){
@@ -2856,22 +2869,23 @@ function drawFood(){for(let i=foods.length-1;i>=0;i--){const p=foods[i];
   ctx.fillStyle=p.color||'#ffb37a';ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fill();
   // Verwijder alleen als ttl verloopt (niet meer als het de bodem raakt)
   if(p.ttl<=0){foods.splice(i,1)}}}
-function drawBubbles(){if(bubbles.length===0)return;const bubbleColor=(THEMES[currentTheme]||THEMES.normal).bubbleColor;ctx.globalAlpha=lightsOn?0.7:0.5;ctx.fillStyle=bubbleColor;for(let i=bubbles.length-1;i>=0;i--){const b=bubbles[i];waterCurrentAt(b.x,b.y);b.y-=b.vy*frameScale;b.x+=(b.vx+curU*0.6)*frameScale;b.ttl--;ctx.beginPath();ctx.arc(b.x,b.y,b.r,0,Math.PI*2);ctx.fill();const popped=b.y<WATER_SURFACE_Y+b.r;if(popped||b.ttl<=0){if(popped)addSurfaceRipple(b.x);releaseBubble(b);bubbles.splice(i,1)}}ctx.globalAlpha=1}
+function drawBubbles(){if(bubbles.length===0)return;const bubbleColor=(THEMES[currentTheme]||THEMES.normal).bubbleColor;ctx.globalAlpha=lit(0.7,0.5);ctx.fillStyle=bubbleColor;for(let i=bubbles.length-1;i>=0;i--){const b=bubbles[i];waterCurrentAt(b.x,b.y);b.y-=b.vy*frameScale;b.x+=(b.vx+curU*0.6)*frameScale;b.ttl--;ctx.beginPath();ctx.arc(b.x,b.y,b.r,0,Math.PI*2);ctx.fill();const popped=b.y<WATER_SURFACE_Y+b.r;if(popped||b.ttl<=0){if(popped)addSurfaceRipple(b.x);releaseBubble(b);bubbles.splice(i,1)}}ctx.globalAlpha=1}
 
 function drawPoops(){
-  for(const p of poops) {
-    // Draw small brown poop on tank floor
-    ctx.fillStyle = lightsOn ? '#8B4513' : '#654321';
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-    ctx.fill();
+  for(const p of poops)drawPoopAt(p.x,p.y,p.size);
+}
+function drawPoopAt(x,y,size){
+  // Draw small brown poop
+  ctx.fillStyle = lightsOn ? '#8B4513' : '#654321';
+  ctx.beginPath();
+  ctx.arc(x, y, size, 0, Math.PI * 2);
+  ctx.fill();
 
-    // Add a slightly darker center for detail
-    ctx.fillStyle = lightsOn ? '#654321' : '#4A2C17';
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, p.size * 0.6, 0, Math.PI * 2);
-    ctx.fill();
-  }
+  // Add a slightly darker center for detail
+  ctx.fillStyle = lightsOn ? '#654321' : '#4A2C17';
+  ctx.beginPath();
+  ctx.arc(x, y, size * 0.6, 0, Math.PI * 2);
+  ctx.fill();
 }
 
 // Speelbal functies
@@ -3036,7 +3050,7 @@ function drawPlayBalls(){
 
     if(isHalloween()){
       // Halloween: pompoen stijl bal (zelfde stijl als decoratie)
-      const lightMul = lightsOn ? 1 : 0.6;
+      const lightMul = lit(1,0.6);
       const hue = 30; // Oranje hue (zoals pompoen decoratie)
 
       // Pompoen lichaam (oranje met gradient - exact zoals decoratie)
@@ -3107,7 +3121,7 @@ function drawPlayBalls(){
 
     } else if(isNewYear()){
       // Nieuwjaar: oliebol stijl (zoals decoratie)
-      const lightMul = lightsOn ? 1 : 0.6;
+      const lightMul = lit(1,0.6);
 
       // Oliebol basis (goudbruin)
       const bolGrad = ctx.createRadialGradient(
@@ -3165,7 +3179,7 @@ function drawPlayBalls(){
 
     } else if(isSummer()){
       // Zomer: strandbal met rood-witte strepen
-      const lightMul = lightsOn ? 1 : 0.7;
+      const lightMul = lit(1,0.7);
 
       // Witte basis
       ctx.fillStyle = `rgba(255,255,255,${lightMul})`;
@@ -3197,7 +3211,7 @@ function drawPlayBalls(){
 
     } else if(isAutumn()){
       // Herfst: glanzende kastanje die zichtbaar rolt
-      const lightMul = lightsOn ? 1 : 0.7;
+      const lightMul = lit(1,0.7);
       const rot = ball.rotation || 0;
 
       const nutGrad = ctx.createRadialGradient(
@@ -3246,7 +3260,7 @@ function drawPlayBalls(){
 
     } else if(isChristmas()){
       // Kerst: echte kerstbal met kroontje
-      const lightMul = lightsOn ? 1 : 0.7;
+      const lightMul = lit(1,0.7);
 
       // Metalen kroontje bovenop de bal
       const capHeight = ball.radius * 0.25;
@@ -3310,7 +3324,7 @@ function drawPlayBalls(){
       ctx.fill();
 
       // Witte glans voor shiny effect
-      ctx.globalAlpha = lightsOn ? 0.6 : 0.3;
+      ctx.globalAlpha = lit(0.6,0.3);
       ctx.fillStyle = '#fff';
       ctx.beginPath();
       ctx.arc(ball.x - ball.radius/3, ball.y - ball.radius/3, ball.radius/3, 0, Math.PI * 2);
@@ -3334,7 +3348,7 @@ function drawPlayBalls(){
 }
 
 function drawPlant(plant,time){
-  const lightMul=lightsOn?1:0.6;
+  const lightMul=lit(1,0.6);
   // Heel subtiele sway voor meer leven
   const swayAmount=Math.sin(time*0.015+plant.swayPhase)*3*(1+currentStrength*0.8);
   const moveAmount=Math.sin(time*0.008+plant.movePhase)*2;
@@ -3349,7 +3363,7 @@ function drawPlant(plant,time){
     const baseWidth = treeHeight * 0.45; // Basis breedte: 45% van hoogte
     const widthVariation = (plant.width / 80) * (treeHeight * 0.15); // Max 15% variatie
     const treeWidth = Math.min(180, baseWidth + widthVariation); // Max 180 pixels breed
-    const alpha = (lightsOn ? 1 : 0.7) * fadeAlpha;
+    const alpha = (lit(1,0.7)) * fadeAlpha;
 
     // Vrolijke bruine stam met texture
     const trunkWidth = treeWidth * 0.18;
@@ -3485,7 +3499,7 @@ function drawPlant(plant,time){
       const sway=frac*swayAmount*swayMultiplier+frac*frac*lean;
       const x=plant.x+sway;
       const width=plant.width*(1-i*0.02/plant.segments);
-      const alpha=(lightsOn?0.9:0.6)*fadeAlpha;
+      const alpha=(lit(0.9,0.6))*fadeAlpha;
 
       ctx.fillStyle=`hsla(${plant.hue},70%,${45*lightMul}%,${alpha})`;
       ctx.beginPath();
@@ -3510,7 +3524,7 @@ function drawPlant(plant,time){
       const y=plant.y-i*segmentHeight;
       const x=plant.x+(i/plant.segments)**2*lean;
       const width=plant.width*(1-i*0.04/plant.segments);
-      const alpha=(lightsOn?0.8:0.5)*fadeAlpha;
+      const alpha=(lit(0.8,0.5))*fadeAlpha;
 
       // Main stem - static
       ctx.strokeStyle=`hsla(${plant.hue-20},80%,${30*lightMul}%,${alpha})`;
@@ -3541,7 +3555,7 @@ function drawPlant(plant,time){
       const x=plant.x+offsetX;
       const bladeHeight=plant.height*(0.8+0.2*(i%3)/2);
       const topX=x+swayAmount*0.6+lean*0.8; // Subtiele sway aan de top, plus de stroming
-      const alpha=(lightsOn?0.8:0.5)*fadeAlpha;
+      const alpha=(lit(0.8,0.5))*fadeAlpha;
 
       ctx.strokeStyle=`hsla(${plant.hue},80%,${40*lightMul}%,${alpha})`;
       ctx.lineWidth=2;
@@ -3560,7 +3574,7 @@ function drawPlant(plant,time){
       const x=plant.x+(i/plant.segments)*lean*0.4;
       const leafWidth=plant.width*plant.branchiness*(1-i*0.1/plant.segments);
       const leafHeight=leafSpacing*0.8;
-      const alpha=(lightsOn?0.9:0.6)*fadeAlpha;
+      const alpha=(lit(0.9,0.6))*fadeAlpha;
 
       ctx.fillStyle=`hsla(${plant.hue},60%,${35*lightMul}%,${alpha})`;
       ctx.beginPath();
@@ -3585,7 +3599,7 @@ function drawPlant(plant,time){
       const sway=frac*swayAmount*0.8+frac*frac*lean;
       const x=plant.x+sway;
       const width=plant.width*(1-i*0.01/plant.segments);
-      const alpha=(lightsOn?0.8:0.5)*fadeAlpha;
+      const alpha=(lit(0.8,0.5))*fadeAlpha;
 
       ctx.strokeStyle=`hsla(${plant.hue},70%,${40*lightMul}%,${alpha})`;
       ctx.lineWidth=width;
@@ -3606,7 +3620,7 @@ function drawPlant(plant,time){
       const endX=plant.x+Math.cos(angle)*branchLength*0.6;
       const endY=baseY-Math.abs(Math.sin(angle))*branchLength;
 
-      ctx.strokeStyle=`hsla(${plant.hue},60%,${45*lightMul}%,${(lightsOn?0.8:0.5)*fadeAlpha})`;
+      ctx.strokeStyle=`hsla(${plant.hue},60%,${45*lightMul}%,${(lit(0.8,0.5))*fadeAlpha})`;
       ctx.lineWidth=plant.width/6;
       ctx.lineCap='round';
       ctx.beginPath();
@@ -3614,7 +3628,7 @@ function drawPlant(plant,time){
       ctx.lineTo(endX,endY); // Straight lines for performance
       ctx.stroke();
 
-      ctx.fillStyle=`hsla(${plant.hue+20},70%,${55*lightMul}%,${(lightsOn?0.6:0.4)*fadeAlpha})`;
+      ctx.fillStyle=`hsla(${plant.hue+20},70%,${55*lightMul}%,${(lit(0.6,0.4))*fadeAlpha})`;
       ctx.beginPath();
       ctx.arc(endX,endY,plant.width/8,0,Math.PI*2);
       ctx.fill();
@@ -3631,12 +3645,12 @@ function drawPlants(time){
 
 function getDecoGrad(deco,key,createFn){
   if(!deco._gradCache)deco._gradCache={};
-  const cacheKey=key+lightsOn+Math.round(fadeAlpha*10);
+  const cacheKey=key+Math.round(lightLevel*10)+'|'+Math.round(fadeAlpha*10);
   if(!deco._gradCache[cacheKey]){deco._gradCache={};deco._gradCache[cacheKey]=createFn()}
   return deco._gradCache[cacheKey];
 }
 function drawDecoration(deco,time){
-  const lightMul=lightsOn?1:0.6;
+  const lightMul=lit(1,0.6);
   const bobAmount=0; // Static decorations for performance
 
   if(deco.type==='rock'){
@@ -4183,7 +4197,7 @@ function drawDecoration(deco,time){
   }
   else if(deco.type==='leafpile'){
     // Herfst: hoopje opgewaaide bladeren, wiegt licht mee met de stroming
-    const lightMul=lightsOn?1:0.55;
+    const lightMul=lit(1,0.55);
     const s=deco.size;
     const bob=Math.sin(time*0.01+deco.bobPhase)*1.5;
     for(const lf of deco.leaves){
@@ -4200,7 +4214,7 @@ function drawDecoration(deco,time){
   }
   else if(deco.type==='branch'){
     // Herfst: kale tak met een paar bladeren die nog vasthouden
-    const lightMul=lightsOn?1:0.5;
+    const lightMul=lit(1,0.5);
     const s=deco.size;
     const sway=Math.sin(time*0.006+deco.bobPhase)*0.03;
     ctx.save();
@@ -4234,7 +4248,7 @@ function drawDecoration(deco,time){
   }
   else if(deco.type==='mushroom'){
     // Herfst: clusterje paddenstoelen (rode met stippen en bruine)
-    const lightMul=lightsOn?1:0.55;
+    const lightMul=lit(1,0.55);
     const s=deco.size;
     const sway=Math.sin(time*0.008+deco.bobPhase)*0.02;
     for(const m of deco.caps){
@@ -4279,7 +4293,7 @@ function drawDecoration(deco,time){
   }
   else if(deco.type==='acorn'){
     // Herfst: eikeltje op het zand
-    const lightMul=lightsOn?1:0.55;
+    const lightMul=lit(1,0.55);
     const s=deco.size;
     ctx.save();
     ctx.translate(deco.x,deco.y);
@@ -4303,7 +4317,7 @@ function drawDecoration(deco,time){
   }
   else if(deco.type==='chestnut'){
     // Herfst: glanzende kastanje met lichte voet
-    const lightMul=lightsOn?1:0.55;
+    const lightMul=lit(1,0.55);
     const s=deco.size;
     ctx.save();
     ctx.translate(deco.x,deco.y);
@@ -5120,7 +5134,7 @@ function drawFish(f,t,now){
   const a=f.caughtVertical?-Math.PI/2:Math.atan2(f.vy,f.vx);
 
   // Subtiele schaduw onder de vis voor diepte-effect (skip on low performance, niet bij gevangen vis of in banner)
-  if(lightsOn&&performanceProfile.quality!=='verylow'&&performanceProfile.quality!=='low'&&!f.caughtVertical&&!f.hideShadow){
+  if(lightLevel>0.5&&performanceProfile.quality!=='verylow'&&performanceProfile.quality!=='low'&&!f.caughtVertical&&!f.hideShadow){
     ctx.globalAlpha=0.15;
     ctx.fillStyle='#000';
     ctx.beginPath();
@@ -5134,7 +5148,7 @@ function drawFish(f,t,now){
   const faceLeft=fishSpeciesEnabled&&Math.abs(a)>Math.PI/2;
   ctx.save();ctx.translate(f.x,f.y);ctx.rotate(a);if(faceLeft)ctx.scale(1,-1);
   const hp=healthPct(f,now); // Unified health (includes hunger, disease, temp effects)
-  const dimBase=1-(1-hp/100)*0.4;const lightMul=lightsOn?1:0.6;let dim=dimBase*lightMul;
+  const dimBase=1-(1-hp/100)*0.4;const lightMul=lit(1,0.6);let dim=dimBase*lightMul;
 
   // Sick fish appear duller and more transparent based on their health
   if(f.sick && !f.medicated) {
@@ -5183,7 +5197,7 @@ function drawFish(f,t,now){
   ctx.save();ctx.translate(s*FIN.x,s*FIN.y);ctx.rotate((finWave-0.5)*(discoOn?1.2:0.6));ctx.fillStyle=`hsla(${((Math.round(fishHue+70)%360)+360)%360},85%,${65*dim}%,1)`;ctx.beginPath();ctx.ellipse(0,0,finW,finH,0,0,Math.PI*2);ctx.fill();ctx.restore();
 
   // Af en toe een glinsterend sterretje op de vis (alleen als gezond en licht aan) - skip on low performance
-  if(lightsOn && performanceProfile.quality!=='low' && performanceProfile.quality!=='verylow' && healthPct(f,now)>50 && Math.sin(t*0.1+f.x*0.05)>0.85){
+  if(lightLevel>0.5 && performanceProfile.quality!=='low' && performanceProfile.quality!=='verylow' && healthPct(f,now)>50 && Math.sin(t*0.1+f.x*0.05)>0.85){
     ctx.fillStyle='rgba(255,255,255,0.9)';
     const sparkX=s*0.2;
     const sparkY=-s*0.15;
@@ -5212,7 +5226,7 @@ function drawFish(f,t,now){
   const emojiPrefix = (sickEmoji ? sickEmoji + ' ' : '') + (behaviorEmoji ? behaviorEmoji + ' ' : '');
   const label1=emojiPrefix + f.name;
   const label2=fishSpeciesEnabled?ageLabel(f,now)+' · '+fishSpecies(f).species.name:ageLabel(f,now);
-  const labelAlpha=lightsOn?0.92:0.7;
+  const labelAlpha=lit(0.92,0.7);
   const pad=6;
   const nameFont='600 14px system-ui,Segoe UI,Roboto,Arial';
   const ageFont='500 11px system-ui,Segoe UI,Roboto,Arial';
@@ -5247,7 +5261,7 @@ const PARTY_NAMES={circle:'kring',heart:'hart',wave:'wave',conga:'polonaise',smi
 let party=null; // {kind,start,n,points}
 function startParty(kind){
   if(party||!PARTY_NAMES[kind])return;
-  const members=fishes.filter(f=>!f.racing&&!f.spectating&&!f.dead&&f!==fishingRod.caughtFish);
+  const members=fishes.filter(f=>!f.racing&&!f.spectating&&!f.dead&&!f.inBag&&f!==fishingRod.caughtFish);
   if(members.length<3)return;
   members.sort((a,b)=>a.bornAt-b.bornAt); // vaste volgorde: de oudste loopt voorop
   members.forEach((f,i)=>{f._partyIndex=i;f.behaviorState='dancing';f.behaviorTimer=0});
@@ -5400,7 +5414,7 @@ function drawCompactLabel(f,s,hp,now){
   nameY=Math.round(nameY);infoY=Math.round(infoY);
 
   ctx.save();
-  ctx.globalAlpha=lightsOn?0.95:0.8;
+  ctx.globalAlpha=lit(0.95,0.8);
   ctx.textBaseline='middle';ctx.lineJoin='round';ctx.strokeStyle='rgba(5,20,30,0.6)';
   ctx.font=COMPACT_NAME_FONT;ctx.lineWidth=3;ctx.strokeText(name,x1,nameY);
   ctx.fillStyle=hp<=25?'#ff8a80':hp<=50||sick?'#ffd166':'#fff';ctx.fillText(name,x1,nameY);
@@ -5920,9 +5934,10 @@ function handleScared(f) {
   // Fish swims away rapidly in a panicked manner
   // Burst away from center of tank
   if(!f.scaredInitialized) {
-    // Pick a random direction away from center
-    const centerX = W / 2;
-    const centerY = H / 2;
+    // Weg van waar op het glas getikt is (of van het midden)
+    const recentTap = tapPoint && Date.now() - tapPoint.at < 5000;
+    const centerX = recentTap ? tapPoint.x : W / 2;
+    const centerY = recentTap ? tapPoint.y : H / 2;
     const awayAngle = Math.atan2(f.y - centerY, f.x - centerX);
     const randomOffset = rand(-0.5, 0.5);
 
@@ -6871,7 +6886,7 @@ function buildQrSign(){
   g.fillStyle='#3d2510';
   for(const [nx,ny] of [[ox+6,oy+6],[ox+bw-6,oy+6],[ox+6,oy+bh-6],[ox+bw-6,oy+bh-6]]){g.beginPath();g.arc(nx,ny,2,0,Math.PI*2);g.fill()}
   // Licht uit: iets donkerder, maar de code blijft scanbaar
-  if(!lightsOn){g.globalCompositeOperation='source-atop';g.fillStyle='rgba(0,10,20,0.3)';g.fillRect(0,0,c.width,c.height)}
+  if(lightLevel<=0.5){g.globalCompositeOperation='source-atop';g.fillStyle='rgba(0,10,20,0.3)';g.fillRect(0,0,c.width,c.height)}
   return c;
 }
 // Planten en decoraties uit de buurt van het bordje houden: ervoor bedekken ze de code, en
@@ -6900,7 +6915,7 @@ cv.addEventListener('click',e=>{if(pointOnQrSign(e))window.open(qrSignUrl,'_blan
 cv.addEventListener('mousemove',e=>{cv.style.cursor=pointOnQrSign(e)?'pointer':''});
 function drawQrSign(){
   if(!qrSignOn||!qrSignQr||!qrSignVersion)return;
-  const key=qrSignVersion+'|'+lightsOn+'|'+qrSignFeed;
+  const key=qrSignVersion+'|'+(lightLevel>0.5)+'|'+qrSignFeed;
   if(qrSignCacheKey!==key){qrSignCache=buildQrSign();qrSignCacheKey=key}
   // Paaltje staat in het zand linksonder, bordje een klein beetje scheef
   const baseX=40+qrSignCache.width/2,baseY=H-22;
@@ -7284,6 +7299,7 @@ function handleRemoteCommand(data) {
                     break;
                 case 'addMedicine':
                     console.log('💊 Medicine added - updating fish status');
+                    startMedicine((data.medicatedFish||[]).map(m=>m.name));
 
                     // Immediate update if server sent medicated fish data
                     if (data.medicatedFish && Array.isArray(data.medicatedFish)) {
@@ -7596,6 +7612,7 @@ function loadGameState(state) {
     medicineCooldown = state.medicineCooldown || (24 * 60 * 60 * 1000);
     fishCounter = state.fishCounter;
     lightsOn = state.lightsOn;
+    snapLight();
     discoOn = state.discoOn;
     pumpOn = state.pumpOn;
     heatingOn = state.heatingOn !== undefined ? state.heatingOn : true;
@@ -7653,6 +7670,8 @@ function loadGameState(state) {
     state.deadLog.forEach(deadFish => {
         deadLog.push(deadFish);
     });
+    deadFishClearedAt = state.deadFishClearedAt || 0;
+    syncFloaters(Date.now());
 
     // Regenerate poop objects based on poopCount
     poops.length = 0;
@@ -7798,14 +7817,34 @@ function addFish(nameOrData, newCounter){
     if(typeof nameOrData === 'object') {
         // Received fish data object from server
         const fish = makeFishFromData(nameOrData);
-        if(fish) fishes.push(fish);
+        if(fish){fishes.push(fish);startFishBag(fish)}
     } else {
         // Received just name (legacy support)
         const fishName = nameOrData || `Vis ${fishCounter}`;
         makeFish(undefined,undefined,fishName);
+        startFishBag(fishes[fishes.length-1]);
     }
 }
 function toggleLight(){lightsOn=!lightsOn;updateLightUI()}
+// Licht gaat niet in één frame om: lightLevel loopt in ongeveer een seconde van 1 (aan) naar
+// 0 (uit) en terug. Bij aangaan slaat de lamp eerst een paar keer aan, zoals een TL-buis.
+// lightsOn blijft de echte toestand (sync, hash); tekenwerk kijkt naar lightLevel of lit().
+const LIGHT_ON_S=1.1,LIGHT_OFF_S=1.2;
+function lit(on,off){return off+(on-off)*lightLevel}
+function snapLight(){lightRaw=lightLevel=lightsOn?1:0}
+function updateLightLevel(dt){
+  const target=lightsOn?1:0;
+  if(lightRaw===target){lightLevel=target;return}
+  lightRaw=target>lightRaw?Math.min(1,lightRaw+dt/LIGHT_ON_S):Math.max(0,lightRaw-dt/LIGHT_OFF_S);
+  if(lightsOn&&lightRaw<0.35){
+    const k=lightRaw/0.35;
+    lightLevel=(k>0.05&&k<0.2)||(k>0.45&&k<0.58)?0.6:0.02;
+  }else if(lightsOn){
+    const k=(lightRaw-0.35)/0.65;lightLevel=k*k*(3-2*k);
+  }else{
+    lightLevel=lightRaw*lightRaw*(3-2*lightRaw);
+  }
+}
 function toggleDisco(){
   discoOn=!discoOn;
   if(!discoOn&&discoBall.deployed){
@@ -7835,6 +7874,8 @@ function castFishingRod(){
 
 function togglePump(){pumpOn=!pumpOn;updatePumpUI()}
 function cleanTank(){
+  startNet(poops,floaters);
+  floaters.length=0;deadFishClearedAt=Date.now();
   poops.length=0;
   console.log('Tank opgeruimd! Alle poep weggehaald.');
 
@@ -7842,9 +7883,9 @@ function cleanTank(){
   sendToServer({ command: 'reportPoop', poopCount: 0 });
 }
 function refreshWater(){
+  startFreshWater(Math.max(waterGreenness,waterGreennessTarget));
   waterGreenness=0;
   waterGreennessTarget=0;
-  algenParticles.length=0;
   console.log('💧 Water ververst! Greenness gereset naar 0%.');
 
   // Report water greenness to server for controller updates
@@ -7853,13 +7894,571 @@ function refreshWater(){
 
 function tapGlass(){
   console.log('👊 Op het glas getikt! Vissen schrikken!');
+  startGlassTap();
 
   // Make all fish scared for a short duration
   fishes.forEach(f => {
+    if(f.inBag) return; // In het zakje merkt hij er niets van
     f.behaviorState = 'scared';
     f.behaviorTimer = Math.floor(rand(120, 240)); // 2-4 seconds of being scared
     f.scaredInitialized = false; // Reset scared state
   });
+}
+
+// === KLUSJES IN BEELD: schepnet, medicijn en vers water ===
+// De toestand verandert meteen (en gaat meteen naar de server); dit is alleen de animatie
+// erbij, net als bij de discobal en de hengel: iets komt van boven de kom in, doet zijn werk
+// en gaat weer weg. Alles is tijdgestuurd, dus bij een haperend frame loopt het gewoon door.
+function easeOut3(p){return 1-Math.pow(1-p,3)}
+function easeInOut2(p){return p<0.5?2*p*p:1-Math.pow(-2*p+2,2)/2}
+function clamp01(v){return v<0?0:v>1?1:v}
+
+function drawChores(now){
+  if(med||medDrops.length||medPuffs.length)drawMedicine(now);
+  if(now<medSparkleUntil)drawMedSparkles(now);
+  if(fishBags.length)drawFishBags(now);
+  if(net)drawNet(now);
+  if(glassTaps.length)drawGlassTaps(now);
+  drawHeatFx(now);
+}
+
+// --- Schepnet: gaat één keer met een golfje door de kom en schept alle poep mee ---
+const NET_DOWN=900,NET_SWEEP=2800,NET_UP=1000,NET_RING=46;
+let net=null;
+function startNet(list,dead){
+  const add=list.map(p=>({sx:p.x,sy:p.y,size:p.size,tIn:0}));
+  for(const fl of dead)add.push({sx:fl.x,sy:fl.y,size:0,fl,tIn:0});
+  // Tweede keer opruimen terwijl het net nog bezig is: die poep gaat gewoon in hetzelfde net
+  if(net){net.caught.push(...add);return}
+  const [hx,hy]=netPath(0);
+  net={t0:Date.now(),caught:add,hx,hy,tx:hx-86,ty:hy+18,wasIn:false};
+}
+function netPath(el){
+  const x0=W*0.08,x1=W*0.92,yMid=H*0.45;
+  if(el<NET_DOWN){const p=easeOut3(el/NET_DOWN);return[x0,-120+(yMid+120)*p]}
+  el-=NET_DOWN;
+  if(el<NET_SWEEP){const p=easeInOut2(el/NET_SWEEP);return[x0+(x1-x0)*p,yMid+Math.sin(p*Math.PI*3)*H*0.2]}
+  el-=NET_SWEEP;
+  const p=easeInOut2(Math.min(1,el/NET_UP));return[x1+40*p,yMid+(-200-yMid)*p];
+}
+// Vissen gaan het net uit de weg
+function netRepel(f,now){
+  if(now-net.t0>NET_DOWN+NET_SWEEP)return;
+  const dx=f.x-net.hx,dy=f.y-net.hy,d2=dx*dx+dy*dy,R=140;
+  if(d2>=R*R||d2<1)return;
+  const d=Math.sqrt(d2),k=(1-d/R)*0.35*frameScale;
+  f.vx+=dx/d*k;f.vy+=dy/d*k;
+}
+function netSlot(i){const col=i%5,row=Math.floor(i/5);return[net.tx+8+col*5+row*3,net.ty-4-row*4+(col%2)*2]}
+function drawNet(now){
+  const el=now-net.t0;
+  if(el>=NET_DOWN+NET_SWEEP+NET_UP){net=null;return}
+  const [hx,hy]=netPath(el);
+  net.hx=hx;net.hy=hy;
+  // De punt van het net hangt achter de ring en zwiept een beetje na
+  const k=Math.min(1,0.18*frameScale);
+  net.tx+=(hx-86-net.tx)*k;net.ty+=(hy+18+Math.min(20,net.caught.length*1.5)-net.ty)*k;
+  const tx=net.tx,ty=net.ty,R=NET_RING;
+  // Door het wateroppervlak: rimpels en een paar belletjes
+  const inWater=hy>WATER_SURFACE_Y;
+  if(inWater!==net.wasIn){addSurfaceRipple(hx-8);addSurfaceRipple(hx+10);for(let i=0;i<5;i++)makeFishBubble(hx,Math.max(hy,WATER_SURFACE_Y+10));net.wasIn=inWater}
+  if(inWater&&el>NET_DOWN&&el<NET_DOWN+NET_SWEEP&&Math.random()<0.12*frameScale)makeFishBubble(tx,ty);
+  // Poep die het net passeert (of die er na de veeg nog ligt) vliegt erin
+  const sweepDone=el>NET_DOWN+NET_SWEEP;
+  for(const c of net.caught)if(!c.tIn&&el>NET_DOWN&&(hx>=c.sx-60||sweepDone))c.tIn=now;
+
+  ctx.save();
+  // Steel
+  ctx.lineCap='round';
+  ctx.strokeStyle='#7a4a22';ctx.lineWidth=8;
+  ctx.beginPath();ctx.moveTo(hx,hy-R);ctx.lineTo(hx-150,hy-R-420);ctx.stroke();
+  ctx.strokeStyle='#b07a45';ctx.lineWidth=2.5;
+  ctx.beginPath();ctx.moveTo(hx-2,hy-R-2);ctx.lineTo(hx-152,hy-R-422);ctx.stroke();
+  // Zak van gaas
+  const bagPath=()=>{ctx.beginPath();ctx.moveTo(hx,hy-R);ctx.quadraticCurveTo(hx-52,hy-R+2,tx,ty);ctx.quadraticCurveTo(hx-50,hy+R+8,hx,hy+R);ctx.closePath()};
+  bagPath();
+  ctx.fillStyle='rgba(235,245,250,0.14)';ctx.fill();
+  ctx.save();ctx.clip();
+  for(let i=0;i<net.caught.length&&i<25;i++){
+    const c=net.caught[i];if(!c.tIn||now-c.tIn<500)continue;
+    const [px,py]=netSlot(i);
+    if(c.fl)drawFloater(c.fl,px+10,py-4,0.3,-1,1,0.55,now);else drawPoopAt(px,py,c.size*0.8);
+  }
+  ctx.strokeStyle='rgba(235,245,250,0.4)';ctx.lineWidth=1;
+  ctx.beginPath();
+  for(let d=-120;d<=120;d+=9){ctx.moveTo(hx-100+d,hy-60);ctx.lineTo(hx+20+d,hy+60);ctx.moveTo(hx-100+d,hy+60);ctx.lineTo(hx+20+d,hy-60)}
+  ctx.stroke();
+  ctx.restore();
+  bagPath();ctx.strokeStyle='rgba(235,245,250,0.6)';ctx.lineWidth=1.5;ctx.stroke();
+  // Poep onderweg naar het net: in een boogje erheen. Wat het net nog niet bereikt heeft,
+  // blijft gewoon liggen (of drijven) tot het langskomt.
+  for(let i=0;i<net.caught.length;i++){
+    const c=net.caught[i];
+    if(!c.tIn){if(c.fl)drawFloater(c.fl,c.sx,c.sy,0,-1,1,1,now);else drawPoopAt(c.sx,c.sy,c.size);continue}
+    const q=(now-c.tIn)/500;if(q>=1)continue;
+    const e=q*q;const [px,py]=i<25?netSlot(i):[tx,ty];
+    const cx=c.sx+(px-c.sx)*e,cy=c.sy+(py-c.sy)*e-Math.sin(q*Math.PI)*30;
+    if(c.fl)drawFloater(c.fl,cx,cy,q*0.3,-1,1,1-q*0.45,now);else drawPoopAt(cx,cy,c.size);
+  }
+  // Ring
+  ctx.strokeStyle='#5f6b75';ctx.lineWidth=5;
+  ctx.beginPath();ctx.ellipse(hx,hy,12,R,0,0,Math.PI*2);ctx.stroke();
+  ctx.strokeStyle='#d7dee4';ctx.lineWidth=2;
+  ctx.beginPath();ctx.ellipse(hx-1,hy,11,R-1,0,0,Math.PI*2);ctx.stroke();
+  ctx.restore();
+}
+
+// --- Medicijn: een pipetje druppelt een paar keer in de kom, elke druppel wordt een wolkje ---
+const MED_IN=800,MED_DRIP=2600,MED_OUT=800,MED_SQUEEZES=4;
+let med=null;const medDrops=[];const medPuffs=[];let medPuffSprite=null;let medSparkleUntil=0;
+function startMedicine(names){
+  const now=Date.now();
+  med={t0:now,x:rand(W*0.3,W*0.7),squeezed:0};
+  // Vissen die medicijn krijgen glinsteren even zodra het eerste wolkje er is
+  const from=now+MED_IN+700,until=now+MED_IN+MED_DRIP+5000;
+  for(const n of names){const f=fishes.find(x=>x.name===n);if(f)f._medFx={from,until}}
+  if(names.length)medSparkleUntil=until;
+}
+function medTipY(){return Math.min(170,H*0.25)}
+function drawMedicine(now){
+  if(med){
+    const el=now-med.t0;
+    if(el>=MED_IN+MED_DRIP+MED_OUT)med=null;
+    else{
+      const target=medTipY();
+      let tipY=target,squash=0;
+      if(el<MED_IN)tipY=-40+(target+40)*easeOut3(el/MED_IN);
+      else if(el<MED_IN+MED_DRIP){
+        const e2=el-MED_IN,cyc=MED_DRIP/MED_SQUEEZES,idx=Math.floor(e2/cyc),s=(e2%cyc)/cyc;
+        if(s<0.4)squash=Math.sin(s/0.4*Math.PI);
+        if(s>=0.2&&med.squeezed<=idx&&idx<MED_SQUEEZES){medDrops.push({x:med.x,y:tipY+4,vy:1.2,born:now});med.squeezed=idx+1}
+      }else tipY=target+(-40-target)*easeInOut2((el-MED_IN-MED_DRIP)/MED_OUT);
+      drawPipette(med.x,tipY+squash*8,0.85-0.18*med.squeezed);
+    }
+  }
+  // Druppels zakken een stukje en bloeien dan open tot een wolkje
+  for(let i=medDrops.length-1;i>=0;i--){
+    const d=medDrops[i];
+    d.vy+=0.06*frameScale;d.y+=d.vy*frameScale;
+    if(now-d.born>380){
+      for(let k=0;k<8;k++)medPuffs.push({x:d.x+rand(-8,8),y:d.y+rand(-8,8),vx:rand(-0.9,0.9),vy:rand(-0.15,0.45),r0:rand(8,14),r1:rand(60,110),born:now,life:rand(6000,8500)});
+      medDrops.splice(i,1);continue;
+    }
+    ctx.fillStyle='#b15cff';
+    ctx.beginPath();ctx.moveTo(d.x,d.y-9);ctx.quadraticCurveTo(d.x+5,d.y-2,d.x,d.y+4);ctx.quadraticCurveTo(d.x-5,d.y-2,d.x,d.y-9);ctx.fill();
+    ctx.fillStyle='rgba(255,255,255,0.7)';ctx.beginPath();ctx.arc(d.x-1.5,d.y-1,1.3,0,Math.PI*2);ctx.fill();
+  }
+  if(!medPuffs.length)return;
+  if(!medPuffSprite){
+    medPuffSprite=document.createElement('canvas');medPuffSprite.width=medPuffSprite.height=64;
+    const g=medPuffSprite.getContext('2d');const rg=g.createRadialGradient(32,32,0,32,32,32);
+    rg.addColorStop(0,'rgba(214,140,255,0.9)');rg.addColorStop(0.45,'rgba(214,140,255,0.45)');rg.addColorStop(1,'rgba(214,140,255,0)');
+    g.fillStyle=rg;g.fillRect(0,0,64,64);
+  }
+  for(let i=medPuffs.length-1;i>=0;i--){
+    const p=medPuffs[i];const age=now-p.born;const q=age/p.life;
+    if(q>=1){medPuffs.splice(i,1);continue}
+    waterCurrentAt(p.x,p.y);
+    p.x+=(p.vx+curU*0.8)*frameScale;p.y+=(p.vy+curV*0.8)*frameScale;p.vx*=Math.pow(0.99,frameScale);
+    const r=p.r0+(p.r1-p.r0)*easeOut3(q);
+    ctx.globalAlpha=Math.min(1,age/400)*Math.pow(1-q,1.2)*0.55;
+    ctx.drawImage(medPuffSprite,p.x-r,p.y-r,r*2,r*2);
+  }
+  ctx.globalAlpha=1;
+}
+function drawPipette(x,tipY,level){
+  // Alleen het onderste stuk van het buisje steekt de kom in; de rest zit boven beeld
+  const top=-30,tubeW=14;
+  ctx.save();
+  // Vloeistof in het buisje, zakt bij elke druppel
+  const liqTop=tipY-(tipY-top)*Math.max(0.04,level);
+  ctx.fillStyle='rgba(177,92,255,0.8)';
+  ctx.beginPath();ctx.moveTo(x-tubeW/2+2,liqTop);ctx.lineTo(x+tubeW/2-2,liqTop);ctx.lineTo(x+tubeW/2-2,tipY-40);ctx.lineTo(x+2,tipY-2);ctx.lineTo(x-2,tipY-2);ctx.lineTo(x-tubeW/2+2,tipY-40);ctx.closePath();ctx.fill();
+  // Glazen buisje dat onderaan smal toeloopt
+  ctx.beginPath();ctx.moveTo(x-tubeW/2,top);ctx.lineTo(x+tubeW/2,top);ctx.lineTo(x+tubeW/2,tipY-40);ctx.lineTo(x+3,tipY);ctx.lineTo(x-3,tipY);ctx.lineTo(x-tubeW/2,tipY-40);ctx.closePath();
+  ctx.fillStyle='rgba(225,245,255,0.18)';ctx.fill();
+  ctx.strokeStyle='rgba(235,250,255,0.85)';ctx.lineWidth=2;ctx.stroke();
+  ctx.strokeStyle='rgba(255,255,255,0.6)';
+  ctx.beginPath();ctx.moveTo(x-tubeW/2+4,top);ctx.lineTo(x-tubeW/2+4,tipY-46);ctx.stroke();
+  // Maatstreepjes
+  ctx.strokeStyle='rgba(255,255,255,0.5)';ctx.lineWidth=1.5;
+  ctx.beginPath();for(let i=1;i<=4;i++){const ly=tipY-40-i*22;if(ly>top){ctx.moveTo(x+tubeW/2,ly);ctx.lineTo(x+tubeW/2-6,ly)}}ctx.stroke();
+  ctx.restore();
+}
+function drawMedSparkles(now){
+  ctx.save();ctx.fillStyle='#fff6c8';
+  for(const f of fishes){
+    const fx=f._medFx;if(!fx)continue;
+    if(now>fx.until){f._medFx=null;continue}
+    if(now<fx.from)continue;
+    const fade=Math.min(1,(now-fx.from)/500,(fx.until-now)/800);
+    const s=f._sizeCache?f._sizeCache.v:24;
+    for(let i=0;i<3;i++){
+      const a=now*0.002+i*2.09+(f.hue||0);
+      const tw=0.5+0.5*Math.sin(now*0.01+i*1.7+(f.hue||0));
+      const px=f.x+Math.cos(a)*s*1.3,py=f.y+Math.sin(a)*s*0.8,r=3.5+4.5*tw;
+      ctx.globalAlpha=fade*(0.4+0.6*tw);
+      ctx.beginPath();ctx.moveTo(px,py-r);ctx.quadraticCurveTo(px,py,px+r,py);ctx.quadraticCurveTo(px,py,px,py+r);ctx.quadraticCurveTo(px,py,px-r,py);ctx.quadraticCurveTo(px,py,px,py-r);ctx.fill();
+    }
+  }
+  ctx.restore();
+}
+
+// --- Vers water: een spons poetst het groen in zachte slingers van het glas ---
+// Het oude groen staat op een eigen canvas; de spons gumt daar langs zijn baan gaten in.
+// De baan is één doorlopende slinger (heen, bocht naar beneden, terug) met kleine
+// poetsrondjes erin, dus geen rechte stroken. Wat na de laatste haal nog groen is, vervaagt.
+const SPONGE_LANES=4,SPONGE_IN=500,SPONGE_LANE_MS=1150,SPONGE_OUT=600;
+let fresh=null;let spongeBrush=null;const spongeFoam=[];
+function startFreshWater(old){
+  if(fresh)return; // Er wordt al gepoetst; het water is dan toch al schoon
+  let mask=null;
+  if(old>0.5){
+    mask=document.createElement('canvas');mask.width=W;mask.height=H;
+    const g=mask.getContext('2d');g.fillStyle=`rgba(45,85,45,${(old/100)*0.9})`;g.fillRect(0,0,W,H);
+  }
+  fresh={t0:Date.now(),old,mask,laneH:H/SPONGE_LANES,lastX:null,lastY:null};
+}
+// Welke strook (als kommagetal): in de bocht aan de rand glijdt hij zacht naar de volgende
+function spongeLane(u){
+  const k=Math.round(u),d=u-k;
+  if(k<1||k>SPONGE_LANES-1||Math.abs(d)>=0.25)return Math.min(SPONGE_LANES-1,Math.floor(u));
+  const q=(d+0.25)/0.5;return k-1+q*q*(3-2*q);
+}
+function spongePathAt(u){
+  const xl=70,xr=W-70;
+  const x=xl+(xr-xl)*(0.5-0.5*Math.cos(Math.PI*u));
+  const y=fresh.laneH*(0.5+spongeLane(u));
+  return [x,y];
+}
+function stampSponge(x,y){
+  const m=fresh.mask;if(!m)return;
+  if(!spongeBrush){
+    spongeBrush=document.createElement('canvas');spongeBrush.width=spongeBrush.height=128;
+    const g=spongeBrush.getContext('2d');const rg=g.createRadialGradient(64,64,0,64,64,64);
+    rg.addColorStop(0,'rgba(0,0,0,1)');rg.addColorStop(0.45,'rgba(0,0,0,0.9)');rg.addColorStop(1,'rgba(0,0,0,0)');
+    g.fillStyle=rg;g.fillRect(0,0,128,128);
+  }
+  const rx=130,ry=fresh.laneH*0.7;
+  const g=m.getContext('2d');g.globalCompositeOperation='destination-out';
+  g.drawImage(spongeBrush,x-rx,y-ry,rx*2,ry*2);g.globalCompositeOperation='source-over';
+  for(let i=algenParticles.length-1;i>=0;i--){const a=algenParticles[i],dx=(a.x-x)/rx,dy=(a.y-y)/ry;if(dx*dx+dy*dy<0.6)algenParticles.splice(i,1)}
+}
+// Vervangt drawWaterGreenness zolang er gepoetst wordt; de spons zit op het glas, dus vóór alles
+function drawFreshWaterFront(now){
+  const el=now-fresh.t0,wipeMs=SPONGE_LANES*SPONGE_LANE_MS,endU=SPONGE_LANES;
+  if(el>=SPONGE_IN+wipeMs+SPONGE_OUT){fresh=null;spongeFoam.length=0;return}
+  let x,y,vx=1,wiping=false,maskAlpha=1,scrub=0;
+  if(el<SPONGE_IN){
+    const [sx,sy]=spongePathAt(0);const p=easeOut3(el/SPONGE_IN);
+    x=-170+(sx+170)*p;y=sy-60*(1-p);
+  }else if(el<SPONGE_IN+wipeMs){
+    const u=(el-SPONGE_IN)/SPONGE_LANE_MS;
+    [x,y]=spongePathAt(u);
+    // Poetsrondjes bovenop de slinger
+    const th=u*Math.PI*2*4.5;scrub=th;
+    x+=Math.cos(th)*26;y+=Math.sin(th)*20;
+    vx=Math.sin(Math.PI*u)*(Math.floor(u)%2?-1:1)||1;
+    wiping=true;
+  }else{
+    const [ex,ey]=spongePathAt(endU);const p=easeInOut2((el-SPONGE_IN-wipeMs)/SPONGE_OUT);
+    const off=ex<W/2?-190:W+190;
+    x=ex+(off-ex)*p;y=ey+40*Math.sin(p*Math.PI);
+    maskAlpha=1-p; // restjes groen vervagen terwijl de spons wegzwaait
+  }
+  if(wiping){
+    // Stempel ook tussen de vorige en huidige plek, zodat een snelle beweging geen gaten laat
+    const lx=fresh.lastX===null?x:fresh.lastX,ly=fresh.lastY===null?y:fresh.lastY;
+    const n=Math.max(1,Math.ceil(Math.hypot(x-lx,y-ly)/25));
+    for(let i=1;i<=n;i++)stampSponge(lx+(x-lx)*i/n,ly+(y-ly)*i/n);
+    fresh.lastX=x;fresh.lastY=y;
+    if(Math.random()<0.9*frameScale)spongeFoam.push({x:x+rand(-75,75),y:y+rand(-55,55),r:rand(3,10),born:now});
+    if(Math.random()<0.3*frameScale)makeFishBubble(x+rand(-60,60),y+rand(-40,40));
+  }
+  if(fresh.mask&&maskAlpha>0){ctx.globalAlpha=maskAlpha;ctx.drawImage(fresh.mask,0,0);ctx.globalAlpha=1}
+  // Schuimbelletjes die de spons achterlaat
+  ctx.save();ctx.strokeStyle='rgba(255,255,255,0.7)';ctx.lineWidth=1.2;
+  for(let i=spongeFoam.length-1;i>=0;i--){
+    const f=spongeFoam[i];const q=(now-f.born)/1600;
+    if(q>=1){spongeFoam.splice(i,1);continue}
+    ctx.globalAlpha=1-q;ctx.fillStyle='rgba(255,255,255,0.35)';
+    ctx.beginPath();ctx.arc(f.x,f.y-q*6,f.r*(1+q*0.3),0,Math.PI*2);ctx.fill();ctx.stroke();
+  }
+  ctx.restore();
+  drawSponge(x,y,vx,scrub);
+}
+const SPONGE_HOLES=[[-45,5,7,5],[-15,22,5,4],[20,0,8,6],[48,20,5,4],[-50,30,4,3],[5,35,6,4],[35,-2,4,3],[-25,-2,4,3]];
+function drawSponge(x,y,vx,scrub){
+  const w=150,h=96,r=22;
+  // Helt een beetje over in de richting waarin hij beweegt en wiebelt mee met het poetsen
+  ctx.save();ctx.translate(x,y);ctx.rotate(clamp(vx,-1,1)*0.14+Math.sin(scrub)*0.06);
+  const sq=1-Math.abs(Math.sin(scrub))*0.05;ctx.scale(1/sq,sq);
+  ctx.fillStyle='rgba(0,0,0,0.18)';roundRect(-w/2+5,-h/2+7,w,h,r);ctx.fill();
+  roundRect(-w/2,-h/2,w,h,r);ctx.fillStyle='#ffd84d';ctx.fill();
+  ctx.save();ctx.clip();
+  ctx.fillStyle='#3fae5a';ctx.fillRect(-w/2,-h/2,w,22);
+  ctx.fillStyle='#2f8f47';ctx.fillRect(-w/2,-h/2+19,w,3);
+  ctx.fillStyle='#ecbf35';
+  for(const [hx,hy,hr,hr2] of SPONGE_HOLES){ctx.beginPath();ctx.ellipse(hx,hy,hr,hr2,0,0,Math.PI*2);ctx.fill()}
+  ctx.fillStyle='rgba(255,255,255,0.25)';ctx.fillRect(-w/2+8,-h/2+26,w-16,5);
+  ctx.restore();
+  roundRect(-w/2,-h/2,w,h,r);ctx.strokeStyle='#d9a92a';ctx.lineWidth=3;ctx.stroke();
+  ctx.restore();
+}
+
+// --- Tikken op het glas: twee tikjes met kringetjes en "tik!", de vissen schieten er vandaan ---
+const glassTaps=[];let tapPoint=null;
+function startGlassTap(){
+  const now=Date.now();
+  const x=rand(W*0.2,W*0.8),y=rand(H*0.25,H*0.7);
+  tapPoint={x,y,at:now};
+  glassTaps.push({x,y,t0:now,dx:0,dy:0},{x:x+rand(18,30),y:y-rand(10,20),t0:now+220,dx:34,dy:-26});
+}
+function drawGlassTaps(now){
+  for(let i=glassTaps.length-1;i>=0;i--){
+    const tp=glassTaps[i];const age=now-tp.t0;
+    if(age<0)continue;
+    if(age>900){glassTaps.splice(i,1);continue}
+    ctx.save();
+    // Kringetje op het glas
+    const q=Math.min(1,age/500);
+    if(q<1){
+      ctx.globalAlpha=0.8*(1-q);ctx.strokeStyle='#ffffff';ctx.lineWidth=3;
+      ctx.beginPath();ctx.ellipse(tp.x,tp.y,10+q*60,8+q*45,0,0,Math.PI*2);ctx.stroke();
+      // Streepjes als in een stripboek
+      const b=Math.min(1,age/250);
+      if(b<1){
+        ctx.globalAlpha=1-b;ctx.lineWidth=3;ctx.lineCap='round';ctx.beginPath();
+        for(let k=0;k<6;k++){const a=k/6*Math.PI*2+0.3,r0=14+b*18,r1=r0+10;ctx.moveTo(tp.x+Math.cos(a)*r0,tp.y+Math.sin(a)*r0);ctx.lineTo(tp.x+Math.cos(a)*r1,tp.y+Math.sin(a)*r1)}
+        ctx.stroke();
+      }
+    }
+    // "tik!" dat even opveert en wegzweeft
+    const tq=age/900;const pop=1+0.45*Math.sin(Math.min(1,age/180)*Math.PI);
+    ctx.globalAlpha=tq<0.6?1:1-(tq-0.6)/0.4;
+    ctx.translate(tp.x+tp.dx+40,tp.y+tp.dy-30-tq*18);ctx.rotate(tp.dx?0.15:-0.12);ctx.scale(pop,pop);
+    ctx.font='800 26px system-ui,Segoe UI,Roboto,Arial';ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.lineJoin='round';ctx.lineWidth=5;ctx.strokeStyle='rgba(20,50,70,0.8)';ctx.strokeText('tik!',0,0);
+    ctx.fillStyle='#fff6c8';ctx.fillText('tik!',0,0);
+    ctx.restore();
+  }
+}
+
+// --- Nieuwe vis: komt in een plastic zakje, dobbert even en zwemt er dan uit ---
+const BAG_IN=900,BAG_WAIT=1700,BAG_OPEN=550,BAG_OUT=900;
+const fishBags=[];
+function startFishBag(f){
+  const now=Date.now();
+  const s=fishSize(f,now);
+  const bag={f,t0:now,x:rand(W*0.2,W*0.8),r:Math.max(58,s*2.3),released:false,phase:rand(0,Math.PI*2)};
+  fishBags.push(bag);
+  f.inBag=bag;f.hideLabel=true;
+}
+function bagPose(bag,now){
+  const el=now-bag.t0,restY=bag.r*1.35+30;
+  let y=restY,ang=Math.sin(now*0.0022+bag.phase)*0.08,open=0;
+  if(el<BAG_IN){const p=easeOut3(el/BAG_IN);y=-bag.r*2.5+(restY+bag.r*2.5)*p;ang+=(1-p)*0.3}
+  else if(el<BAG_IN+BAG_WAIT){y+=Math.sin(now*0.003+bag.phase)*4}
+  else if(el<BAG_IN+BAG_WAIT+BAG_OPEN){const p=easeInOut2((el-BAG_IN-BAG_WAIT)/BAG_OPEN);open=p;ang+=p*0.5}
+  else{const p=easeInOut2(Math.min(1,(el-BAG_IN-BAG_WAIT-BAG_OPEN)/BAG_OUT));open=1;ang+=0.5;y=restY+(-bag.r*3-restY)*p}
+  return {y,ang,open,el};
+}
+// De vis zit in het zakje; drawFish tekent hem en het zakje komt er daarna overheen
+function updateBagFish(f,now){
+  const bag=f.inBag;const {y,open,el}=bagPose(bag,now);
+  if(open>0.35&&!bag.released){
+    // Het zakje gaat open: de vis zwemt eruit, schuin naar beneden de kom in
+    bag.released=true;f.inBag=null;f.hideLabel=false;
+    f.vx=(bag.x<W/2?1:-1)*rand(1.2,2);f.vy=rand(1.5,2.2);f.behaviorState='normal';f.behaviorTimer=0;
+    for(let i=0;i<6;i++)makeFishBubble(f.x,f.y);
+    return;
+  }
+  const t=now*0.004+bag.phase;
+  f.x=bag.x+Math.sin(t)*bag.r*0.3;f.y=y+bag.r*0.3+Math.sin(t*1.7)*3;
+  f.vx=Math.cos(t)>=0?1:-1;f.vy=Math.sin(t*1.7)*0.2;
+  if(el<BAG_IN)f.vy=0;
+}
+function drawFishBags(now){
+  for(let i=fishBags.length-1;i>=0;i--){
+    const bag=fishBags[i];const {y,ang,open,el}=bagPose(bag,now);
+    if(el>=BAG_IN+BAG_WAIT+BAG_OPEN+BAG_OUT){if(bag.f.inBag===bag){bag.f.inBag=null;bag.f.hideLabel=false}fishBags.splice(i,1);continue}
+    drawBag(bag.x,y,bag.r,ang,open,now,bag.phase);
+  }
+}
+function drawBag(x,y,r,ang,open,now,phase){
+  // Hangt aan een touwtje van boven de kom, zodat het niet zomaar midden in het water zweeft
+  const neckY=-r*1.35,neckW=r*0.18;
+  const kx=x+Math.sin(ang)*(-neckY+10),ky=y-Math.cos(ang)*(-neckY+10);
+  ctx.save();ctx.strokeStyle='rgba(240,230,210,0.85)';ctx.lineWidth=2;
+  ctx.beginPath();ctx.moveTo(kx,ky);ctx.quadraticCurveTo(kx+(x-kx)*0.2+6,ky/2,x+(kx-x)*0.1,-20);ctx.stroke();ctx.restore();
+  ctx.save();ctx.translate(x,y);ctx.rotate(ang);
+  // Zakje: ronde bodem die naar een gedraaid nekje toeloopt
+  const shape=()=>{ctx.beginPath();ctx.moveTo(-neckW,neckY);
+    ctx.bezierCurveTo(-neckW,neckY+r*0.5,-r*1.05,-r*0.2,-r,r*0.35);
+    ctx.bezierCurveTo(-r*0.95,r*1.05,r*0.95,r*1.05,r,r*0.35);
+    ctx.bezierCurveTo(r*1.05,-r*0.2,neckW,neckY+r*0.5,neckW,neckY);ctx.closePath()};
+  // Water in het zakje, met een wiebelend waterlijntje
+  const wl=-r*0.2+Math.sin(now*0.005+phase)*2;
+  ctx.save();shape();ctx.clip();
+  ctx.fillStyle='rgba(150,215,245,0.22)';ctx.fillRect(-r*1.2,wl,r*2.4,r*1.6);
+  ctx.strokeStyle='rgba(235,250,255,0.7)';ctx.lineWidth=2;
+  ctx.beginPath();for(let k=-12;k<=12;k++){const px=k/12*r*1.1,py=wl+Math.sin(k*0.9+now*0.006)*1.5;k===-12?ctx.moveTo(px,py):ctx.lineTo(px,py)}ctx.stroke();
+  ctx.restore();
+  shape();ctx.fillStyle='rgba(230,245,255,0.12)';ctx.fill();
+  ctx.strokeStyle='rgba(240,250,255,0.75)';ctx.lineWidth=2.5;ctx.stroke();
+  // Glans
+  ctx.strokeStyle='rgba(255,255,255,0.55)';ctx.lineWidth=4;ctx.lineCap='round';
+  ctx.beginPath();ctx.arc(0,r*0.3,r*0.72,Math.PI*1.05,Math.PI*1.35);ctx.stroke();
+  // Knoopje met een elastiekje; gaat open en het elastiekje schiet weg
+  if(open<0.3){
+    ctx.fillStyle='rgba(240,250,255,0.85)';
+    ctx.beginPath();ctx.ellipse(-neckW*1.4,neckY-6,neckW*1.3,6,-0.5,0,Math.PI*2);ctx.ellipse(neckW*1.4,neckY-6,neckW*1.3,6,0.5,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#ff6b9d';ctx.fillRect(-neckW-2,neckY-2,neckW*2+4,5);
+  }else{
+    const p=(open-0.3)/0.7;
+    ctx.globalAlpha=1-p;ctx.strokeStyle='#ff6b9d';ctx.lineWidth=3;
+    ctx.beginPath();ctx.ellipse(neckW*3+p*60,neckY-10-p*50,6,4,p*6,0,Math.PI*2);ctx.stroke();ctx.globalAlpha=1;
+    // Open nekje
+    ctx.strokeStyle='rgba(240,250,255,0.75)';ctx.lineWidth=2.5;
+    ctx.beginPath();ctx.moveTo(-neckW,neckY);ctx.lineTo(-neckW*2.2,neckY-12);ctx.moveTo(neckW,neckY);ctx.lineTo(neckW*2.2,neckY-12);ctx.stroke();
+  }
+  ctx.restore();
+}
+
+
+// --- Verwarming: alleen een kort effect als hij aan of uit gaat, geen vast voorwerp in beeld ---
+// Aan: een warme gloed stijgt van de bodem op met kringeltjes. Uit: een koele waas zakt van
+// boven met fonkeltjes. Een thermometertje wipt er even bij en het kwik gaat omhoog of omlaag.
+const HEAT_FX_MS=3600;
+let lastHeatingOn=null;let heatFx=null;
+function drawHeatFx(now){
+  if(lastHeatingOn===null||!gameLoopStarted){lastHeatingOn=heatingOn;return}
+  if(heatingOn!==lastHeatingOn){
+    lastHeatingOn=heatingOn;
+    heatFx={t0:now,warm:heatingOn,bits:Array.from({length:16},()=>({x:rand(20,W-20),d:rand(0,900),sp:rand(0.8,1.2),ph:rand(0,6)}))};
+  }
+  if(!heatFx)return;
+  const el=now-heatFx.t0;
+  if(el>=HEAT_FX_MS){heatFx=null;return}
+  const q=el/HEAT_FX_MS,env=Math.sin(Math.min(1,q*1.15)*Math.PI);
+  const warm=heatFx.warm;
+  ctx.save();
+  // Gloed die opstijgt (warm) of neerdaalt (koel)
+  const front=warm?H*(1-easeOut3(q)*1.1):H*easeOut3(q)*1.1;
+  const g=warm?ctx.createLinearGradient(0,H,0,front-H*0.3):ctx.createLinearGradient(0,0,0,front+H*0.3);
+  const col=warm?'255,150,60':'150,205,255';
+  const peak=warm?0.2:0.3;g.addColorStop(0,`rgba(${col},${peak*env})`);g.addColorStop(0.7,`rgba(${col},${peak*0.4*env})`);g.addColorStop(1,`rgba(${col},0)`);
+  ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+  // Kringeltjes omhoog of fonkeltjes omlaag
+  ctx.lineCap='round';
+  for(const b of heatFx.bits){
+    const t=(el-b.d)/2400;if(t<0||t>1)continue;
+    const a=Math.sin(t*Math.PI)*0.7;
+    if(warm){
+      const by=H-40-t*H*0.55*b.sp;
+      ctx.strokeStyle=`rgba(255,200,140,${a})`;ctx.lineWidth=2.5;ctx.beginPath();
+      for(let k=0;k<=8;k++){const px=b.x+Math.sin(k*0.9+t*8+b.ph)*5,py=by-k*3;k?ctx.lineTo(px,py):ctx.moveTo(px,py)}
+      ctx.stroke();
+    }else{
+      const by=30+t*H*0.5*b.sp,bx=b.x+Math.sin(t*5+b.ph)*12,r=6+2.5*Math.sin(t*9+b.ph);
+      ctx.fillStyle=`rgba(235,248,255,${a})`;ctx.beginPath();
+      ctx.moveTo(bx,by-r);ctx.quadraticCurveTo(bx,by,bx+r,by);ctx.quadraticCurveTo(bx,by,bx,by+r);ctx.quadraticCurveTo(bx,by,bx-r,by);ctx.quadraticCurveTo(bx,by,bx,by-r);ctx.fill();
+    }
+  }
+  drawThermoBadge(el,warm);
+  ctx.restore();
+}
+function drawThermoBadge(el,warm){
+  // Wipt erin, kwik beweegt, wipt weer weg
+  const inP=Math.min(1,el/350),outP=Math.max(0,(el-HEAT_FX_MS+400)/400);
+  const sc=(inP<1?easeOut3(inP)*(1+0.25*Math.sin(inP*Math.PI)):1)*(1-outP);
+  if(sc<=0.01)return;
+  const lvl0=warm?0.25:0.8,lvl1=warm?0.8:0.25,lv=lvl0+(lvl1-lvl0)*easeInOut2(clamp01((el-300)/1500));
+  const cx=70,cy=110,hgt=110,tw=16,bulb=15;
+  ctx.save();ctx.translate(cx,cy);ctx.scale(sc,sc);ctx.rotate(Math.sin(el*0.006)*0.06);
+  ctx.fillStyle='rgba(255,255,255,0.9)';roundRect(-30,-hgt/2-18,60,hgt+54,30);ctx.fill();
+  const mc=warm?'#ff5a3c':'#3c9dff';
+  ctx.fillStyle='#e3edf3';roundRect(-tw/2,-hgt/2,tw,hgt,tw/2);ctx.fill();
+  ctx.beginPath();ctx.arc(0,hgt/2+8,bulb,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle=mc;
+  const top=hgt/2-(hgt-8)*lv;roundRect(-tw/2+4,top,tw-8,hgt/2-top+6,(tw-8)/2);ctx.fill();
+  ctx.beginPath();ctx.arc(0,hgt/2+8,bulb-4,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='rgba(255,255,255,0.6)';ctx.beginPath();ctx.arc(-4,hgt/2+4,3.5,0,Math.PI*2);ctx.fill();
+  // Pijltje omhoog of omlaag
+  ctx.fillStyle=mc;ctx.beginPath();
+  if(warm){ctx.moveTo(18,-hgt/2+6);ctx.lineTo(25,-hgt/2+18);ctx.lineTo(11,-hgt/2+18)}
+  else{ctx.moveTo(18,-hgt/2+18);ctx.lineTo(25,-hgt/2+6);ctx.lineTo(11,-hgt/2+6)}
+  ctx.fill();
+  ctx.restore();
+}
+
+// --- Dode vissen drijven een paar dagen buik-boven aan het oppervlak ---
+// Ze komen uit deadLog (dat de server bewaart), dus ze blijven na een herlaad gewoon liggen.
+// Poep opruimen schept ze met het net mee; de server onthoudt dat in deadFishClearedAt.
+const FLOAT_MS=2*24*60*60*1000,FLOAT_FADE_MS=6*60*60*1000,FLOAT_MAX=5,FLOAT_RISE=6000;
+const floaters=[];let deadFishClearedAt=0;
+function syncFloaters(now){
+  const want=deadLog.filter(d=>d.diedAt&&now-d.diedAt<FLOAT_MS&&d.diedAt>deadFishClearedAt)
+    .sort((a,b)=>b.diedAt-a.diedAt).slice(0,FLOAT_MAX);
+  for(let i=floaters.length-1;i>=0;i--)if(!want.some(d=>d.name===floaters[i].name))floaters.splice(i,1);
+  for(const d of want)if(!floaters.some(fl=>fl.name===d.name))floaters.push(makeFloater(d,null,now));
+}
+function makeFloater(d,from,now){
+  const fl={name:d.name,hue:isNaN(d.hue)?0:d.hue,baseSize:d.baseSize||22,eats:d.eats||0,bornAt:d.bornAt||now,diedAt:d.diedAt||now,
+    x:from?from.x:rand(80,W-80),y:from?from.y:WATER_SURFACE_Y,phase:rand(0,Math.PI*2),vx:rand(-0.08,0.08),flip:Math.random()<0.5?-1:1};
+  // Net overleden: draait langzaam om en stijgt vanaf de plek waar hij zwom
+  if(from){fl.riseStart=now;fl.fromY=from.y;fl.fromA=Math.atan2(from.vy||0,from.vx||1);fl.flip=Math.abs(fl.fromA)>Math.PI/2?-1:1}
+  return fl;
+}
+function floaterSize(fl){return fishSize(fl,fl.diedAt)}
+function floaterRestY(fl){return WATER_SURFACE_Y+floaterSize(fl)*0.3}
+function drawFloaters(now){
+  for(let i=floaters.length-1;i>=0;i--){
+    const fl=floaters[i];
+    const left=FLOAT_MS-(now-fl.diedAt);
+    if(left<=0){floaters.splice(i,1);continue}
+    let y,roll=1,ang=Math.sin(now*0.0011+fl.phase)*0.08;
+    const bob=Math.sin(now*0.0016+fl.phase)*2;
+    if(fl.riseStart&&now-fl.riseStart<FLOAT_RISE){
+      const q=(now-fl.riseStart)/FLOAT_RISE;
+      y=fl.fromY+(floaterRestY(fl)+bob-fl.fromY)*easeInOut2(q);
+      roll=Math.cos(Math.min(1,q*3)*Math.PI); // van 1 (rechtop) naar -1 (buik boven)
+      const a0=fl.flip<0?fl.fromA-Math.PI:fl.fromA;
+      ang=a0*(1-Math.min(1,q*2))+ang*Math.min(1,q*2);
+    }else{
+      fl.riseStart=0;roll=-1;y=floaterRestY(fl)+bob;
+      waterCurrentAt(fl.x,y);fl.x+=(fl.vx+curU*0.4)*frameScale;
+      if(fl.x<40||fl.x>W-40){fl.vx=-fl.vx;fl.x=clamp(fl.x,40,W-40)}
+    }
+    fl.y=y;
+    drawFloater(fl,fl.x,y,ang,roll,Math.min(1,left/FLOAT_FADE_MS),1,now);
+  }
+}
+function drawFloater(fl,x,y,ang,roll,alpha,scale,now){
+  const s=floaterSize(fl)*scale;
+  ctx.save();ctx.globalAlpha=alpha*0.9;
+  ctx.translate(x,y);ctx.rotate(ang);ctx.scale(fl.flip,roll);
+  // Flets en grijzig: de gewone sprite met een grijze waas eroverheen
+  const sprite=getFishSprite(fl,s,fl.hue,0.7*lit(1,0.7));
+  if(fl._grey?.src!==sprite.cv||fl._grey.d!==sprite.d||fl._grey.s!==sprite.s){
+    const gc=fl._grey?.cv||document.createElement('canvas');gc.width=sprite.cv.width;gc.height=sprite.cv.height;
+    const g=gc.getContext('2d');g.drawImage(sprite.cv,0,0);
+    g.globalCompositeOperation='source-atop';g.fillStyle='rgba(150,162,160,0.62)';g.fillRect(0,0,gc.width,gc.height);
+    fl._grey={cv:gc,src:sprite.cv,d:sprite.d,s:sprite.s};
+  }
+  ctx.drawImage(fl._grey.cv,-sprite.cx,-sprite.cy);
+  // Kruisje als oog
+  const meta=fishSpeciesEnabled?fishSpecies(fl):null;const E=meta?meta.species.eye:{x:0.35,y:-0.08,r:0.11};
+  const ex=s*E.x,ey=s*E.y,er=Math.max(2.5,s*E.r*0.9);
+  ctx.fillStyle='#e8eef2';ctx.beginPath();ctx.arc(ex,ey,er*1.1,0,Math.PI*2);ctx.fill();
+  ctx.strokeStyle='#26323a';ctx.lineWidth=Math.max(1.3,s*0.05);ctx.lineCap='round';
+  ctx.beginPath();ctx.moveTo(ex-er*0.7,ey-er*0.7);ctx.lineTo(ex+er*0.7,ey+er*0.7);ctx.moveTo(ex+er*0.7,ey-er*0.7);ctx.lineTo(ex-er*0.7,ey+er*0.7);ctx.stroke();
+  ctx.restore();
+  if(scale<1)return;
+  // Naampje eronder, zodat je ziet wie het is
+  ctx.save();ctx.globalAlpha=alpha*0.75;ctx.fillStyle='#fff';ctx.textAlign='center';ctx.textBaseline='top';
+  ctx.font='600 12px system-ui,Segoe UI,Roboto,Arial';ctx.fillText('† '+fl.name,x,y+s*0.8+4);
+  ctx.restore();
 }
 
 // === RACE SYSTEM ===
@@ -8454,6 +9053,7 @@ const dt=Math.min(0.05,(now-lastT)/1000);lastT=now;
 // Framerate-independent movement: scale per-frame motion to a 60fps baseline.
 // dt is clamped above, so frameScale caps at 3 (prevents teleporting on very low FPS).
 frameScale=dt*60;
+updateLightLevel(dt);
 
 // Smooth interpolation for waterGreenness (fade effect)
 const lerpSpeed=0.02; // Lower = slower fade, smoother transition
@@ -8506,6 +9106,12 @@ for(let i=0;i<fishes.length;i++){
     drawFish(f,t,now);
     continue;
   }
+  // Nieuwe vis zit nog in zijn zakje
+  if(f.inBag){
+    updateBagFish(f,now);
+    drawFish(f,t,now);
+    continue;
+  }
   // Tijdens een dansfeest volgt de vis zijn plek in de formatie of de polonaise
   if(party&&f._partyIndex!==undefined){
     updatePartyFish(f,now);
@@ -8522,11 +9128,18 @@ for(let i=0;i<fishes.length;i++){
   }
   // De stroming duwt vissen een klein beetje mee
   if(currentStrength>0.005){waterCurrentAt(f.x,f.y);f.x+=curU*0.3*frameScale;f.y+=curV*0.3*frameScale}
+  if(net)netRepel(f,now);
   drawFish(f,t,now);
 }
 
+// Dode vissen aan het oppervlak
+drawFloaters(now);
+
 // Play balls - update and draw (above fish, below front plants)
 updatePlayBalls();drawPlayBalls();
+
+// Klusjes: schepnet, medicijn, vers water
+drawChores(now);
 
 // Fishing rod - update state machine
 updateFishingRod(t);
@@ -8561,9 +9174,9 @@ drawRaceWinnerPopup(t);
 // Draw error popup overlay (disconnected of already active)
 drawErrorPopup();
 
-for(let i=fishes.length-1;i>=0;i--){if(fishes[i].dead){const deadFish={...fishes[i],diedAt:Date.now(),health:0};deadLog.push(deadFish);fishes.splice(i,1);sendToServer({command:'fishDied',fish:deadFish})}}
+for(let i=fishes.length-1;i>=0;i--){if(fishes[i].dead){const deadFish={...fishes[i],diedAt:Date.now(),health:0};deadLog.push(deadFish);if(!floaters.some(fl=>fl.name===deadFish.name)){floaters.push(makeFloater(deadFish,fishes[i],now));if(floaters.length>FLOAT_MAX)floaters.shift()}fishes.splice(i,1);sendToServer({command:'fishDied',fish:deadFish})}}
 
-if(now-lastListUpdate>LIST_UPDATE_INTERVAL){drawLists();drawActivityList();lastListUpdate=now}
+if(now-lastListUpdate>LIST_UPDATE_INTERVAL){drawLists();drawActivityList();syncFloaters(now);lastListUpdate=now}
 if(now-lastCooldownUpdate>COOLDOWN_UPDATE_INTERVAL){updateCooldown();updateStatusBar();lastCooldownUpdate=now}
 
 // Periodieke ball state sync met server (elke 10 seconden)

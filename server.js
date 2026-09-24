@@ -219,6 +219,7 @@ let appState = {
     feedCooldown: 60 * 60 * 1000, // 1 hour in milliseconds
     fishes: [],
     deadLog: [],
+    deadFishClearedAt: 0, // Dode vissen van voor dit moment drijven niet meer (weggeschept met het net)
     fishCounter: 1,
     currentAccessCode: '',
     accessCodeExpiry: 0,
@@ -1221,8 +1222,9 @@ function handleCycleTheme() {
 function handleCleanTank() {
     console.log('Tank wordt opgeruimd - alle poep weggehaald');
 
-    // Reset poop count
+    // Reset poop count; het net schept ook de dode vissen van het oppervlak mee
     appState.poopCount = 0;
+    appState.deadFishClearedAt = Date.now();
 
     // Log event
     logEvent('tank_cleaned', {
@@ -1766,6 +1768,7 @@ function sendGameState(client) {
         data: {
             fishes: appState.fishes,
             deadLog: appState.deadLog,
+            deadFishClearedAt: appState.deadFishClearedAt,
             fishCounter: appState.fishCounter,
             lastFed: appState.lastFed,
             lastMedicine: appState.lastMedicine,
