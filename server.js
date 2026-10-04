@@ -120,26 +120,31 @@ function getCurrentTheme() {
         return 'newyear';
     }
 
-    // Automatic seasonal themes disabled - only normal, halloween, christmas, and newyear
-    // // Spring: March 21 - June 20
-    // if ((month === 2 && day >= 21) || (month > 2 && month < 5) || (month === 5 && day <= 20)) {
-    //     return 'spring';
-    // }
+    // Seasons: each season only gets its core months, with a month of 'normal' in between
+    // (March, June, September and December 1-18) so the themes stay special.
+    // Spring and winter are skipped for now because they barely differ from 'normal';
+    // re-enable them here once they look good enough.
+    const ENABLED_SEASONS = ['summer', 'autumn'];
 
-    // // Summer: June 21 - September 20
-    // if ((month === 5 && day >= 21) || (month > 5 && month < 8) || (month === 8 && day <= 20)) {
-    //     return 'summer';
-    // }
+    // Winter: January 7 - end of February (January 1-6 is New Year)
+    if ((month === 0 || month === 1) && ENABLED_SEASONS.includes('winter')) {
+        return 'winter';
+    }
 
-    // // Autumn: September 21 - December 20
-    // if ((month === 8 && day >= 21) || (month > 8 && month < 11) || (month === 11 && day <= 20)) {
-    //     return 'autumn';
-    // }
+    // Spring: April - May
+    if ((month === 3 || month === 4) && ENABLED_SEASONS.includes('spring')) {
+        return 'spring';
+    }
 
-    // // Winter: December 21 - March 20
-    // if ((month === 11 && day >= 21) || month === 0 || month === 1 || (month === 2 && day <= 20)) {
-    //     return 'winter';
-    // }
+    // Summer: July - August
+    if ((month === 6 || month === 7) && ENABLED_SEASONS.includes('summer')) {
+        return 'summer';
+    }
+
+    // Autumn: October - November (Halloween takes precedence above)
+    if ((month === 9 || month === 10) && ENABLED_SEASONS.includes('autumn')) {
+        return 'autumn';
+    }
 
     // Default: normal theme
     return 'normal';
@@ -1180,7 +1185,8 @@ function handleToggleHeating() {
 
 function handleCycleTheme() {
     // Theme cycle order
-    const themes = ['normal', 'spring', 'summer', 'autumn', 'winter', 'tropical', 'arctic', 'halloween', 'christmas', 'newyear'];
+    // Spring, winter, tropical and arctic are skipped for now (too close to 'normal'); still selectable via config
+    const themes = ['normal', 'summer', 'autumn', 'halloween', 'christmas', 'newyear'];
 
     // Get current theme (from config or auto)
     const oldTheme = getCurrentTheme();

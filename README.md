@@ -108,7 +108,7 @@ Beschikbare opties:
 
 | Optie | Beschrijving                                                                                                                                                                                                                                      | Standaard |
 |-------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------|
-| `theme` | Thema van de vissenkom. Opties: `null` (automatisch op basis van seizoen), `normal`, `spring`, `summer`, `autumn`, `winter`, `tropical`, `arctic`, `halloween`, `christmas`, `newyear` | `null` |
+| `theme` | Thema van de vissenkom. Opties: `null` (automatisch: `summer` in juli en augustus, `autumn` in oktober en november, `halloween` van 25 okt t/m 1 nov, `christmas` van 19 t/m 26 dec, `newyear` van 27 dec t/m 6 jan, de rest van het jaar `normal`), `normal`, `spring`, `summer`, `autumn`, `winter`, `tropical`, `arctic`, `halloween`, `christmas`, `newyear` | `null` |
 | `showFooter` | Toon de footer in de controller | `true` |
 | `footerLink` | URL waar de footer naartoe linkt | `https://github.com/rickvanderwolk/vissenkom` |
 | `footerLinkText` | Tekst van de link in de footer | `View on GitHub` |
