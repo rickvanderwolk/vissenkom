@@ -1,6 +1,6 @@
 # Vissenkom
 
-<img src="assets/preview2-optimized.png" width="49%" /> <img src="assets/preview3-optimized.png" width="49%" />
+<img src="assets/preview4-optimized.png" width="77%" alt="De vissenkom" /> <img src="assets/preview5-optimized.png" width="20%" alt="De controller op een telefoon" />
 
 Een virtuele vissenkom die je fysieke aanwezigheid vereist.
 
