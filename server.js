@@ -105,13 +105,13 @@ function getCurrentTheme() {
     const month = now.getMonth(); // 0-11 (0=January, 9=October)
     const day = now.getDate(); // 1-31
 
-    // Halloween: October 25 - November 1 (inclusive)
-    if ((month === 9 && day >= 25) || (month === 10 && day <= 1)) {
+    // Halloween: October 19 - November 1 (inclusive, two weeks)
+    if ((month === 9 && day >= 19) || (month === 10 && day <= 1)) {
         return 'halloween';
     }
 
-    // Christmas: December 19 - December 26 (inclusive)
-    if (month === 11 && day >= 19 && day <= 26) {
+    // Christmas: December 13 - December 26 (inclusive, two weeks)
+    if (month === 11 && day >= 13 && day <= 26) {
         return 'christmas';
     }
 
@@ -121,7 +121,7 @@ function getCurrentTheme() {
     }
 
     // Seasons: each season only gets its core months, with a month of 'normal' in between
-    // (March, June, September and December 1-18) so the themes stay special.
+    // (March, June, September and December 1-12) so the themes stay special.
     // Spring and winter are skipped for now because they barely differ from 'normal';
     // re-enable them here once they look good enough.
     const ENABLED_SEASONS = ['summer', 'autumn'];
