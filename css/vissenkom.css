@@ -41,6 +41,12 @@ body.ui-minimal #water:not(.status-warn):not(.status-danger){display:none}
 /* Blokken die uit staan door uiStyle of config.showPanels (wint van de display die de lijst-code zet) */
 .panel.panel-off{display:none!important}
 .top-banner.banner-off{display:none}
+/* Meldingen rechtsboven in de kom (zie showActivityToasts). Geen backdrop-filter: dat kost op
+   een zwakke GPU elke frame een blur van de bewegende kom eronder */
+#toasts{position:absolute;top:12px;right:12px;display:flex;flex-direction:column;align-items:flex-end;gap:6px;z-index:5;pointer-events:none}
+.toast{background:rgba(0,0,0,.5);color:#e9f1f7;padding:6px 12px;border-radius:999px;font-size:14px;font-weight:600;white-space:nowrap;border:1px solid rgba(255,255,255,.15);animation:toast-in .35s ease-out;transition:opacity .4s,transform .4s}
+.toast.toast-out{opacity:0;transform:translateY(-6px)}
+@keyframes toast-in{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
 /* Met het QR-bordje aan staat de voerstatus op het bordje, dan is de voer-pil overbodig */
 body.qr-sign-on #cooldown{display:none}
 .qrbox #qrLink{display:block;text-decoration:none;cursor:pointer}

@@ -43,7 +43,7 @@ Vissen vertonen uiteenlopend gedrag:
 
 ### Interactie
 
-Via de controller kan je o.a.:
+Bovenaan de controller staan vis toevoegen en de verzorging; spelen en de instellingen van de kom staan ingeklapt onder "Meer". Onderaan Meer staat "Over de kom": hoe het nu met de kom gaat, de laatste activiteiten, de sterren en alle overleden vissen, en dat werkt zich vanzelf bij. Via de controller kan je o.a.:
 - **Vissen toevoegen**: voeg nieuwe vissen toe aan de kom
 - **Voer geven**: houd je vissen in leven
 - **Medicijnen toedienen**: genees zieke vissen
@@ -112,12 +112,10 @@ Beschikbare opties:
 | `showFooter` | Toon de footer in de controller | `true` |
 | `footerLink` | URL waar de footer naartoe linkt | `https://github.com/rickvanderwolk/vissenkom` |
 | `footerLinkText` | Tekst van de link in de footer | `View on GitHub` |
-| `showBehaviorEmoji` | Toon emoji's bij vissen die hun huidige gedrag weergeven (bijv. dansen, rusten, schooling) | `true` |
-| `showControllerStatusBlocks` | Toon statusblokken in de controller (temperatuur, pomp, etc.) | `false` |
-| `showAddFishTip` | Toon de tip-badge bovenin de controller die naar de "Vis toevoegen"-sectie linkt | `true` |
+| `showBehaviorEmoji` | Toon emoji's bij vissen die hun huidige gedrag weergeven (bijv. dansen, rusten, schooling). Laat je hem weg, dan volgt hij `uiStyle`: aan in `classic`, uit in `minimal` | volgt `uiStyle` |
 | `fishSpecies` | Geef elke vis een eigen soort (vorm, staart, vinnen en patroon), afgeleid uit naam en kleur. Uit = alle vissen hebben het klassieke uiterlijk | `false` |
-| `uiStyle` | Uiterlijk van de kom als geheel. `classic`: kaartjes met naam, gezondheidsbalk en leeftijd bij elke vis, de balk bovenaan, het QR-blok links en alle lijstjes. `minimal`: naam met drie gezondheidsstipjes en daaronder de leeftijd, als losse tekst vlak boven de vis (bij honger of ziekte kleurt de naam geel of rood); geen balk en geen lijstjes; de QR-code op een houten bordje in de kom met daarop ook of je kunt voeren; temperatuur en water alleen bij een probleem. Rustiger bij veel vissen | `classic` |
-| `showPanels` | Lijstjes links per stuk aan- of uitzetten, los van `uiStyle`: `newest` (nieuwste bewoners), `stars` (sterren van de kom), `legends` (legenden van de kom), `memorial` (in onze harten), `activity` (laatste activiteiten) en `version`. Wat je weglaat volgt de stijl: aan in `classic`, uit in `minimal`. Bijvoorbeeld `{ "activity": true }` om in `minimal` de activiteiten te tonen. "Legenden" verschijnt alleen als er een overleden vis bij de oudste drie hoort, "In onze harten" alleen als er een vis is overleden | volgt `uiStyle` |
+| `uiStyle` | Uiterlijk van de kom als geheel. `classic`: kaartjes met naam, gezondheidsbalk en leeftijd bij elke vis, de balk bovenaan, het QR-blok links en alle lijstjes. `minimal`: alleen wat je nodig hebt om mee te doen of een vis te herkennen staat er altijd; de rest verschijnt alleen als er iets is. Naam met drie gezondheidsstipjes en daaronder de leeftijd, als losse tekst vlak boven de vis (bij honger of ziekte kleurt de naam geel of rood); geen balk en geen lijstjes; de QR-code op een houten bordje in de kom met daarop ook of je kunt voeren; een ⭐ achter de naam van de drie oudste levende vissen; temperatuur en water alleen bij een probleem; nieuwe activiteiten verschijnen een paar seconden als melding rechtsboven in de kom. Rustiger bij veel vissen | `minimal` |
+| `showPanels` | Lijstjes links per stuk aan- of uitzetten, los van `uiStyle`: `newest` (nieuwste bewoners), `stars` (sterren van de kom), `legends` (legenden van de kom), `memorial` (in onze harten), `activity` (laatste activiteiten) en `version`. Wat je weglaat volgt de stijl: aan in `classic`, uit in `minimal`. Bijvoorbeeld `{ "activity": true }` om in `minimal` de activiteiten te tonen (dan als lijstje in plaats van als meldingen). "Legenden" verschijnt alleen als er een overleden vis bij de oudste drie hoort, "In onze harten" alleen als er een vis is overleden | volgt `uiStyle` |
 | `hungerRate` | Gezondheidsverlies per 10 minuten door honger | `0.167` (~4 dagen tot dood) |
 | `diseaseRate` | Extra gezondheidsverlies per 10 minuten bij ziekte zonder medicijnen | `0.083` |
 | `viewport` | Object met `offsetTop`, `offsetBottom`, `offsetLeft`, `offsetRight` om het zichtbare gebied aan te passen (handig voor schermen met randen) | `0` voor alle waarden |

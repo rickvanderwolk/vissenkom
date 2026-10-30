@@ -18,152 +18,7 @@
     <div class="controller-container">
         <h1>🐟 Vissenkom Controller</h1>
 
-        <!-- Tip: vis toevoegen -->
-        <div class="fish-hint-box" id="addFishTip">
-            <div class="fish-hint-icon">🐟</div>
-            <div class="fish-hint-text">
-                <strong>Tip:</strong> Voeg een vis toe via <span class="fish-hint-link" id="addFishHintLink">Vis toevoegen ↓</span>
-            </div>
-        </div>
-
-        <!-- Compact Status Dashboard -->
-        <div class="status-dashboard" style="display: none;">
-            <div class="status-item">
-                <div>Voer</div>
-                <div id="feedStatus">-</div>
-            </div>
-            <div class="status-item">
-                <div>Medicijn</div>
-                <div id="medicineStatus">-</div>
-            </div>
-            <div class="status-item">
-                <div>Poep</div>
-                <div id="poopStatus">-</div>
-            </div>
-            <div class="status-item">
-                <div>Water</div>
-                <div id="waterStatus">-</div>
-            </div>
-            <div class="status-item">
-                <div>Licht</div>
-                <div id="lightStatus">-</div>
-            </div>
-            <div class="status-item">
-                <div>Disco</div>
-                <div id="discoStatus">-</div>
-            </div>
-            <div class="status-item">
-                <div>Pomp</div>
-                <div id="pumpStatus">-</div>
-            </div>
-            <div class="status-item">
-                <div>Verwarming</div>
-                <div id="heatingStatus">-</div>
-            </div>
-            <div class="status-item">
-                <div>Temperatuur</div>
-                <div id="temperatureStatus">-</div>
-            </div>
-            <div class="status-item">
-                <div>Vissen</div>
-                <div id="fishCountStatus">-</div>
-            </div>
-            <div class="status-item">
-                <div>Ziek</div>
-                <div id="sickFishStatus">-</div>
-            </div>
-        </div>
-
-        <!-- Verzorging -->
-        <div class="category-section">
-            <h3 class="section-header section-header--care">❤️ Verzorging</h3>
-            <div class="controls-grid">
-                <button id="feedBtn" class="control-button care-button" disabled>
-                    🍤 Voeren
-                </button>
-                <button id="medicineBtn" class="control-button care-button" disabled>
-                    💊 Medicijn toedienen
-                </button>
-            </div>
-        </div>
-
-        <!-- Onderhoud -->
-        <div class="category-section">
-            <h3 class="section-header section-header--maintenance">✨ Onderhoud</h3>
-            <div class="controls-grid">
-                <button id="cleanBtn" class="control-button maintenance-button" disabled>
-                    💩 Poep opruimen
-                </button>
-                <button id="refreshWaterBtn" class="control-button maintenance-button" disabled>
-                    💧 Water verversen
-                </button>
-            </div>
-        </div>
-
-        <!-- Spel -->
-        <div class="category-section">
-            <h3 class="section-header section-header--play">🎮 Interactie</h3>
-            <div class="controls-grid">
-                <button id="tapGlassBtn" class="control-button play-button" disabled>
-                    👆 Op glas tikken
-                </button>
-                <button id="playBallBtn" class="control-button play-button" disabled>
-                    🎾 Speelbal gooien
-                </button>
-                <button id="fishingRodBtn" class="control-button play-button" disabled>
-                    🎣 Hengel uitgooien
-                </button>
-                <button id="raceBtn" class="control-button play-button" disabled>
-                    🏁 Race starten
-                </button>
-                <button id="partyBtn" class="control-button play-button" disabled>
-                    💃 Laten dansen
-                </button>
-            </div>
-
-            <!-- Race selectie -->
-            <div id="raceSelection" class="race-selection" style="display: none;">
-                <h3 class="section-header section-header--play">Kies twee vissen voor de race</h3>
-                <div class="race-dropdowns">
-                    <select id="raceFish1" class="race-select" disabled>
-                        <option value="">Kies vis 1...</option>
-                    </select>
-                    <span class="race-vs">VS</span>
-                    <select id="raceFish2" class="race-select" disabled>
-                        <option value="">Kies vis 2...</option>
-                    </select>
-                </div>
-                <div class="race-actions">
-                    <button id="startRaceBtn" class="control-button play-button" disabled>
-                        🏁 Start!
-                    </button>
-                    <button id="cancelRaceBtn" class="control-button cancel-button">
-                        ✕ Annuleren
-                    </button>
-                </div>
-            </div>
-        </div>
-
-        <!-- Kom instellingen -->
-        <div class="category-section">
-            <h3 class="section-header section-header--tank">🏠 Kom</h3>
-            <div class="controls-grid">
-                <button id="lightBtn" class="control-button tank-button" disabled>
-                    🌙 Licht uit
-                </button>
-                <button id="discoBtn" class="control-button tank-button" disabled>
-                    💡🎉 Disco aan
-                </button>
-                <button id="pumpBtn" class="control-button tank-button" disabled>
-                    💨 Pomp aan
-                </button>
-                <button id="heatingBtn" class="control-button tank-button" disabled>
-                    🔥 Verwarming uit
-                </button>
-            </div>
-        </div>
-
-        <!-- Vis toevoegen -->
+        <!-- Vis toevoegen: de reden om te scannen, dus bovenaan -->
         <div class="category-section" id="addFishSection">
             <h3 class="section-header section-header--fish">🐟 Vis toevoegen</h3>
             <div class="add-fish-container">
@@ -173,6 +28,115 @@
                 </button>
             </div>
         </div>
+
+        <!-- Verzorging: alles wat de vissen in leven houdt -->
+        <div class="category-section">
+            <h3 class="section-header section-header--care">❤️ Verzorging</h3>
+            <div class="controls-grid tile-grid">
+                <button id="feedBtn" class="control-button care-button" disabled>
+                    <span class="tile-emoji">🍤</span>Voeren<span class="btn-note" id="feedNote"></span>
+                </button>
+                <button id="medicineBtn" class="control-button care-button" disabled>
+                    <span class="tile-emoji">💊</span>Medicijn<span class="btn-note" id="medicineNote"></span>
+                </button>
+                <button id="cleanBtn" class="control-button care-button" disabled>
+                    <span class="tile-emoji">💩</span>Poep opruimen<span class="btn-note" id="cleanNote"></span>
+                </button>
+                <button id="refreshWaterBtn" class="control-button care-button" disabled>
+                    <span class="tile-emoji">💧</span>Water verversen<span class="btn-note" id="waterNote"></span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Spelen en de kom: ingeklapt, zodat je eerst alleen ziet wat ertoe doet -->
+        <details class="more-section" id="moreSection">
+            <summary class="more-summary"><span class="when-closed">Meer ▾</span><span class="when-open">Minder ▴</span></summary>
+
+            <div class="category-section">
+                <h3 class="section-header section-header--play">🎮 Spelen</h3>
+                <div class="controls-grid tile-grid">
+                    <button id="tapGlassBtn" class="control-button play-button" disabled>
+                        <span class="tile-emoji">👆</span>Tikken
+                    </button>
+                    <button id="playBallBtn" class="control-button play-button" disabled>
+                        <span class="tile-emoji">🎾</span>Bal gooien
+                    </button>
+                    <button id="fishingRodBtn" class="control-button play-button" disabled>
+                        <span class="tile-emoji">🎣</span>Hengelen
+                    </button>
+                    <button id="raceBtn" class="control-button play-button" disabled>
+                        <span class="tile-emoji">🏁</span>Race
+                    </button>
+                    <button id="partyBtn" class="control-button play-button" disabled>
+                        <span class="tile-emoji">💃</span>Dansen
+                    </button>
+                </div>
+
+                <!-- Race selectie -->
+                <div id="raceSelection" class="race-selection" style="display: none;">
+                    <h3 class="section-header section-header--play">Kies twee vissen voor de race</h3>
+                    <div class="race-dropdowns">
+                        <select id="raceFish1" class="race-select" disabled>
+                            <option value="">Kies vis 1...</option>
+                        </select>
+                        <span class="race-vs">VS</span>
+                        <select id="raceFish2" class="race-select" disabled>
+                            <option value="">Kies vis 2...</option>
+                        </select>
+                    </div>
+                    <div class="race-actions">
+                        <button id="startRaceBtn" class="control-button play-button" disabled>
+                            🏁 Start!
+                        </button>
+                        <button id="cancelRaceBtn" class="control-button cancel-button">
+                            ✕ Annuleren
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Kom: schakelaars die laten zien hoe het nu staat -->
+            <div class="category-section">
+                <h3 class="section-header section-header--tank">🏠 Kom</h3>
+                <div class="toggle-list">
+                    <button id="lightBtn" class="toggle-row" role="switch" aria-checked="false" disabled>
+                        <span class="toggle-name">💡 Licht</span><span class="toggle-state">-</span><span class="switch"></span>
+                    </button>
+                    <button id="heatingBtn" class="toggle-row" role="switch" aria-checked="false" disabled>
+                        <span class="toggle-name">🔥 Verwarming</span><span class="toggle-state">-</span><span class="switch"></span>
+                    </button>
+                    <button id="pumpBtn" class="toggle-row" role="switch" aria-checked="false" disabled>
+                        <span class="toggle-name">💨 Pomp</span><span class="toggle-state">-</span><span class="switch"></span>
+                    </button>
+                    <button id="discoBtn" class="toggle-row" role="switch" aria-checked="false" disabled>
+                        <span class="toggle-name">🎉 Disco</span><span class="toggle-state">-</span><span class="switch"></span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Over de kom: om te lezen, niet om te doen; pas opgehaald als je Meer opent -->
+            <div class="category-section" id="historySection">
+                <h3 class="section-header section-header--history">🐠 Over de kom</h3>
+                <div class="history-block">
+                    <h4>📍 Nu in de kom</h4>
+                    <div class="now-chips" id="nowList"></div>
+                </div>
+                <div class="history-block">
+                    <h4>🕐 Laatste activiteiten</h4>
+                    <ul class="history-list" id="historyActivity"></ul>
+                    <button id="historyActivityMore" class="history-more" hidden></button>
+                </div>
+                <div class="history-block">
+                    <h4>⭐ Sterren van de kom</h4>
+                    <ol class="history-list" id="historyStars"></ol>
+                </div>
+                <div class="history-block" id="historyMemorialBlock" hidden>
+                    <h4 id="historyMemorialTitle">💙 In onze harten</h4>
+                    <ul class="history-list" id="historyMemorial"></ul>
+                    <button id="historyMemorialMore" class="history-more" hidden></button>
+                </div>
+            </div>
+        </details>
     </div>
 
     <div class="version-display">
@@ -188,6 +152,7 @@
         </div>
     </div>
 
+    <script src="js/activity.js"></script>
     <script src="js/controller.js"></script>
 </body>
 </html>

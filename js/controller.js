@@ -10,20 +10,6 @@
         let accessCodeExpiry = 0;
         let qrValidityCheckInterval = null;
 
-        // Theme names and emojis
-        const THEME_INFO = {
-            'normal': { name: 'Normaal', emoji: '🐟' },
-            'spring': { name: 'Lente', emoji: '🌸' },
-            'summer': { name: 'Zomer', emoji: '☀️' },
-            'autumn': { name: 'Herfst', emoji: '🍂' },
-            'winter': { name: 'Winter', emoji: '❄️' },
-            'tropical': { name: 'Tropisch', emoji: '🌴' },
-            'arctic': { name: 'Arctisch', emoji: '🧊' },
-            'halloween': { name: 'Halloween', emoji: '🎃' },
-            'christmas': { name: 'Kerst', emoji: '🎄' },
-            'newyear': { name: 'Nieuwjaar', emoji: '🎆' }
-        };
-
         // DOM elements
         const feedBtn = document.getElementById('feedBtn');
         const lightBtn = document.getElementById('lightBtn');
@@ -34,6 +20,11 @@
         const tapGlassBtn = document.getElementById('tapGlassBtn');
         const fishingRodBtn = document.getElementById('fishingRodBtn');
         const medicineBtn = document.getElementById('medicineBtn');
+        // Waarom een knop niet kan, in de knop zelf (het statusblok staat standaard uit)
+        const feedNote = document.getElementById('feedNote');
+        const medicineNote = document.getElementById('medicineNote');
+        const cleanNote = document.getElementById('cleanNote');
+        const waterNote = document.getElementById('waterNote');
         const addFishBtn = document.getElementById('addFishBtn');
         const fishNameInput = document.getElementById('fishNameInput');
         const heatingBtn = document.getElementById('heatingBtn');
@@ -53,18 +44,6 @@
         let fishList = [];
         let raceActive = false;
 
-        // Status displays
-        const lightStatus = document.getElementById('lightStatus');
-        const discoStatus = document.getElementById('discoStatus');
-        const pumpStatus = document.getElementById('pumpStatus');
-        const feedStatus = document.getElementById('feedStatus');
-        const waterStatus = document.getElementById('waterStatus');
-        const poopStatus = document.getElementById('poopStatus');
-        const sickFishStatus = document.getElementById('sickFishStatus');
-        const medicineStatus = document.getElementById('medicineStatus');
-        const temperatureStatus = document.getElementById('temperatureStatus');
-        const heatingStatus = document.getElementById('heatingStatus');
-        const fishCountStatus = document.getElementById('fishCountStatus');
         const ballStatus = document.getElementById('ballStatus');
         const raceStatus = document.getElementById('raceStatus');
         // const themeStatus = document.getElementById('themeStatus'); // Tijdelijk uitgeschakeld
@@ -126,6 +105,7 @@
                     requestGameState();
                     requestVersion();
                     requestConfig();
+                    if (moreSection.open) sendCommand('getHistory');
                 };
 
                 ws.onmessage = function(event) {
@@ -276,6 +256,95 @@
             }
         }
 
+        // Over de kom (onderaan Meer): wordt opgehaald als je Meer openklapt, en opnieuw zodra de
+        // server meldt dat er iets gebeurd is. Eens per minuut ook, zodat "x geleden" blijft kloppen.
+        const HISTORY_TOP = 3;
+        const HISTORY_SHORT = 5; // activiteiten en overleden vissen: eerst 5, dan "Toon meer"
+        const moreSection = document.getElementById('moreSection');
+        let historyShowAllActivity = false;
+        let historyShowAllDead = false;
+        let lastHistory = null;
+
+        moreSection.addEventListener('toggle', () => {
+            if (moreSection.open) sendCommand('getHistory');
+        });
+        setInterval(() => {
+            if (isConnected && moreSection.open) sendCommand('getHistory');
+        }, 60000);
+        document.getElementById('historyActivityMore').addEventListener('click', () => {
+            historyShowAllActivity = true;
+            if (lastHistory) renderHistory(lastHistory);
+        });
+        document.getElementById('historyMemorialMore').addEventListener('click', () => {
+            historyShowAllDead = true;
+            if (lastHistory) renderHistory(lastHistory);
+        });
+
+        // Namen komen van bezoekers, dus altijd als tekst, nooit als HTML
+        function fillList(listEl, lines) {
+            listEl.replaceChildren(...lines.map(line => {
+                const li = document.createElement('li');
+                li.textContent = line;
+                return li;
+            }));
+        }
+
+        // Een lijst die eerst kort is, met een knop "Toon meer" als er meer is
+        function fillShortList(listEl, moreBtn, lines, showAll) {
+            fillList(listEl, showAll ? lines : lines.slice(0, HISTORY_SHORT));
+            moreBtn.hidden = showAll || lines.length <= HISTORY_SHORT;
+            moreBtn.textContent = `Toon meer (${lines.length})`;
+        }
+
+        // Nu in de kom: hoe het er nu voor staat, in woorden (zelfde grenzen als in de kom)
+        function renderNow(status) {
+            const temp = Math.round(status.temperature || 24);
+            const tempWord = temp < 20 ? 'te koud' : temp < 22 ? 'wat koud' : temp <= 26 ? 'goed' : temp <= 28 ? 'wat warm' : 'te warm';
+            const green = Math.round(status.waterGreenness || 0);
+            const poop = status.poopCount || 0;
+            const fish = status.fishCount || 0;
+            const sick = status.sickFishCount || 0;
+            const chips = [
+                `🐟 ${fish} ${fish === 1 ? 'vis' : 'vissen'}${sick ? `, ${sick} ziek` : ''}`,
+                `🌡️ ${temp}°C, ${tempWord}`,
+                `💧 ${green < 10 ? 'helder' : `${green}% groen`}`,
+                `💩 ${poop ? poop + ' poep' : 'schoon'}`
+            ];
+            document.getElementById('nowList').replaceChildren(...chips.map(text => {
+                const chip = document.createElement('span');
+                chip.className = 'now-chip';
+                chip.textContent = text;
+                return chip;
+            }));
+        }
+
+        function renderHistory(data) {
+            lastHistory = data;
+            const now = Date.now();
+            const living = data.living || [];
+            const dead = (data.dead || []).filter(d => d.diedAt);
+
+            const stars = [...living].sort((a, b) => a.bornAt - b.bornAt).slice(0, HISTORY_TOP);
+            fillList(document.getElementById('historyStars'),
+                stars.length ? stars.map(f => `${f.name} · ${ageLabelMS(now - f.bornAt)}`) : ['Nog geen vissen in de kom']);
+
+            const events = (data.events || []).slice().reverse()
+                .filter(e => !ACTIVITY_INTERNAL.has(e.type))
+                .map(e => ({ e, shown: activityText(e) }))
+                .filter(x => x.shown);
+            fillShortList(document.getElementById('historyActivity'), document.getElementById('historyActivityMore'),
+                events.length ? events.map(({ e, shown }) => `${shown.emoji} ${shown.text} · ${ageLabelMS(now - e.timestamp)} geleden`) : ['Nog niets gebeurd'],
+                historyShowAllActivity);
+
+            const memorialBlock = document.getElementById('historyMemorialBlock');
+            memorialBlock.hidden = dead.length === 0;
+            document.getElementById('historyMemorialTitle').textContent = `💙 In onze harten (${dead.length})`;
+            const byDeath = dead.sort((a, b) => b.diedAt - a.diedAt);
+            fillShortList(document.getElementById('historyMemorial'), document.getElementById('historyMemorialMore'),
+                byDeath.map(f => `${f.name} · ${ageLabelMS(f.diedAt - f.bornAt)} oud · ${ageLabelMS(now - f.diedAt)} geleden`),
+                historyShowAllDead);
+        }
+
         function requestStatus() {
             sendCommand('getStatus');
         }
@@ -323,7 +392,6 @@
                     handleRaceFinished(message.data);
                     break;
                 case 'gameState':
-                    updateFishCount(message.data);
                     updateFishList(message.data);
                     break;
                 case 'version':
@@ -331,6 +399,12 @@
                     break;
                 case 'config':
                     updateFooter(message.config);
+                    break;
+                case 'history':
+                    renderHistory(message.data);
+                    break;
+                case 'historyChanged':
+                    if (moreSection.open) sendCommand('getHistory');
                     break;
                 case 'success':
                     showSuccess(message.message);
@@ -368,93 +442,15 @@
                 // Create clickable link
                 footerEl.innerHTML = `<a href="${config.footerLink}" target="_blank" rel="noopener noreferrer" style="color: #50e3c2; text-decoration: none;">${linkText}</a>`;
             }
-
-            // Update status display visibility
-            initStatusDisplay(config);
         }
 
         function updateStatus(status) {
-            lightStatus.textContent = status.lightsOn ? '💡 Aan' : 'Uit';
-            lightStatus.style.color = status.lightsOn ? '#e9f1f7' : '#999';
-
-            discoStatus.textContent = status.discoOn ? '🎉 Aan' : 'Uit';
-            discoStatus.style.color = status.discoOn ? '#e9f1f7' : '#999';
-
-            pumpStatus.textContent = status.pumpOn ? '💨 Aan' : 'Uit';
-            pumpStatus.style.color = status.pumpOn ? '#e9f1f7' : '#999';
-
-            // Update water status
+            renderNow(status);
             const greenness = status.waterGreenness || 0;
-            const greennessRounded = Math.round(greenness);
-
-            if (greenness < 10) {
-                waterStatus.textContent = '✨ Helder';
-                waterStatus.style.color = '#4ecdc4';
-            } else if (greenness < 25) {
-                waterStatus.textContent = `${greennessRounded}% groen`;
-                waterStatus.style.color = '#4ecdc4';
-            } else if (greenness < 50) {
-                waterStatus.textContent = `${greennessRounded}% groen`;
-                waterStatus.style.color = '#ffd700';
-            } else if (greenness < 75) {
-                waterStatus.textContent = `${greennessRounded}% groen`;
-                waterStatus.style.color = '#ff9800';
-            } else {
-                waterStatus.textContent = `${greennessRounded}% groen`;
-                waterStatus.style.color = '#f44336';
-            }
-
-            // Update poop status
-            const poopCount = status.poopCount || 0;
-            if (poopCount === 0) {
-                poopStatus.textContent = '✨ Schoon';
-                poopStatus.style.color = '#4ecdc4';
-            } else if (poopCount <= 5) {
-                poopStatus.textContent = `${poopCount} 💩`;
-                poopStatus.style.color = '#ffd700';
-            } else if (poopCount <= 15) {
-                poopStatus.textContent = `${poopCount} 💩`;
-                poopStatus.style.color = '#ff9800';
-            } else {
-                poopStatus.textContent = `${poopCount} 💩`;
-                poopStatus.style.color = '#f44336';
-            }
-
-            // Update sick fish status
-            const sickCount = status.sickFishCount || 0;
-            if (sickCount === 0) {
-                sickFishStatus.textContent = '✅ Geen';
-                sickFishStatus.style.color = '#4ecdc4';
-            } else if (sickCount === 1) {
-                sickFishStatus.textContent = '🦠 1 vis';
-                sickFishStatus.style.color = '#ff9800';
-            } else {
-                sickFishStatus.textContent = `🦠 ${sickCount} vissen`;
-                sickFishStatus.style.color = '#f44336';
-            }
-
-            // Update temperature status (zonder decimalen)
-            const temp = status.temperature || 24;
-            const tempRounded = Math.round(temp);
-
-            if (temp >= 22 && temp <= 26) {
-                temperatureStatus.textContent = `✅ ${tempRounded}°C`;
-                temperatureStatus.style.color = '#4ecdc4';  // green
-            } else if (temp >= 20 && temp <= 28) {
-                temperatureStatus.textContent = `⚠️ ${tempRounded}°C`;
-                temperatureStatus.style.color = '#ffd700';  // yellow
-            } else {
-                temperatureStatus.textContent = `❌ ${tempRounded}°C`;
-                temperatureStatus.style.color = '#f44336';  // red
-            }
-
-            // Update heating status
-            heatingStatus.textContent = status.heatingOn ? '🔥 Aan' : 'Uit';
-            heatingStatus.style.color = status.heatingOn ? '#e9f1f7' : '#999';
 
             // Update theme status (tijdelijk uitgeschakeld)
             // if (status.theme) {
-            //     const themeInfo = THEME_INFO[status.theme] || THEME_INFO['normal'];
+            //     const themeInfo = ACTIVITY_THEMES[status.theme] || ACTIVITY_THEMES.normal;
             //     themeStatus.textContent = `${themeInfo.emoji} ${themeInfo.name}`;
             //     themeStatus.style.color = '#e9f1f7';
             // }
@@ -468,17 +464,18 @@
                 }
             }
 
-            // Update button texts
-            lightBtn.textContent = status.lightsOn ? '💡 Licht uit' : '💡 Licht aan';
-            discoBtn.textContent = status.discoOn ? '🎉 Disco uit' : '🎉 Disco aan';
-            pumpBtn.textContent = status.pumpOn ? '💨 Pomp uit' : '💨 Pomp aan';
-            heatingBtn.textContent = status.heatingOn ? '🔥 Verwarming uit' : '🔥 Verwarming aan';
+            // Schakelaars tonen hoe het nu staat (niet wat de knop gaat doen)
+            setToggle(lightBtn, status.lightsOn);
+            setToggle(discoBtn, status.discoOn);
+            setToggle(pumpBtn, status.pumpOn);
+            setToggle(heatingBtn, status.heatingOn);
 
             // Update clean button availability based on poop count
             const hasPoopToClear = status.poopCount && status.poopCount > 0;
             if (isConnected) {
                 cleanBtn.disabled = !hasPoopToClear;
                 cleanBtn.style.opacity = hasPoopToClear ? '1' : '0.5';
+                cleanNote.textContent = hasPoopToClear ? '' : 'kom is schoon';
 
                 console.log('Mobile Debug: Clean button', hasPoopToClear ? 'enabled' : 'disabled', 'poop count:', status.poopCount);
             }
@@ -488,15 +485,17 @@
             if (isConnected) {
                 refreshWaterBtn.disabled = !needsWaterRefresh;
                 refreshWaterBtn.style.opacity = needsWaterRefresh ? '1' : '0.5';
+                waterNote.textContent = needsWaterRefresh ? '' : 'water is helder';
 
                 console.log('Mobile Debug: Refresh water button', needsWaterRefresh ? 'enabled' : 'disabled', 'greenness:', greenness.toFixed(1) + '%');
             }
 
-            // Update fish count if present in status
-            if (status.fishCount !== undefined) {
-                fishCountStatus.textContent = `🐟 ${status.fishCount}`;
-                fishCountStatus.style.color = '#e9f1f7';
-            }
+        }
+
+        function setToggle(btn, on) {
+            btn.classList.toggle('on', !!on);
+            btn.setAttribute('aria-checked', on ? 'true' : 'false');
+            btn.querySelector('.toggle-state').textContent = on ? 'aan' : 'uit';
         }
 
         function ageLabelMS(ms) {
@@ -519,16 +518,14 @@
             if (cooldownData.canFeed) {
                 feedCooldownEndTime = 0; // Clear cooldown
                 feedBtn.disabled = false;
-                feedStatus.textContent = '✅ Kan nu';
-                feedStatus.style.color = '#4ecdc4';
+                feedNote.textContent = '';
             } else {
                 // Calculate end time based on lastFed + cooldown duration
                 feedCooldownEndTime = cooldownData.lastFed + (60 * 60 * 1000); // 1 hour
                 // Initial display will be updated by the countdown timer
                 feedBtn.disabled = true;
                 const timeText = ageLabelMS(cooldownData.timeLeft);
-                feedStatus.textContent = `Kan over ${timeText}`;
-                feedStatus.style.color = '#ff9800';
+                feedNote.textContent = `kan over ${timeText}`;
             }
         }
 
@@ -537,16 +534,14 @@
             if (cooldownData.canAddMedicine) {
                 medicineCooldownEndTime = 0; // Clear cooldown
                 medicineBtn.disabled = false;
-                medicineStatus.textContent = '✅ Kan nu';
-                medicineStatus.style.color = '#4ecdc4';
+                medicineNote.textContent = '';
             } else {
                 // Calculate end time based on lastMedicine + cooldown duration
                 medicineCooldownEndTime = cooldownData.lastMedicine + (24 * 60 * 60 * 1000); // 24 hours
                 // Initial display will be updated by the countdown timer
                 medicineBtn.disabled = true;
                 const timeText = ageLabelMS(cooldownData.timeLeft);
-                medicineStatus.textContent = `Kan over ${timeText}`;
-                medicineStatus.style.color = '#ff9800';
+                medicineNote.textContent = `kan over ${timeText}`;
             }
         }
 
@@ -566,14 +561,6 @@
             } else {
                 playBallBtn.disabled = false;
                 if (ballStatus) { ballStatus.textContent = '✅ Kan nu'; ballStatus.style.color = '#4ecdc4'; }
-            }
-        }
-
-        function updateFishCount(gameData) {
-            if (gameData && gameData.fishes) {
-                const fishCount = gameData.fishes.length;
-                fishCountStatus.textContent = `🐟 ${fishCount}`;
-                fishCountStatus.style.color = '#e9f1f7';
             }
         }
 
@@ -740,44 +727,6 @@
             }
         });
 
-        // Status display visibility
-        function initStatusDisplay(config) {
-            const showStatus = config && config.showControllerStatusBlocks !== undefined ? config.showControllerStatusBlocks : true;
-
-            const dashboard = document.querySelector('.status-dashboard');
-            if (dashboard) {
-                dashboard.style.display = showStatus ? 'grid' : 'none';
-            }
-
-            // Add-fish tip badge visibility (default to true if not specified)
-            const showAddFishTip = config && config.showAddFishTip !== undefined ? config.showAddFishTip : true;
-            const addFishTip = document.getElementById('addFishTip');
-            if (addFishTip) {
-                addFishTip.style.display = showAddFishTip ? 'flex' : 'none';
-            }
-        }
-
-        // Single page layout - no tab switching needed
-        function initTabs() {
-            // Tip badge scrolls down to the "Vis toevoegen" section
-            const addFishHintLink = document.getElementById('addFishHintLink');
-            const addFishSection = document.getElementById('addFishSection');
-            if (addFishHintLink && addFishSection) {
-                addFishHintLink.addEventListener('click', () => {
-                    addFishSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    // Only auto-focus on non-touch devices. On iOS/Android the keyboard
-                    // would pop up and cover the input (which sits near the bottom of the
-                    // page); letting the user tap the field themselves lets the OS keep it
-                    // visible above the keyboard.
-                    const isTouch = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
-                    const fishNameInput = document.getElementById('fishNameInput');
-                    if (!isTouch && fishNameInput && !fishNameInput.disabled) {
-                        fishNameInput.focus();
-                    }
-                });
-            }
-        }
-
         // Mobile debugging - check DOM elements on startup
         function checkDOMElements() {
             console.log('Mobile Debug: Checking DOM elements...');
@@ -803,13 +752,11 @@
             document.addEventListener('DOMContentLoaded', () => {
                 console.log('Mobile Debug: DOM loaded');
                 checkDOMElements();
-                initTabs();
                 connectWebSocket();
             });
         } else {
             console.log('Mobile Debug: DOM already loaded');
             checkDOMElements();
-            initTabs();
             connectWebSocket();
         }
 
@@ -830,14 +777,12 @@
                 if (timeLeft > 0) {
                     feedBtn.disabled = true;
                     const timeText = ageLabelMS(timeLeft);
-                    feedStatus.textContent = `Kan over ${timeText}`;
-                    feedStatus.style.color = '#ff9800';
+                    feedNote.textContent = `kan over ${timeText}`;
                 } else {
                     // Cooldown ended
                     feedCooldownEndTime = 0;
                     feedBtn.disabled = false;
-                    feedStatus.textContent = '✅ Kan nu';
-                    feedStatus.style.color = '#4ecdc4';
+                    feedNote.textContent = '';
                 }
             }
 
@@ -849,14 +794,12 @@
                 if (timeLeft > 0) {
                     medicineBtn.disabled = true;
                     const timeText = ageLabelMS(timeLeft);
-                    medicineStatus.textContent = `Kan over ${timeText}`;
-                    medicineStatus.style.color = '#ff9800';
+                    medicineNote.textContent = `kan over ${timeText}`;
                 } else {
                     // Cooldown ended
                     medicineCooldownEndTime = 0;
                     medicineBtn.disabled = false;
-                    medicineStatus.textContent = '✅ Kan nu';
-                    medicineStatus.style.color = '#4ecdc4';
+                    medicineNote.textContent = '';
                 }
             }
         }, 100); // Update every 100ms for smooth countdown

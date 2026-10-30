@@ -203,12 +203,17 @@ function resize(){
 function updateUIPositions(){
   const side=document.querySelector('.side');
   const statusbar=document.querySelector('.statusbar');
+  const toasts=document.getElementById('toasts');
   if(side){
     side.style.left=(viewportConfig.offsetLeft+8)+'px';
     side.style.top=(viewportConfig.offsetTop+8)+'px';
   }
   if(statusbar){
     statusbar.style.bottom=(viewportConfig.offsetBottom+8)+'px';
+  }
+  if(toasts){
+    toasts.style.top=(viewportConfig.offsetTop+12)+'px';
+    toasts.style.right=(viewportConfig.offsetRight+12)+'px';
   }
 }
 window.addEventListener('resize',resize);
@@ -226,7 +231,7 @@ let lastFed=0;let lastMedicine=0;let feedCooldown=60*60*1000;let medicineCooldow
 let lightsOn=true;let lightRaw=1;let lightLevel=1;let discoOn=false;let pumpOn=false;let heatingOn=true;const pumpPos={x:0,y:0};let pumpJustOnUntil=0;
 let discoBall={x:0,y:0,targetY:0,rotation:0,deployed:false,deployStart:0,deployDuration:2500,undeploying:false,undeployStart:0};
 let fishingRod={x:0,y:0,targetY:0,deployed:false,deployStart:0,deployDuration:2000,state:'idle',caughtFish:null,reelingStart:0,showCatchStart:0,baitSwing:0,retractStart:0};
-let race={active:false,fish1:null,fish2:null,startTime:0,duration:15000,startX:0,finishX:0,fish1Speed:0,fish2Speed:0,fish1X:0,fish2X:0,winner:null,spectatorPositions:[],showingWinner:false,winnerFish:null,loserFish:null,winnerShowStart:0};
+let race={active:false,fish1:null,fish2:null,startTime:0,duration:15000,startX:0,finishX:0,runner1:null,runner2:null,fish1X:0,fish2X:0,winner:null,spectatorPositions:[],showingWinner:false,winnerFish:null,loserFish:null,winnerShowStart:0};
 let waterGreenness=0;let waterGreennessTarget=0;
 let currentTemperature=24;
 let currentTheme='normal'; // Current theme (loaded from server)
@@ -244,8 +249,6 @@ function hasDecoration(type){return getThemeConfig().decorations.includes(type)}
 // Theme configurations
 const THEMES={
   normal:{
-    name:'Normaal',
-    emoji:'🐟',
     bgLight:['#0d5168','#094050','#073342','#052530'],
     bgDark:['#082030','#051520','#030f18','#020a10'],
     vignette:0.15,
@@ -254,8 +257,6 @@ const THEMES={
     decorations:[]
   },
   spring:{
-    name:'Lente',
-    emoji:'🌸',
     bgLight:['#1a7a6e','#156b5f','#105c50','#0b4d42'],
     bgDark:['#0a4038','#083630','#062c28','#042220'],
     vignette:0.12,
@@ -264,8 +265,6 @@ const THEMES={
     decorations:['flower','butterfly']
   },
   summer:{
-    name:'Zomer',
-    emoji:'☀️',
     bgLight:['#22a7e6','#1b93d6','#137fc0','#0a66a3'],
     bgDark:['#0e5487','#0b4670','#083759','#052a44'],
     vignette:0.10,
@@ -274,8 +273,6 @@ const THEMES={
     decorations:['parasol']
   },
   autumn:{
-    name:'Herfst',
-    emoji:'🍂',
     bgLight:['#0d5168','#094050','#073342','#052530'],
     bgDark:['#082030','#051520','#030f18','#020a10'],
     vignette:0.15,
@@ -287,8 +284,6 @@ const THEMES={
     lampHueShift:16   // Lichtbundel blijft goud in plaats van naar cyaan te draaien
   },
   winter:{
-    name:'Winter',
-    emoji:'❄️',
     bgLight:['#1a4d6d','#16415c','#12354a','#0e2938'],
     bgDark:['#0a1f2e','#081924','#06131a','#040d10'],
     vignette:0.20,
@@ -297,8 +292,6 @@ const THEMES={
     decorations:['snowflake']
   },
   tropical:{
-    name:'Tropisch',
-    emoji:'🌴',
     bgLight:['#00838f','#00796b','#00695c','#004d40'],
     bgDark:['#003d3d','#003333','#002929','#001f1f'],
     vignette:0.14,
@@ -307,8 +300,6 @@ const THEMES={
     decorations:['coral']
   },
   arctic:{
-    name:'Arctisch',
-    emoji:'🧊',
     bgLight:['#1e3a5f','#1a324f','#162a40','#122230'],
     bgDark:['#0f1b2e','#0c1624','#09111a','#060c10'],
     vignette:0.22,
@@ -317,8 +308,6 @@ const THEMES={
     decorations:['aurora','ice']
   },
   halloween:{
-    name:'Halloween',
-    emoji:'🎃',
     bgLight:['#0a1418','#050c10','#020608','#000000'],
     bgDark:['#0a1418','#050c10','#020608','#000000'],
     vignette:0.40,
@@ -327,8 +316,6 @@ const THEMES={
     decorations:['pumpkin','skull','spiderweb']
   },
   christmas:{
-    name:'Kerst',
-    emoji:'🎄',
     bgLight:['#0f1a38','#1a2540','#0d1f35','#162038'], // Donkerblauw met meer variatie
     bgDark:['#070d1f','#0a1028','#060b1a','#081020'], // Diep donkerblauw
     vignette:0.25,
@@ -337,8 +324,6 @@ const THEMES={
     decorations:['christmastree','snowman','christmaslights','snowflake']
   },
   newyear:{
-    name:'Nieuwjaar',
-    emoji:'🎆',
     bgLight:['#0a0a1a','#101028','#0d0d20','#080818'], // Donkere nachtlucht
     bgDark:['#050510','#080818','#040410','#020208'], // Diep donkerblauw/zwart
     vignette:0.30,
@@ -1598,8 +1583,20 @@ function limitSpeed(f){
     }
   }
 }
+// Hoe ver de vis vanaf zijn midden richting een wand reikt, bij zijn huidige stand.
+// Voor kop en staart nemen we allebei de langste, zodat omkeren bij een wand (vx of vy
+// klapt om) de vis niet laat verspringen. Opzij: boven de rug, onder de buik.
+function fishWallReach(f,vertical,up){
+  const R=fishSpeciesEnabled?fishSpecies(f).species.reach:CLASSIC_FISH.reach;
+  const s=f._sizeCache?f._sizeCache.v:24;
+  const h=Math.atan2(f.vy,f.vx);
+  const along=Math.max(R[0],R[3]);
+  const side=vertical?(up?R[1]:R[2]):Math.max(R[1],R[2]);
+  const c=vertical?Math.sin(h):Math.cos(h);const sn=vertical?Math.cos(h):Math.sin(h);
+  return s*Math.hypot(along*c,side*sn);
+}
 // Hoogste punt waar het midden van een vis mag komen: net onder het wateroppervlak
-function fishTopY(f){return WATER_SURFACE_Y+(f._sizeCache?f._sizeCache.v:24)*0.6+4}
+function fishTopY(f){return WATER_SURFACE_Y+fishWallReach(f,true,true)+4}
 
 function bounceOffWalls(f){
   // Niet over de QR-code op het bordje zwemmen: via de kortste kant eruit
@@ -1615,11 +1612,13 @@ function bounceOffWalls(f){
       else{f.x=z.x0-r;f.vx=-Math.abs(f.vx)-0.1}
     }
   }
-  const margin = 20;
+  // Hele vis binnen beeld houden, ook kop, staart en vinnen
+  const side = fishWallReach(f, false) + 2;
+  const bottom = fishWallReach(f, true, false) + 2;
 
   // Bounce off left wall
-  if(f.x < margin) {
-    f.x = margin + 1;
+  if(f.x < side) {
+    f.x = side + 1;
     f.vx = Math.abs(f.vx) + 0.1;
     // Update target velocity to match bounce
     f.targetVx = Math.abs(f.targetVx || f.vx);
@@ -1632,8 +1631,8 @@ function bounceOffWalls(f){
     }
   }
   // Bounce off right wall
-  if(f.x > W - margin) {
-    f.x = W - margin - 1;
+  if(f.x > W - side) {
+    f.x = W - side - 1;
     f.vx = -Math.abs(f.vx) - 0.1;
     // Update target velocity to match bounce
     f.targetVx = -Math.abs(f.targetVx || f.vx);
@@ -1661,8 +1660,8 @@ function bounceOffWalls(f){
     }
   }
   // Bounce off bottom wall
-  if(f.y > H - margin) {
-    f.y = H - margin - 1;
+  if(f.y > H - bottom) {
+    f.y = H - bottom - 1;
     f.vy = -Math.abs(f.vy) - 0.1;
     // Update target velocity to match bounce
     f.targetVy = -Math.abs(f.targetVy || f.vy);
@@ -5222,7 +5221,7 @@ function drawFish(f,t,now){
   // hp already calculated above - reuse it for label and health bar
   // Sick emoji is always shown, behavior emoji only if enabled
   const sickEmoji=getSickEmoji(f);
-  const behaviorEmoji=appConfig.showBehaviorEmoji ? getBehaviorEmoji(f.behaviorState || 'normal', f) : '';
+  const behaviorEmoji=behaviorEmojiOn ? getBehaviorEmoji(f.behaviorState || 'normal', f) : '';
   const emojiPrefix = (sickEmoji ? sickEmoji + ' ' : '') + (behaviorEmoji ? behaviorEmoji + ' ' : '');
   const label1=emojiPrefix + f.name;
   const label2=fishSpeciesEnabled?ageLabel(f,now)+' · '+fishSpecies(f).species.name:ageLabel(f,now);
@@ -5257,7 +5256,6 @@ function roundRect(x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,
 // polonaise, of synchroonzwemmen (verdeeld over de kom en allemaal hetzelfde patroontje). Eerst
 // verzamelen, dan dansen in de maat, dan met vaart uitzwermen. De server kiest de vorm.
 const PARTY_GATHER=4000,PARTY_DANCE=13000; // ms
-const PARTY_NAMES={circle:'kring',heart:'hart',wave:'wave',conga:'polonaise',smiley:'smiley',vortex:'draaikolk',sync:'synchroon'};
 let party=null; // {kind,start,n,points}
 function startParty(kind){
   if(party||!PARTY_NAMES[kind])return;
@@ -5358,6 +5356,9 @@ function updatePartyFish(f,now){
 }
 
 // ---- Compacte labels (uiStyle: 'minimal') ------------------------------------
+// De sterren van de kom (de drie oudste levende vissen) krijgen een ⭐ achter hun naam, in plaats
+// van het lijstje uit classic. Bijgewerkt in drawLists.
+let starFishNames=new Set();
 // In een volle kom zijn 40-50 witte naambordjes drukker dan de vissen zelf. Compact is
 // het losse tekst vlak boven de vis: naam met drie gezondheidsstipjes, daaronder klein de
 // leeftijd. De soort zie je aan de vorm. Vissen die aandacht nodig hebben krijgen een
@@ -5386,8 +5387,8 @@ function drawCompactOverlay(now){
 function drawCompactLabel(f,s,hp,now){
   const sick=f.sick&&!f.medicated;
   const sickEmoji=getSickEmoji(f);
-  const behaviorEmoji=appConfig.showBehaviorEmoji?getBehaviorEmoji(f.behaviorState||'normal',f):'';
-  const name=(sickEmoji?sickEmoji+' ':'')+(behaviorEmoji?behaviorEmoji+' ':'')+f.name;
+  const behaviorEmoji=behaviorEmojiOn?getBehaviorEmoji(f.behaviorState||'normal',f):'';
+  const name=(sickEmoji?sickEmoji+' ':'')+(behaviorEmoji?behaviorEmoji+' ':'')+f.name+(starFishNames.has(f.name)?' ⭐':'');
   const info=ageLabel(f,now);
   const c=f._compactLabel;
   if(!c||c.name!==name||c.info!==info){
@@ -6530,6 +6531,7 @@ function drawLists(){
 
   // Living list
   const livingAges=[...fishes].map(f=>({name:f.name,age:now-f.bornAt})).sort((a,b)=>b.age-a.age).slice(0,TOP_N);
+  starFishNames=new Set(livingAges.map(x=>x.name));
   const livingItems=livingAges.map((x,i)=>({idx:i+1,label:`${x.name} · ${ageLabelMS(x.age)}`}));
   updateListItems(livingListEl,livingItems);
 
@@ -6552,9 +6554,9 @@ function drawActivityList(){
 
   activityPanelEl.style.display='block';
 
-  // Process events in reverse order (newest first). Interne controles van de server horen
-  // niet in het blok voor bezoekers.
-  const eventsToShow=recentActivity.filter(e=>e.type!=='state_validation_error').reverse();
+  // Process events in reverse order (newest first). Interne gebeurtenissen horen niet in het
+  // blok voor bezoekers; zelfde regel als in de controller (js/activity.js).
+  const eventsToShow=recentActivity.filter(e=>!ACTIVITY_INTERNAL.has(e.type)).reverse();
 
   // Get existing items
   const existingItems=activityListEl.children;
@@ -6563,155 +6565,23 @@ function drawActivityList(){
   eventsToShow.forEach((event,i)=>{
     const ago=now-event.timestamp;
     const timeStr=ageLabelMS(ago)+' geleden';
-    let emoji='';
-    let label='';
-
-    switch(event.type){
-      case 'feed':
-        emoji='🍤';
-        label=`Gevoerd · ${timeStr}`;
-        break;
-      case 'fish_added':
-        emoji='🐟';
-        label=`${event.data.name} toegevoegd · ${timeStr}`;
-        break;
-      case 'fish_died':
-        emoji='💀';
-        label=`${event.data.name} overleden · ${timeStr}`;
-        break;
-      case 'glass_tapped':
-        emoji='👆';
-        label=`Op kom getikt · ${timeStr}`;
-        break;
-      case 'theme_change':{
-        const th=THEMES[event.data&&event.data.to];
-        emoji=th&&th.emoji?th.emoji:'🎨';
-        label=`Thema: ${th&&th.name?th.name:(event.data&&event.data.to)||'anders'} · ${timeStr}`;
-        break;
-      }
-      case 'party_started':
-        emoji='💃';
-        label=`Dansen${PARTY_NAMES[event.data&&event.data.kind]?' ('+PARTY_NAMES[event.data.kind]+')':''} · ${timeStr}`;
-        break;
-      case 'play_ball_added':
-        emoji='🎾';
-        label=`Speelbal gegooid · ${timeStr}`;
-        break;
-      case 'fishing_rod_cast':
-        emoji='🎣';
-        label=`Hengel uitgegooid · ${timeStr}`;
-        break;
-      case 'fish_caught':
-        emoji='🏆';
-        const caughtFishName=event.data.name||'Vis';
-        label=`${caughtFishName} gevangen · ${timeStr}`;
-        break;
-      case 'tank_cleaned':
-        emoji='💩';
-        label=`Kom schoongemaakt · ${timeStr}`;
-        break;
-      case 'water_refreshed':
-        emoji='💧';
-        label=`Water ververst · ${timeStr}`;
-        break;
-      case 'medicine_added':
-        emoji='💊';
-        label=`Medicijn gegeven · ${timeStr}`;
-        break;
-      case 'light_toggle':
-        emoji='💡';
-        const lightState=event.data.state||'aan';
-        label=`Licht ${lightState} · ${timeStr}`;
-        break;
-      case 'disco_toggle':
-        emoji='🎉';
-        const discoState=event.data.state||'aan';
-        label=`Disco ${discoState} · ${timeStr}`;
-        break;
-      case 'pump_toggle':
-        emoji='💨';
-        const pumpState=event.data.state||'aan';
-        label=`Pomp ${pumpState} · ${timeStr}`;
-        break;
-      case 'heating_toggle':
-        emoji='🔥';
-        const heatingState=event.data.state||'aan';
-        label=`Verwarming ${heatingState} · ${timeStr}`;
-        break;
-      case 'controller_access':
-        emoji='🎮';
-        label=`Controller verbonden · ${timeStr}`;
-        // Speel pling geluid af bij nieuwe controller connectie
-        const eventId=event.timestamp+'_'+event.type;
-        if(!playedAudioEvents.has(eventId)){
-          playedAudioEvents.add(eventId);
-          // Hergebruik audio object of maak nieuwe aan
-          if(!plingAudio){
-            plingAudio=new Audio('pling.mp3');
-          }
-          plingAudio.currentTime=0; // Reset naar begin voor hergebruik
-          plingAudio.play().catch(err=>console.log('Audio afspelen mislukt:',err));
+    if(event.type==='controller_access'){
+      // Speel pling geluid af bij nieuwe controller connectie
+      const eventId=event.timestamp+'_'+event.type;
+      if(!playedAudioEvents.has(eventId)){
+        playedAudioEvents.add(eventId);
+        // Hergebruik audio object of maak nieuwe aan
+        if(!plingAudio){
+          plingAudio=new Audio('pling.mp3');
         }
-        break;
-      case 'access_code_generated':
-        emoji='🔑';
-        label=`Nieuwe QR-code · ${timeStr}`;
-        break;
-      case 'water_greenness_milestone':
-        emoji='✨';
-        const percentage=event.data.percentage||0;
-        label=`Water ${percentage}% schoon · ${timeStr}`;
-        break;
-      case 'fish_critical_health':
-        emoji='⚠️';
-        const criticalFishName=event.data.name||'Vis';
-        label=`${criticalFishName} kritieke gezondheid · ${timeStr}`;
-        break;
-      case 'fish_died_disease':
-        emoji='☠️';
-        const diedFishName=event.data.name||'Vis';
-        const cause=event.data.cause==='temperature'?'temperatuur':'ziekte';
-        label=`${diedFishName} overleden (${cause}) · ${timeStr}`;
-        break;
-      case 'fish_recovered':
-        emoji='💚';
-        const recoveredFishName=event.data.name||'Vis';
-        label=`${recoveredFishName} hersteld · ${timeStr}`;
-        break;
-      case 'fish_infected_environment':
-        emoji='🦠';
-        const infectedFishName=event.data.name||'Vis';
-        label=`${infectedFishName} geïnfecteerd (vuil water) · ${timeStr}`;
-        break;
-      case 'fish_infected_contact':
-        emoji='🦠';
-        const contactFishName=event.data.name||'Vis';
-        label=`${contactFishName} geïnfecteerd (contact) · ${timeStr}`;
-        break;
-      case 'fish_infected_arrival':
-        emoji='🦠';
-        const arrivalFishName=event.data.name||'Vis';
-        label=`${arrivalFishName} is ziek · ${timeStr}`;
-        break;
-      case 'race_started':
-        emoji='🏁';
-        const raceFish1=event.data.fish1||'Vis';
-        const raceFish2=event.data.fish2||'Vis';
-        label=`Race: ${raceFish1} vs ${raceFish2} · ${timeStr}`;
-        break;
-      case 'race_finished':
-        emoji='🏆';
-        const raceWinner=event.data.winner||'Vis';
-        const raceLoser=event.data.loser||'Vis';
-        label=`${raceWinner} wint van ${raceLoser}! · ${timeStr}`;
-        break;
-      case 'invalid_access_code':
-        // Niet tonen in activity feed
-        return;
-      default:
-        emoji='📝';
-        label=`${event.type} · ${timeStr}`;
+        plingAudio.currentTime=0; // Reset naar begin voor hergebruik
+        plingAudio.play().catch(err=>console.log('Audio afspelen mislukt:',err));
+      }
     }
+    const shown=activityText(event);
+    if(!shown)return;
+    const emoji=shown.emoji;
+    const label=`${shown.text} · ${timeStr}`;
 
     // Update existing item or create new one
     if(i<existingItems.length){
@@ -6740,6 +6610,47 @@ function drawActivityList(){
   while(activityListEl.children.length>eventsToShow.length){
     activityListEl.removeChild(activityListEl.lastChild);
   }
+}
+
+// ---- Meldingen in de kom ----------------------------------------------------------------
+// Staat het activiteitenblok uit (standaard in minimal), dan verschijnt een nieuwe activiteit een
+// paar seconden als melding rechtsboven in de kom, de nieuwste bovenaan. Dezelfde melding vlak na
+// elkaar (vaak tikken) wordt één melding met een teller. Bij het laden komen de oude activiteiten
+// niet langs.
+const TOAST_MS=6000,TOAST_MAX=3;
+let toastSeenUntil=null;
+function showActivityToasts(events){
+  const latest=events.reduce((m,e)=>Math.max(m,e.timestamp||0),0);
+  if(toastSeenUntil===null){toastSeenUntil=latest;return}
+  const fresh=events.filter(e=>e.timestamp>toastSeenUntil);
+  toastSeenUntil=Math.max(toastSeenUntil,latest);
+  const panel=document.getElementById('activityPanel');
+  if(panel&&!panel.classList.contains('panel-off'))return;
+  for(const e of fresh)if(!ACTIVITY_QUIET.has(e.type))showToast(e);
+}
+function showToast(event){
+  const shown=activityText(event);
+  const box=document.getElementById('toasts');
+  if(!shown||!box)return;
+  const live=[...box.children].filter(t=>!t.classList.contains('toast-out'));
+  const newest=live[0];
+  if(newest&&newest.dataset.text===shown.text){
+    const n=(+newest.dataset.count||1)+1;newest.dataset.count=n;
+    newest.querySelector('.toast-count').textContent=` ×${n}`;
+    clearTimeout(newest._timer);newest._timer=setTimeout(()=>hideToast(newest),TOAST_MS);
+    return;
+  }
+  const el=document.createElement('div');el.className='toast';el.dataset.text=shown.text;
+  el.textContent=`${shown.emoji} ${shown.text}`;
+  const count=document.createElement('span');count.className='toast-count';el.appendChild(count);
+  box.prepend(el);live.unshift(el);
+  el._timer=setTimeout(()=>hideToast(el),TOAST_MS);
+  while(live.length>TOAST_MAX)hideToast(live.pop());
+}
+function hideToast(el){
+  if(el.classList.contains('toast-out'))return;
+  clearTimeout(el._timer);el.classList.add('toast-out');
+  setTimeout(()=>el.remove(),400);
 }
 
 function drawQR(){
@@ -6945,7 +6856,7 @@ function fallbackToExternalQR(canvas, controllerUrl, accessCode) {
 // WebSocket connection for receiving commands
 let ws = null;
 let currentVersion = null; // Store current version to detect changes
-let appConfig = { showBehaviorEmoji: true }; // Store config from server
+let appConfig = {}; // Store config from server
 // uiStyle bepaalt de hele opzet, zodat elke stijl een getest geheel is:
 // - classic: balk bovenaan, QR-blok links, alle lijstjes
 // - minimal: geen balk, QR-bordje in de kom (met de voerstatus erop), geen lijstjes
@@ -6979,6 +6890,9 @@ function applyStyleLayout() {
 let fishSpeciesEnabled = false;
 // uiStyle 'minimal': compacte naamlabels, donkere panelen, QR-bordje in de kom (zie applyStyleLayout)
 let minimalUi = false;
+// Gedrag-emoji boven de vissen: wat in de config staat wint, anders volgt het de stijl (aan in
+// classic, uit in minimal, waar alleen staat wat je nodig hebt)
+let behaviorEmojiOn = true;
 let gameLoopStarted = false; // Track if game loop has been started
 let wsReconnectAttempts = 0; // Track reconnection attempts
 let wsConnectedOnce = false; // Track if we've successfully connected before
@@ -7213,6 +7127,7 @@ function handleRemoteCommand(data) {
                 fishSpeciesEnabled = appConfig.fishSpecies === true;
                 minimalUi = appConfig.uiStyle === 'minimal';
                 document.body.classList.toggle('ui-minimal', minimalUi);
+                behaviorEmojiOn = appConfig.showBehaviorEmoji !== undefined ? appConfig.showBehaviorEmoji === true : !minimalUi;
                 applyStyleLayout();
                 // Handle viewport config
                 if(data.config.viewport) {
@@ -7242,6 +7157,7 @@ function handleRemoteCommand(data) {
             console.log('🕐 Received recent activity:', data.events.length, 'events');
             recentActivity = data.events || [];
             drawActivityList();
+            showActivityToasts(recentActivity);
             break;
         default:
             // Handle regular commands
@@ -8462,6 +8378,28 @@ function drawFloater(fl,x,y,ang,roll,alpha,scale,now){
 }
 
 // === RACE SYSTEM ===
+// Race: elke vis heeft een eigen tempo dat om de 2-4 seconden verandert (een sprintje of een
+// dipje), en wie achterligt krijgt een duwtje dat groeit met de achterstand. Snelheid en
+// gezondheid tellen mee, maar ook een langzamere vis kan winnen en de leiding kan wisselen.
+const RACE_PACE_MIN=0.5,RACE_PACE_MAX=1.5,RACE_CATCHUP=4;
+function makeRaceRunner(fish){
+  const health=fish.health!==undefined?fish.health:100;
+  // speed loopt van 1.5 tot 3.0; sterk afgevlakt, anders ligt de uitslag bij de start al vast
+  return{base:(0.8+0.2*(fish.speed||2)/2.25)*(0.75+0.25*health/100),pace:1,targetPace:1,nextPaceAt:0,x:0};
+}
+// Snelheid in px/s; t is de tijd sinds de start in ms, nominal de snelheid van een gemiddelde vis
+function raceRunnerSpeed(r,leaderX,distance,nominal,t,dt){
+  if(t>=r.nextPaceAt){r.targetPace=RACE_PACE_MIN+Math.random()*(RACE_PACE_MAX-RACE_PACE_MIN);r.nextPaceAt=t+2000+Math.random()*2000}
+  r.pace+=(r.targetPace-r.pace)*Math.min(1,dt/400);
+  return nominal*r.base*r.pace*(1+RACE_CATCHUP*(leaderX-r.x)/distance);
+}
+// Start en finish gelden voor de neus, zoals bij de wanden en de bal: een pijlvis of een grote
+// vis steekt verder voor zijn midden uit dan een maanvis of een jong visje
+function raceNose(f){
+  const R=fishSpeciesEnabled?fishSpecies(f).species.reach:CLASSIC_FISH.reach;
+  return R[0]*fishSize(f,Date.now());
+}
+
 function startRace(fish1Name, fish2Name) {
   // Find the fish objects
   const fish1 = fishes.find(f => f.name === fish1Name);
@@ -8474,12 +8412,6 @@ function startRace(fish1Name, fish2Name) {
 
   console.log(`🏁 Race gestart: ${fish1Name} VS ${fish2Name}`);
 
-  // Calculate race speeds based on fish properties + random factor
-  const baseSpeed1 = (fish1.speed || 2) * ((fish1.health || 100) / 100);
-  const baseSpeed2 = (fish2.speed || 2) * ((fish2.health || 100) / 100);
-  const randomFactor1 = 0.7 + Math.random() * 0.6; // 0.7 - 1.3
-  const randomFactor2 = 0.7 + Math.random() * 0.6;
-
   // Setup race
   race.active = true;
   race.fish1 = fish1;
@@ -8488,10 +8420,13 @@ function startRace(fish1Name, fish2Name) {
   race.duration = 20500; // 5.5s setup + 15s race
   race.startX = W * 0.15; // Start at 15% from left
   race.finishX = W * 0.85; // Finish at 85% from left
-  race.fish1Speed = baseSpeed1 * randomFactor1;
-  race.fish2Speed = baseSpeed2 * randomFactor2;
-  race.fish1X = race.startX;
+  race.runner1 = makeRaceRunner(fish1);
+  race.runner2 = makeRaceRunner(fish2);
+  race.runner1.x = race.runner2.x = race.startX;
+  race.fish1X = race.startX; // neuzen; het midden van de vis ligt nose1/nose2 daarachter
   race.fish2X = race.startX;
+  race.nose1 = raceNose(fish1);
+  race.nose2 = raceNose(fish2);
   race.winner = null;
 
   // Calculate race Y positions (two lanes)
@@ -8504,13 +8439,13 @@ function startRace(fish1Name, fish2Name) {
   fish1.preRaceX = fish1.x;
   fish1.preRaceY = fish1.y;
   fish1.racing = true;
-  fish1.raceTargetX = race.startX;
+  fish1.raceTargetX = race.startX - race.nose1;
   fish1.raceTargetY = raceY1;
 
   fish2.preRaceX = fish2.x;
   fish2.preRaceY = fish2.y;
   fish2.racing = true;
-  fish2.raceTargetX = race.startX;
+  fish2.raceTargetX = race.startX - race.nose2;
   fish2.raceTargetY = raceY2;
 
   // Setup spectator positions for other fish
@@ -8542,7 +8477,7 @@ function updateRace(dt) {
 
     // Move race fish to start with velocity for swim animation
     if (race.fish1) {
-      const targetX = race.fish1.preRaceX + (race.startX - race.fish1.preRaceX) * easeProgress;
+      const targetX = race.fish1.preRaceX + (race.fish1.raceTargetX - race.fish1.preRaceX) * easeProgress;
       const targetY = race.fish1.preRaceY + (race.fish1Y - race.fish1.preRaceY) * easeProgress;
       race.fish1.vx = (targetX - race.fish1.x) * 0.1;
       race.fish1.vy = (targetY - race.fish1.y) * 0.1;
@@ -8551,7 +8486,7 @@ function updateRace(dt) {
       race.fish1.dir = 1; // Face right
     }
     if (race.fish2) {
-      const targetX = race.fish2.preRaceX + (race.startX - race.fish2.preRaceX) * easeProgress;
+      const targetX = race.fish2.preRaceX + (race.fish2.raceTargetX - race.fish2.preRaceX) * easeProgress;
       const targetY = race.fish2.preRaceY + (race.fish2Y - race.fish2.preRaceY) * easeProgress;
       race.fish2.vx = (targetX - race.fish2.x) * 0.1;
       race.fish2.vy = (targetY - race.fish2.y) * 0.1;
@@ -8579,14 +8514,14 @@ function updateRace(dt) {
     // Fish bob gently at start line
     const countdownTime = elapsed - 2000;
     if (race.fish1) {
-      race.fish1.x = race.startX;
+      race.fish1.x = race.fish1.raceTargetX;
       race.fish1.y = race.fish1Y + Math.sin(countdownTime * 0.005) * 8;
       race.fish1.vx = 0.5; // Small forward velocity for swim animation
       race.fish1.vy = Math.sin(countdownTime * 0.008) * 0.5;
       race.fish1.dir = 1;
     }
     if (race.fish2) {
-      race.fish2.x = race.startX;
+      race.fish2.x = race.fish2.raceTargetX;
       race.fish2.y = race.fish2Y + Math.sin(countdownTime * 0.006 + 1) * 8;
       race.fish2.vx = 0.5;
       race.fish2.vy = Math.sin(countdownTime * 0.009 + 1) * 0.5;
@@ -8609,28 +8544,23 @@ function updateRace(dt) {
   const raceElapsed = elapsed - setupDuration; // Time since race actually started
   const raceDuration = race.duration - setupDuration;
 
-  // Add some randomness to speed over time
-  const wobble1 = Math.sin(raceElapsed * 0.003) * 0.15;
-  const wobble2 = Math.sin(raceElapsed * 0.004 + 1) * 0.15;
-
-  // Update fish positions
-  const speed1 = race.fish1Speed * (1 + wobble1);
-  const speed2 = race.fish2Speed * (1 + wobble2);
-
-  // Normalize speeds so race takes roughly the full duration
-  const avgSpeed = (speed1 + speed2) / 2;
-  const normalizedSpeed1 = (speed1 / avgSpeed) * (raceDistance / raceDuration) * 1000;
-  const normalizedSpeed2 = (speed2 / avgSpeed) * (raceDistance / raceDuration) * 1000;
+  // Gemiddelde vis doet de race in ongeveer de geplande tijd
+  const nominal = raceDistance / (raceDuration / 1000) / ((race.runner1.base + race.runner2.base) / 2);
+  const leaderX = Math.max(race.fish1X, race.fish2X);
+  const speed1 = raceRunnerSpeed(race.runner1, leaderX, raceDistance, nominal, raceElapsed, dt);
+  const speed2 = raceRunnerSpeed(race.runner2, leaderX, raceDistance, nominal, raceElapsed, dt);
 
   // Calculate new X positions
-  const newX1 = Math.min(race.finishX, race.fish1X + normalizedSpeed1 * (dt / 1000));
-  const newX2 = Math.min(race.finishX, race.fish2X + normalizedSpeed2 * (dt / 1000));
+  const newX1 = Math.min(race.finishX, race.fish1X + speed1 * (dt / 1000));
+  const newX2 = Math.min(race.finishX, race.fish2X + speed2 * (dt / 1000));
+  race.runner1.x = newX1;
+  race.runner2.x = newX2;
 
   // Update fish with velocity for proper swim animation
   if (race.fish1) {
     race.fish1.vx = (newX1 - race.fish1X) * 60; // Convert to velocity
     race.fish1.vy = Math.sin(raceElapsed * 0.008) * 1.5; // Gentle vertical swimming
-    race.fish1.x = newX1;
+    race.fish1.x = newX1 - race.nose1;
     race.fish1.y = race.fish1Y + Math.sin(raceElapsed * 0.006) * 15; // Swimming wave
     race.fish1.dir = 1;
     race.fish1X = newX1;
@@ -8638,7 +8568,7 @@ function updateRace(dt) {
   if (race.fish2) {
     race.fish2.vx = (newX2 - race.fish2X) * 60;
     race.fish2.vy = Math.sin(raceElapsed * 0.009 + 1) * 1.5;
-    race.fish2.x = newX2;
+    race.fish2.x = newX2 - race.nose2;
     race.fish2.y = race.fish2Y + Math.sin(raceElapsed * 0.007 + 2) * 15;
     race.fish2.dir = 1;
     race.fish2X = newX2;

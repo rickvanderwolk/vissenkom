@@ -159,61 +159,10 @@
         }
 
         .section-header--care { color: #3ecf5c; }
-        .section-header--maintenance { color: #f39c12; }
         .section-header--play { color: #00bcd4; }
         .section-header--tank { color: #4a90e2; }
         .section-header--fish { color: #9b59b6; }
-
-        /* Status dashboard at top */
-        .status-dashboard {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(85px, 1fr));
-            gap: 10px;
-            margin-bottom: 32px;
-            padding: 16px;
-            background: rgba(0, 0, 0, 0.25);
-            border-radius: 16px;
-            border: 1px solid rgba(255, 255, 255, 0.08);
-        }
-
-        @media (max-width: 600px) {
-            .status-dashboard {
-                grid-template-columns: repeat(3, 1fr);
-                gap: 8px;
-                padding: 12px;
-            }
-
-            .status-dashboard .status-item {
-                font-size: 0.78em;
-            }
-        }
-
-        @media (max-width: 360px) {
-            .status-dashboard {
-                grid-template-columns: repeat(2, 1fr);
-            }
-        }
-
-        .status-dashboard .status-item {
-            text-align: center;
-            font-size: 0.85em;
-            line-height: 1.4;
-            min-width: 0;
-        }
-
-        .status-dashboard .status-item > div:first-child {
-            opacity: 0.7;
-            font-size: 0.85em;
-            margin-bottom: 2px;
-        }
-
-        .status-dashboard .status-item > div:last-child {
-            font-weight: 700;
-            font-size: 1em;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
+        .section-header--history { color: #50e3c2; }
 
         .controls-grid {
             display: grid;
@@ -305,66 +254,221 @@
         }
 
 
-        /* Fish hint box on Home tab */
-        .fish-hint-box {
+        /* Waarom een knop (nog) niet kan, klein onder de tekst */
+        .btn-note {
+            display: block;
+            font-size: 14px;
+            font-weight: 600;
+            opacity: 0.85;
+        }
+
+        .btn-note:empty {
+            display: none;
+        }
+
+        /* "Meer": spelen en de kom, standaard ingeklapt */
+        .more-section {
+            margin-top: 8px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            padding-top: 20px;
+        }
+
+        .more-summary {
+            list-style: none;
+            cursor: pointer;
+            text-align: center;
+            font-weight: 700;
+            font-size: 1.05em;
+            color: #50e3c2;
+            padding: 14px;
+            border-radius: 14px;
+            background: rgba(255, 255, 255, 0.06);
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .more-summary::-webkit-details-marker {
+            display: none;
+        }
+
+        .more-section[open] > .more-summary {
+            margin-bottom: 24px;
+        }
+
+        /* Dicht: "Meer", open: "Minder" */
+        .more-summary .when-open,
+        .more-section[open] > .more-summary .when-closed {
+            display: none;
+        }
+
+        .more-section[open] > .more-summary .when-open {
+            display: inline;
+        }
+
+        /* Over de kom: elk onderdeel een kaartje, net als de schakelaars */
+        .history-block {
+            margin-bottom: 14px;
+            padding: 14px 16px;
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            background: rgba(255, 255, 255, 0.06);
+        }
+
+        .history-block h4 {
+            margin: 0 0 6px 0;
+            font-size: 1em;
+            color: #50e3c2;
+        }
+
+        .history-list {
+            margin: 0;
+            padding: 0;
+            list-style: none;
+            font-size: 15px;
+            line-height: 1.4;
+        }
+
+        .history-list li {
+            padding: 8px 0;
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .history-list li:first-child {
+            border-top: none;
+        }
+
+        /* Sterren en legenden zijn een top drie: nummer ervoor */
+        ol.history-list {
+            counter-reset: rank;
+        }
+
+        ol.history-list li::before {
+            counter-increment: rank;
+            content: counter(rank) ". ";
+            opacity: 0.6;
+        }
+
+        /* Tegels voor alles wat je doet (verzorging en spelen): emoji boven de tekst, zodat ook
+           langere woorden in twee kolommen passen. Kleur per groep: groen verzorgen, cyaan spelen */
+        .tile-grid .control-button {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 2px;
+            line-height: 1.25;
+        }
+
+        .tile-grid .tile-emoji {
+            display: block;
+            font-size: 1.6em;
+            line-height: 1.2;
+        }
+
+        /* Nu in de kom: korte waarden naast elkaar in plaats van een lijst */
+        .now-chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 4px;
+        }
+
+        .now-chip {
+            padding: 6px 10px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.08);
+            font-size: 15px;
+            white-space: nowrap;
+        }
+
+        .history-more {
+            appearance: none;
+            margin-top: 8px;
+            padding: 10px 14px;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.06);
+            color: #e9f1f7;
+            font: inherit;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        /* Schakelaars: naam, stand in woorden en een schuifje, zoals in de instellingen van je telefoon */
+        .toggle-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .toggle-row {
+            appearance: none;
             display: flex;
             align-items: center;
             gap: 12px;
-            margin-bottom: 24px;
-            padding: 16px 18px;
-            background: linear-gradient(135deg, rgba(155, 89, 182, 0.15), rgba(142, 68, 173, 0.15));
-            border: 2px solid rgba(155, 89, 182, 0.3);
-            border-radius: 14px;
-            backdrop-filter: blur(10px);
-            -webkit-backdrop-filter: blur(10px);
-        }
-
-        .fish-hint-icon {
-            font-size: 28px;
-            flex-shrink: 0;
-            animation: gentle-bounce 2s ease-in-out infinite;
-        }
-
-        @keyframes gentle-bounce {
-            0%, 100% {
-                transform: translateY(0);
-            }
-            50% {
-                transform: translateY(-3px);
-            }
-        }
-
-        .fish-hint-text {
+            width: 100%;
+            min-height: 58px;
+            padding: 12px 18px;
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            background: rgba(255, 255, 255, 0.08);
             color: #e9f1f7;
-            font-size: 15px;
-            line-height: 1.5;
-            font-weight: 500;
-        }
-
-        .fish-hint-text strong {
-            color: #9b59b6;
+            font: inherit;
+            font-size: 17px;
             font-weight: 700;
-        }
-
-        .fish-hint-link {
-            color: #9b59b6;
-            font-weight: 700;
+            text-align: left;
             cursor: pointer;
-            text-decoration: underline;
-            text-decoration-thickness: 2px;
-            text-underline-offset: 2px;
-            transition: all 0.2s ease;
-            /* Mobile touch optimization */
-            -webkit-tap-highlight-color: rgba(155, 89, 182, 0.2);
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
         }
 
-        .fish-hint-link:hover {
-            color: #b370cf;
-            text-decoration-thickness: 3px;
+        .toggle-row:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
         }
 
-        .fish-hint-link:active {
-            color: #8e44ad;
+        .toggle-name {
+            flex: 1;
+        }
+
+        .toggle-state {
+            font-weight: 600;
+            opacity: 0.7;
+        }
+
+        .switch {
+            position: relative;
+            flex: none;
+            width: 52px;
+            height: 30px;
+            border-radius: 15px;
+            background: rgba(255, 255, 255, 0.2);
+            transition: background 0.2s ease;
+        }
+
+        .switch::after {
+            content: '';
+            position: absolute;
+            top: 3px;
+            left: 3px;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: #fff;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+            transition: transform 0.2s ease;
+        }
+
+        .toggle-row.on .switch {
+            background: #3ecf5c;
+        }
+
+        .toggle-row.on .switch::after {
+            transform: translateX(22px);
+        }
+
+        .toggle-row.on .toggle-state {
+            color: #3ecf5c;
+            opacity: 1;
         }
 
         .add-fish-container {
@@ -455,6 +559,18 @@
                 min-height: 58px;
             }
 
+            /* Spelen onder Meer: kleinere tegels in twee kolommen */
+            .controls-grid.tile-grid {
+                grid-template-columns: 1fr 1fr;
+                gap: 10px;
+            }
+
+            .tile-grid .control-button {
+                padding: 12px 8px;
+                font-size: 15px;
+                min-height: 84px;
+            }
+
             h1 {
                 font-size: 1.8em; /* Slightly smaller for small screens */
                 margin: 0 0 24px 0;
@@ -479,35 +595,21 @@
                 font-size: 1em;
             }
 
-            .fish-hint-box {
-                gap: 10px;
-                margin-bottom: 20px;
-                padding: 14px 16px;
-            }
 
-            .fish-hint-icon {
-                font-size: 24px;
-            }
 
-            .fish-hint-text {
-                font-size: 14px;
-            }
 
+            /* Naam en knop op één regel, zodat Voeren hoger op het scherm staat */
             .add-fish-container {
-                flex-direction: column; /* Stack vertically on mobile */
-                align-items: stretch;
+                flex-wrap: nowrap;
             }
 
             #fishNameInput {
-                min-width: unset; /* Remove min-width on mobile */
-                margin-bottom: 6px; /* Reduced from 10px to 6px */
+                min-width: 0; /* Remove min-width on mobile */
             }
 
             .add-fish-btn {
                 flex: none !important;
-                width: 100% !important; /* Full width on mobile */
-                padding: 15px !important;
-                margin-top: 6px; /* Reduced from 10px to 6px */
+                padding: 12px 16px !important;
             }
         }
 
@@ -610,19 +712,8 @@
             }
 
 
-            .fish-hint-box {
-                gap: 8px;
-                margin-bottom: 16px;
-                padding: 12px 14px;
-            }
 
-            .fish-hint-icon {
-                font-size: 22px;
-            }
 
-            .fish-hint-text {
-                font-size: 13px;
-            }
 
             #fishNameInput {
                 padding: 10px;
@@ -662,21 +753,6 @@
             box-shadow: 0 2px 8px rgba(62, 207, 92, 0.15) !important;
         }
 
-        .tank-button {
-            background: linear-gradient(135deg, #4a90e2, #357abd) !important;
-            box-shadow: 0 4px 16px rgba(74, 144, 226, 0.4), 0 2px 8px rgba(0, 0, 0, 0.2) !important;
-        }
-
-        @media (hover: hover) and (pointer: fine) {
-            .tank-button:hover {
-                box-shadow: 0 6px 24px rgba(74, 144, 226, 0.5), 0 3px 10px rgba(0, 0, 0, 0.25) !important;
-            }
-        }
-
-        .tank-button:disabled {
-            box-shadow: 0 2px 8px rgba(74, 144, 226, 0.15) !important;
-        }
-
         .fish-button {
             background: linear-gradient(135deg, #9b59b6, #8e44ad) !important;
             box-shadow: 0 4px 16px rgba(155, 89, 182, 0.4), 0 2px 8px rgba(0, 0, 0, 0.2) !important;
@@ -690,22 +766,6 @@
 
         .fish-button:disabled {
             box-shadow: 0 2px 8px rgba(155, 89, 182, 0.15) !important;
-        }
-
-        /* Maintenance button colors */
-        .maintenance-button {
-            background: linear-gradient(135deg, #f39c12, #e67e22) !important;
-            box-shadow: 0 4px 16px rgba(243, 156, 18, 0.4), 0 2px 8px rgba(0, 0, 0, 0.2) !important;
-        }
-
-        @media (hover: hover) and (pointer: fine) {
-            .maintenance-button:hover {
-                box-shadow: 0 6px 24px rgba(243, 156, 18, 0.5), 0 3px 10px rgba(0, 0, 0, 0.25) !important;
-            }
-        }
-
-        .maintenance-button:disabled {
-            box-shadow: 0 2px 8px rgba(243, 156, 18, 0.15) !important;
         }
 
         /* Play button */

@@ -68,11 +68,8 @@ let config = {
     showFooter: true,
     footerLink: 'https://github.com/rickvanderwolk/vissenkom',
     footerLinkText: 'View on GitHub',
-    showBehaviorEmoji: true,
-    showControllerStatusBlocks: false,
-    showAddFishTip: true,
     fishSpecies: false,
-    uiStyle: 'classic',
+    uiStyle: 'minimal',
     hungerRate: 0.167,
     diseaseRate: 0.083,
     viewport: {
@@ -867,6 +864,8 @@ function logEvent(type, data = {}) {
 
     // Broadcast updated activity list to all main apps
     broadcastRecentActivity();
+    // Controllers alleen een seintje: wie "Over de kom" open heeft, haalt het dan zelf op
+    controllers.forEach(client => sendToClient(client, { type: 'historyChanged' }));
 }
 
 function broadcastRecentActivity() {
@@ -1064,6 +1063,9 @@ function handleCommand(data, fromClient) {
             break;
         case 'getRecentActivity':
             sendRecentActivity(fromClient);
+            break;
+        case 'getHistory':
+            sendHistory(fromClient);
             break;
         case 'toggleHeating':
             handleToggleHeating();
@@ -1942,6 +1944,19 @@ function sendRecentActivity(client) {
     };
 
     sendToClient(client, activityMessage);
+}
+
+// "Over de kom" voor de controller: alleen op verzoek (als iemand Meer opent), want met
+// alle dode vissen erbij is het groter dan de gewone statusberichten
+function sendHistory(client) {
+    sendToClient(client, {
+        type: 'history',
+        data: {
+            living: appState.fishes.map(f => ({ name: f.name, bornAt: f.bornAt })),
+            dead: appState.deadLog.map(f => ({ name: f.name, bornAt: f.bornAt, diedAt: f.diedAt })),
+            events: eventLog.slice(-40)
+        }
+    });
 }
 
 // Note: Feed and medicine cooldown updates are now only sent when actions occur.
