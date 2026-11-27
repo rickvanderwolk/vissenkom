@@ -4,7 +4,7 @@ let lamps=[];let W=0,H=0;
 let viewportConfig={offsetTop:0,offsetBottom:0,offsetLeft:0,offsetRight:0};
 
 // === ADAPTIVE PERFORMANCE SYSTEM ===
-let performanceProfile={quality:'low',particleCount:0.4,detailLevel:0.7,skipFrames:0,fishUpdateRate:1};
+let performanceProfile={quality:'low',particleCount:0.4,detailLevel:0.7,fishUpdateRate:1};
 let fpsHistory=[];let frameCount=0;let lastFPSCheck=Date.now();
 // Cached background gradients (invalidated on resize/theme/light change)
 let cachedBgGrad=null;let cachedVignetteGrad=null;let cachedBgKey='';
@@ -28,10 +28,10 @@ function measureFPS(){
 }
 // Quality levels: 0=verylow, 1=low, 2=medium, 3=high
 const PERF_PROFILES=[
-  {quality:'verylow',particleCount:0.2,detailLevel:0.5,skipFrames:1,fishUpdateRate:1},
-  {quality:'low',particleCount:0.4,detailLevel:0.7,skipFrames:0,fishUpdateRate:1},
-  {quality:'medium',particleCount:0.7,detailLevel:0.85,skipFrames:0,fishUpdateRate:1},
-  {quality:'high',particleCount:1,detailLevel:1,skipFrames:0,fishUpdateRate:1}
+  {quality:'verylow',particleCount:0.2,detailLevel:0.5,fishUpdateRate:1},
+  {quality:'low',particleCount:0.4,detailLevel:0.7,fishUpdateRate:1},
+  {quality:'medium',particleCount:0.7,detailLevel:0.85,fishUpdateRate:1},
+  {quality:'high',particleCount:1,detailLevel:1,fishUpdateRate:1}
 ];
 let currentPerfLevel=1; // Start low, scale up based on device capability
 let lastTargetLevel=-1;
@@ -9093,14 +9093,7 @@ const now=Date.now();t++;
 measureFPS(); // Measure FPS for adaptive performance
 trackRafGap(frameTs);maybeSendPerfReport();
 
-// Skip frame if performance is low. Don't advance lastFrameTs here, so the skipped
-// frame's time carries into the next processed frame (keeps swim speed correct).
-if(performanceProfile.skipFrames>0&&t%2===0){
-  requestAnimationFrame(loop);
-  return;
-}
-
-// Time since the last *processed* frame. Clamped to 0.05s to prevent huge jumps.
+// Time since the previous frame. Clamped to 0.05s to prevent huge jumps.
 const dt=lastFrameTs?Math.max(0,Math.min(0.05,(frameTs-lastFrameTs)/1000)):1/60;lastFrameTs=frameTs;
 // Framerate-independent movement: scale per-frame motion to a 60fps baseline.
 // dt is clamped above, so frameScale caps at 3 (prevents teleporting on very low FPS).
