@@ -158,6 +158,12 @@ const server = http.createServer((req, res) => {
     const parsedUrl = new URL(req.url, `http://${req.headers.host}`);
     const pathname = parsedUrl.pathname;
 
+    if (pathname === '/perf') {
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
+        res.end(renderPerfPage());
+        return;
+    }
+
     if (pathname === '/' || pathname === '/index.html') {
         filePath = path.join(__dirname, 'index.html');
     } else if (pathname === '/controller' || pathname === '/controller.html') {
@@ -976,9 +982,14 @@ loadEventLog();
 
 
 function handleCommand(data, fromClient) {
-    console.log('Ontvangen commando:', data);
+    if (data.command !== 'reportPerf') {
+        console.log('Ontvangen commando:', data);
+    }
 
     switch (data.command) {
+        case 'reportPerf':
+            handleReportPerf(data.perf, fromClient);
+            break;
         case 'feed':
             handleFeed();
             break;
@@ -1399,6 +1410,63 @@ function handleReportPoop(poopCount) {
 
         // Auto-save will handle persistence (every 30s)
     }
+}
+
+// Latest perf summary from the main display, shown at /perf
+let lastPerfReport = null;
+
+function handleReportPerf(perf, fromClient) {
+    if (!mainApps.has(fromClient) || !perf || typeof perf !== 'object') return;
+    if (JSON.stringify(perf).length > 4096) return;
+    lastPerfReport = { perf, receivedAt: Date.now() };
+}
+
+function escapeHtml(value) {
+    return String(value).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+function renderPerfPage() {
+    let body;
+    if (!lastPerfReport) {
+        body = '<p>No report yet. The display sends one every 5 seconds once the tank is running.</p>';
+    } else {
+        const p = lastPerfReport.perf;
+        const ageSec = Math.round((Date.now() - lastPerfReport.receivedAt) / 1000);
+        const gaps = Array.isArray(p.rafGaps) ? p.rafGaps : [];
+        const total = gaps.reduce((a, b) => a + (Number(b) || 0), 0) || 1;
+        const labels = ['< 25 ms (every vblank)', '25-42 ms (every 2nd)', '42-58 ms (every 3rd)', '58-100 ms', '>= 100 ms (hitch)'];
+        const gapRows = labels.map((label, i) => {
+            const n = Number(gaps[i]) || 0;
+            return `<tr><td>${label}</td><td>${n}</td><td>${Math.round(n / total * 100)}%</td></tr>`;
+        }).join('');
+        const rows = [
+            ['Report age', `${ageSec} s`],
+            ['Quality', `${p.quality} (level ${p.level})`],
+            ['FPS', `${p.fps} (avg ${p.avgFps})`],
+            ['JS frame time', `${p.frameMsAvg} ms (max ${p.frameMsMax} ms)`],
+            ['Longest gap', `${p.rafGapMax} ms`],
+            ['Canvas', p.canvas],
+            ['Window', p.window],
+            ['Screen', `${p.screen} @ dpr ${p.dpr}`],
+            ['GPU', p.gpu],
+            ['Tab hidden', p.hidden],
+            ['Theme', p.theme],
+            ['Fish', p.fish],
+            ['Lights / disco', `${p.lights} / ${p.disco}`],
+            ['Uptime', `${p.uptimeMin} min`],
+            ['User agent', p.ua]
+        ].map(([k, v]) => `<tr><th>${escapeHtml(k)}</th><td>${escapeHtml(v)}</td></tr>`).join('');
+        body = `<table>${rows}</table>
+<h2>Frame gaps (last ${escapeHtml(p.windowSec)} s)</h2>
+<table><tr><th>Gap</th><th>Frames</th><th>Share</th></tr>${gapRows}</table>`;
+    }
+    return `<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="refresh" content="5"><title>Vissenkom perf</title>
+<style>body{font:16px/1.4 system-ui,sans-serif;margin:16px;background:#111;color:#eee}
+table{border-collapse:collapse;width:100%;margin-bottom:16px}th,td{text-align:left;padding:6px 8px;border-bottom:1px solid #333;vertical-align:top;word-break:break-word}
+th{color:#9cf;font-weight:600}h1{font-size:1.3rem}h2{font-size:1.1rem}</style></head>
+<body><h1>Vissenkom perf</h1>${body}</body></html>`;
 }
 
 function handleReportWaterGreenness(waterGreenness) {

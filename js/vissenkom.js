@@ -171,6 +171,54 @@ function hideStats(){
 }
 window.showStats=showStats;
 
+// === REMOTE PERF REPORT ===
+// The display sends a perf summary to the server every few seconds, readable at
+// /perf (e.g. on a phone) for kiosks without a keyboard. rafGaps counts the time
+// between requestAnimationFrame callbacks, which reflects what actually reaches
+// the screen better than the FPS counter: at 60Hz, 17ms = every vblank,
+// 33ms = every 2nd, 50ms = every 3rd. A mix of buckets means uneven motion.
+const RAF_GAP_BUCKETS=[25,42,58,100]; // upper bounds in ms; last bucket is >=100
+let rafGaps=[0,0,0,0,0];let rafGapMax=0;let lastRafTs=0;
+let lastPerfReport=Date.now();let gpuInfo=null;const perfStartedAt=Date.now();
+function trackRafGap(ts){
+  if(lastRafTs){
+    const d=ts-lastRafTs;let b=0;
+    while(b<RAF_GAP_BUCKETS.length&&d>=RAF_GAP_BUCKETS[b])b++;
+    rafGaps[b]++;if(d>rafGapMax)rafGapMax=d;
+  }
+  lastRafTs=ts;
+}
+function getGpuInfo(){
+  try{
+    const c=document.createElement('canvas');const gl=c.getContext('webgl');
+    if(!gl)return 'no webgl';
+    const ext=gl.getExtension('WEBGL_debug_renderer_info');
+    const r=ext?gl.getParameter(ext.UNMASKED_RENDERER_WEBGL):gl.getParameter(gl.RENDERER);
+    const lose=gl.getExtension('WEBGL_lose_context');if(lose)lose.loseContext();
+    return String(r);
+  }catch(e){return 'error'}
+}
+function maybeSendPerfReport(){
+  const now=Date.now();
+  if(now-lastPerfReport<5000)return;
+  if(gpuInfo===null)gpuInfo=getGpuInfo();
+  const avg=a=>a.length?a.reduce((x,y)=>x+y,0)/a.length:0;
+  sendToServer({command:'reportPerf',perf:{
+    quality:performanceProfile.quality,level:currentPerfLevel,
+    fps:fpsHistory.length?fpsHistory[fpsHistory.length-1]:0,
+    avgFps:Math.round(avg(fpsHistory)*10)/10,
+    frameMsAvg:Math.round(avg(frameTimeHistory)*10)/10,
+    frameMsMax:Math.round((frameTimeHistory.length?Math.max(...frameTimeHistory):0)*10)/10,
+    rafGaps:rafGaps.slice(),rafGapMax:Math.round(rafGapMax),windowSec:Math.round((now-lastPerfReport)/1000),
+    canvas:`${cv.width}x${cv.height}`,window:`${innerWidth}x${innerHeight}`,
+    screen:`${screen.width}x${screen.height}`,dpr:devicePixelRatio,
+    gpu:gpuInfo,ua:navigator.userAgent,hidden:document.hidden,
+    theme:currentTheme,fish:fishes.length,lights:lightsOn,disco:discoOn,
+    uptimeMin:Math.round((now-perfStartedAt)/60000)
+  }});
+  rafGaps=[0,0,0,0,0];rafGapMax=0;lastPerfReport=now;
+}
+
 // === OBJECT POOLING ===
 const bubblePool=[];const particlePool=[];
 function getBubble(){
@@ -222,7 +270,7 @@ const fireworks=[]; // Nieuwjaar vuurwerk
 let recentActivity=[];
 let playedAudioEvents=new Set(); // Track welke events al audio hebben afgespeeld
 let plingAudio=null; // Herbruikbaar audio object voor pling geluid
-let lastFed=0;let lastMedicine=0;let feedCooldown=60*60*1000;let medicineCooldown=24*60*60*1000;let fishCounter=1;let lastT=Date.now();let TOP_N=3;let lastSeenSeq=0;
+let lastFed=0;let lastMedicine=0;let feedCooldown=60*60*1000;let medicineCooldown=24*60*60*1000;let fishCounter=1;let lastFrameTs=0;let TOP_N=3;let lastSeenSeq=0;
 let lightsOn=true;let lightRaw=1;let lightLevel=1;let discoOn=false;let pumpOn=false;let heatingOn=true;const pumpPos={x:0,y:0};let pumpJustOnUntil=0;
 let discoBall={x:0,y:0,targetY:0,rotation:0,deployed:false,deployStart:0,deployDuration:2500,undeploying:false,undeployStart:0};
 let fishingRod={x:0,y:0,targetY:0,deployed:false,deployStart:0,deployDuration:2000,state:'idle',caughtFish:null,reelingStart:0,showCatchStart:0,baitSwing:0,retractStart:0};
@@ -9031,17 +9079,21 @@ function hideLoadingIndicator() {
 function init(){document.getElementById('tank').style.background=BG;document.body.classList.add('dark');document.body.classList.remove('light');lightsOn=true;resize();updateCooldown();updateStatusBar();drawLists();drawActivityList();showLoadingIndicator();initWebSocket()}
 init();
 
-function loop(){
+function loop(rafTs){
 const frameStart=performance.now();
 // Stop loop if game is not active (e.g., vissenkom already active elsewhere)
 if(!gameLoopStarted){
   return;
 }
+// rAF timestamp = when this frame is meant to be shown. Steadier than reading the
+// clock at callback start, which jitters with whatever ran before the callback.
+const frameTs=typeof rafTs==='number'?rafTs:frameStart;
 
 const now=Date.now();t++;
 measureFPS(); // Measure FPS for adaptive performance
+trackRafGap(frameTs);maybeSendPerfReport();
 
-// Skip frame if performance is low. Don't advance lastT here, so the skipped
+// Skip frame if performance is low. Don't advance lastFrameTs here, so the skipped
 // frame's time carries into the next processed frame (keeps swim speed correct).
 if(performanceProfile.skipFrames>0&&t%2===0){
   requestAnimationFrame(loop);
@@ -9049,7 +9101,7 @@ if(performanceProfile.skipFrames>0&&t%2===0){
 }
 
 // Time since the last *processed* frame. Clamped to 0.05s to prevent huge jumps.
-const dt=Math.min(0.05,(now-lastT)/1000);lastT=now;
+const dt=lastFrameTs?Math.max(0,Math.min(0.05,(frameTs-lastFrameTs)/1000)):1/60;lastFrameTs=frameTs;
 // Framerate-independent movement: scale per-frame motion to a 60fps baseline.
 // dt is clamped above, so frameScale caps at 3 (prevents teleporting on very low FPS).
 frameScale=dt*60;
